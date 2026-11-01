@@ -8,22 +8,33 @@
 // resizing, adding and removing cards), each card's period picker, and saving.
 // What a card draws is dashcards.js's business, where a card may go is
 // widgets/dashgrid.js's, and what a period means is widgets/dashperiod.js's.
+// The page is drawn in Ant Design (ant.css, ant.js): line Tabs with Customize
+// as their extra content, small Cards, and while customizing editable-card
+// Tabs, the layout's name, Add widgets (a Drawer of the widgets), Cancel and
+// Save.
 //
 // SAVING. Layouts live in the database (GET/PUT /api/dashboard, handlers/
 // dashboard.js), and one PUT carries every layout. Outside Customize a change
 // (a card's period, a chip, the open tab) saves itself a moment later. Inside
-// Customize nothing is saved until Save, and every step in between can be
-// undone. A database
+// Customize nothing is saved until Save; Cancel puts every layout back as it
+// was, and every step in between can be undone (Ctrl+Z, Ctrl+Y). A database
 // that never saved a layout gets the Overview layout, the Dashboard as it
 // was before layouts existed. If the saved layouts cannot be read, the default
 // is shown and nothing is saved, so a failed read can never overwrite them.
 //
 // EVERY CARD OWNS ITS PERIOD. The picker in the card's header row sets it; there
-// is no page-wide date. A card may also wear a colour (the square beside its
-// period, chosen from COLORS). Cards on one layout that wear the same colour are
-// LINKED: they share a period, so changing it on one changes it on the rest
-// (those that offer the chosen preset). Joining a colour takes on the period of
-// the cards already wearing it.
+// is no page-wide date. A card may also wear a colour (chosen in the picker's
+// footer, from COLORS, and shown as a dot and an edge on its period control).
+// Cards on one layout that wear the same colour are LINKED: they share a
+// period, so changing it on one changes it on the rest (those that offer the
+// chosen preset). Joining a colour takes on the period of the cards already
+// wearing it.
+//
+// ARRANGING. While customizing, a card is moved by dragging it and resized by
+// dragging its corner; the cards around it make room as it goes, by the rule in
+// widgets/dashgrid.js. A focused card moves with the arrow keys and resizes with
+// Shift and the arrows. A widget is added from the Drawer with its Add button,
+// or dragged out of the Drawer onto the grid.
 //
 // DRAWING. A card is drawn for the box the grid gives it. A ResizeObserver on
 // each card body redraws it when that box changes, without the entrance; the
@@ -53,25 +64,7 @@
     const STACK_BELOW = 640;        // canvas width under which cards stack in one column
     const SAVE_DELAY = 600;
     const UNDO_DEPTH = 60;
-    const VIEW_KEY = 'dashboard';   // ViewState slot: which widget groups are collapsed
     const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
-
-    // Phosphor glyphs (static/icons/Phosphor), inlined like every icon in the app.
-    const ph = (d) => `<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="${d}"></path></svg>`;
-    const stroke = (inner) => `<svg viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
-    const ICONS = {
-        plus: ph('M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z'),
-        link: ph('M240,88.23a54.43,54.43,0,0,1-16,37L189.25,160a54.27,54.27,0,0,1-38.63,16h-.05A54.63,54.63,0,0,1,96,119.84a8,8,0,0,1,16,.45A38.62,38.62,0,0,0,150.58,160h0a38.39,38.39,0,0,0,27.31-11.31l34.75-34.75a38.63,38.63,0,0,0-54.63-54.63l-11,11A8,8,0,0,1,135.7,59l11-11A54.65,54.65,0,0,1,224,48,54.86,54.86,0,0,1,240,88.23ZM109,185.66l-11,11A38.41,38.41,0,0,1,70.6,208h0a38.63,38.63,0,0,1-27.29-65.94L78,107.31A38.63,38.63,0,0,1,144,135.71a8,8,0,0,0,16,.45A54.86,54.86,0,0,0,144,96a54.65,54.65,0,0,0-77.27,0L32,130.75A54.62,54.62,0,0,0,70.56,224h0a54.28,54.28,0,0,0,38.64-16l11-11A8,8,0,0,0,109,185.66Z'),
-        trash: ph('M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z'),
-        dots: ph('M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128Zm56-12a12,12,0,1,0,12,12A12,12,0,0,0,196,116ZM60,116a12,12,0,1,0,12,12A12,12,0,0,0,60,116Z'),
-        gear: ph('M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z'),
-        sliders: stroke('<path d="M40 80h40M136 80h80M40 176h104M200 176h16"/><circle cx="108" cy="80" r="24"/><circle cx="172" cy="176" r="24"/>'),
-        check: stroke('<path d="M56 136l44 44 100-104"/>'),
-        // The six-dot drag handle of the Categories editor (settingsCategories.js).
-        grip: '<svg viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>',
-        chevron: '<svg class="cat-group-chevron" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg>',
-        tick: '<svg class="tx-pop-check" viewBox="0 0 20 20" fill="none"><path d="M5 10.5l3.5 3.5L15 6.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    };
 
     // ─── State ───────────────────────────────────────────────────────────────
     let state = { active: null, layouts: [] };
@@ -79,13 +72,13 @@
         loaded: false,
         canSave: true,       // false once the saved layouts could not be read
         editing: false,
+        base: null,          // the layouts as Customize found them, for Cancel
         undo: [],
         redo: [],
-        drawerOpen: false,
         stacked: false,
     };
     const dom = {};
-    const live = new Map();  // card id → { el, body, key, data, loading, error, size, sig }
+    const live = new Map();  // card id → { el, body, key, data, loading, error, size, sig, chrome }
 
     const clone = (v) => JSON.parse(JSON.stringify(v));
     const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -100,6 +93,7 @@
     const resolvePeriod = (card) => DashPeriod.resolve(card.period);
     const samePeriod = (a, b) => a.preset === b.preset && a.month === b.month;
     const defaultSize = (def) => def.sizes.M || Object.values(def.sizes)[0];
+    const thisMonth = () => DashPeriod.formatMonth({ year: new Date().getFullYear(), monthIdx: new Date().getMonth() });
 
     /** A card as this build draws it: a known type, settings over the type's
      *  defaults, a period the type offers, and a box inside the grid at no less
@@ -210,11 +204,11 @@
 
     /** Save now. Writes go out one at a time, in order, so a slow save can never
      *  land after a newer one. A failure says so and keeps what is on screen;
-     *  the next change saves everything again. */
+     *  the next change saves everything again. Resolves true when it saved. */
     function saveNow() {
         clearTimeout(saveTimer);
         saveTimer = 0;
-        if (!ui.canSave) return saveChain;
+        if (!ui.canSave) return saveChain.then(() => false);
         const body = JSON.stringify(payload());
         saveChain = saveChain.then(async () => {
             try {
@@ -224,9 +218,11 @@
                     body,
                 });
                 if (!r.ok) throw new Error(`PUT /api/dashboard answered ${r.status}`);
+                return true;
             } catch (err) {
                 console.error('[dashboard] could not save the layouts', err);
-                UI.toast('Could not save the dashboard', { type: 'error' });
+                Ant.message.error('Could not save the dashboard');
+                return false;
             }
         });
         return saveChain;
@@ -255,7 +251,7 @@
         } catch (err) {
             console.error('[dashboard] could not read the saved layouts; showing the default', err);
             ui.canSave = false;
-            UI.toast('Could not load your saved dashboard', { type: 'error' });
+            Ant.message.error('Could not load your saved dashboard');
         }
         const overview = overviewLayout();
         return { active: overview.id, layouts: [overview] };
@@ -265,35 +261,65 @@
     function enterEdit() {
         if (ui.editing || !ui.loaded) return;
         if (saveTimer) saveNow();
-        closePopover();
+        closePop();
         hideChartTip();
         ui.editing = true;
+        ui.base = clone(state);
         ui.undo = [];
         ui.redo = [];
         dom.root.classList.add('is-editing');
-        openDrawer();
+        const hadFocus = dom.actions.contains(document.activeElement);
+        buildControls();
         renderAll();
-        announce('Customizing. Drag a card to move it, drag its corner to resize it, or focus it and use the arrow keys.');
+        if (hadFocus) dom.actions.querySelector('[data-act="widgets"]').focus();
+        announce('Customizing. Drag a card to move it, drag its corner to resize it, or focus it and use the arrow keys. Add widgets opens the widget list.');
     }
 
-    function exitEdit() {
+    /** Whether Customize has changed any layout since it began. */
+    const editsMade = () => !!ui.base && JSON.stringify(ui.base.layouts) !== JSON.stringify(state.layouts);
+
+    /** End Customize. `keep` saves what it changed; otherwise every layout goes
+     *  back to how Customize found it. */
+    function exitEdit(keep) {
         if (!ui.editing) return;
         endGesture(false);
         endLibraryDrag(false);
-        closePopover();
-        const changed = ui.undo.length > 0;
+        closePop();
+        closeDrawer();
+        const changed = editsMade();
+        if (!keep && changed) {
+            const back = ui.base;
+            state = { active: back.layouts.some((l) => l.id === state.active) ? state.active : back.active, layouts: back.layouts };
+        }
+        const refocus = dom.actions.contains(document.activeElement) || dom.tabs.contains(document.activeElement);
         ui.editing = false;
+        ui.base = null;
         ui.undo = [];
         ui.redo = [];
         dom.root.classList.remove('is-editing');
-        const refocus = dom.drawer.contains(document.activeElement);
-        closeDrawer();
+        buildControls();
         renderAll();
         if (refocus) dom.customize.focus();
-        if (changed) {
-            saveNow();
-            UI.toast('Layout saved');
+        if (keep && changed) {
+            saveNow().then((ok) => { if (ok) Ant.message.success('Dashboard saved'); });
+        } else {
+            // Switching tabs inside Customize is not an edit, but it is where
+            // the page now stands.
+            saveSoon();
+            if (!keep && changed) announce('Changes discarded');
         }
+    }
+
+    /** Cancel: straight out when nothing changed, else after a Popconfirm. */
+    async function cancelEdit(anchor) {
+        if (!editsMade()) { exitEdit(false); return; }
+        const ok = await Ant.popconfirm(anchor, {
+            title: 'Discard your changes?',
+            desc: 'Every layout goes back to how it was before you customized.',
+            okText: 'Discard',
+            danger: true,
+        });
+        if (ok) exitEdit(false);
     }
 
     /** Record the layouts before a change, so it can be undone. */
@@ -309,16 +335,11 @@
         to.push(clone(state));
         state = from.pop();
         renderAll();
+        syncNameInput();
         announce(message);
     }
     const undo = () => travel(ui.undo, ui.redo, 'Undone');
     const redo = () => travel(ui.redo, ui.undo, 'Redone');
-
-    /** An Undo for a toast: undoes the change that pushed `mark`, and nothing if
-     *  another change has been made since or Customize has ended. */
-    const undoTo = (mark) => () => {
-        if (ui.editing && ui.undo[ui.undo.length - 1] === mark) undo();
-    };
 
     // ─── Geometry ────────────────────────────────────────────────────────────
     const geo = { width: 0, colW: 0 };
@@ -391,60 +412,128 @@
     const hidePlaceholder = () => { dom.placeholder.hidden = true; };
 
     // ─── Cards ───────────────────────────────────────────────────────────────
+    // A card is Ant's small Card: the title (with the drag handle while
+    // customizing, and the info tip otherwise) and the extra content (the gear,
+    // an inline Segmented, the period control, and Remove while customizing)
+    // over the body the widget draws into.
     function createCardEl(card) {
         const el = document.createElement('article');
-        el.className = 'dashboard-card dash-card';
+        el.className = 'dash-card ant-card ant-card-small';
         el.dataset.id = card.id;
         el.dataset.type = card.type;
         el.innerHTML = `
-            <header class="dashboard-card-header dash-card-head">
-                <span class="dash-grip" aria-hidden="true">${ICONS.grip}</span>
-                <h2 class="dashboard-card-title dash-card-title"></h2>
-                <div class="dash-card-controls">
-                    <button type="button" class="card-gear-btn" data-act="gear" aria-haspopup="dialog" aria-expanded="false" hidden>${ICONS.gear}</button>
-                    <div class="range-selector dash-period">
-                        <button type="button" class="range-selector-btn dash-period-btn" data-act="period" aria-haspopup="dialog" aria-expanded="false"></button>
+            <header class="ant-card-head dash-card-head">
+                <div class="ant-card-head-wrapper">
+                    <div class="ant-card-head-title dash-card-title">
+                        <span class="dash-grip" aria-hidden="true">${Ant.icon('holder')}</span>
+                        <h2 class="dash-card-name"></h2>
+                    </div>
+                    <div class="ant-card-extra dash-card-controls">
+                        <button type="button" class="ant-btn ant-btn-text ant-btn-sm ant-btn-icon-only dash-gear" data-act="gear"
+                            aria-haspopup="dialog" aria-expanded="false" hidden>${Ant.icon('setting')}</button>
+                        <div class="dash-inline"></div>
+                        <div class="dash-period"></div>
+                        <button type="button" class="ant-btn ant-btn-text ant-btn-dangerous ant-btn-sm ant-btn-icon-only dash-remove"
+                            data-act="remove" data-tip="Remove from layout">${Ant.icon('close')}</button>
                     </div>
                 </div>
             </header>
-            <div class="dash-card-body"></div>
-            <div class="dash-card-tools" role="toolbar" aria-label="Card tools">
-                <button type="button" class="dash-tool" data-act="remove" title="Remove" aria-label="Remove card">${ICONS.trash}</button>
-            </div>
+            <div class="ant-card-body dash-card-body"></div>
             <span class="dash-resize" aria-hidden="true"></span>`;
         return el;
     }
 
-    /** The header: title and info tip, the period button, and the gear when the
-     *  card has one. Rewritten only when what it shows has changed. */
+    /** The period control's markup for its kind: for a single month,
+     *  DatePicker's trigger between a previous and a next month button
+     *  (Space.Compact); for a range or a look-ahead, a small button reading the
+     *  period with Dropdown's caret. Both open the period picker, and both
+     *  carry the link colour as a dot before the period and their edge. On a
+     *  narrow card the arrows go and a range reads by its short name (YTD, 6M)
+     *  instead of its dates (dashboard.css). */
+    function periodControlSkeleton(kind) {
+        const trigger = 'data-act="period" aria-haspopup="dialog" aria-expanded="false"';
+        const dot = '<span class="dash-link-dot" aria-hidden="true" hidden></span>';
+        if (kind === 'month') {
+            return `<div class="ant-space-compact dash-period-month" role="group">
+                <button type="button" class="ant-btn ant-btn-default ant-btn-sm ant-btn-icon-only dash-step" data-act="month-prev"
+                    aria-label="Previous month">${Ant.icon('left')}</button>
+                <button type="button" class="ant-picker dash-period-btn" ${trigger}>${dot}<span class="ant-picker-input"></span>
+                    <span class="ant-picker-suffix">${Ant.icon('calendar')}</span></button>
+                <button type="button" class="ant-btn ant-btn-default ant-btn-sm ant-btn-icon-only dash-step" data-act="month-next"
+                    aria-label="Next month">${Ant.icon('right')}</button>
+            </div>`;
+        }
+        return `<button type="button" class="ant-btn ant-btn-default ant-btn-sm dash-period-btn" ${trigger}>${dot}<span class="dash-period-long"></span><span class="dash-period-short"></span>${Ant.icon('down')}</button>`;
+    }
+
+    /** Bring a card's period control in line with its period and colour. It
+     *  is rebuilt only when its kind changes, so an open picker stays hung
+     *  from the same trigger while its choices redraw it. */
+    function syncPeriodControl(host, card, period, title) {
+        const kind = period.kind === 'month' ? 'month' : 'menu';
+        if (host.dataset.kind !== kind) {
+            host.innerHTML = periodControlSkeleton(kind);
+            host.dataset.kind = kind;
+        }
+        const btn = host.querySelector('[data-act="period"]');
+        btn.title = period.label;
+        btn.setAttribute('aria-label', `${title} period: ${period.label}${card.color ? `, ${COLORS[card.color]} link` : ''}`);
+        const dot = btn.querySelector('.dash-link-dot');
+        dot.hidden = !card.color;
+        if (card.color) {
+            btn.dataset.color = card.color;
+            dot.dataset.color = card.color;
+        } else {
+            delete btn.dataset.color;
+        }
+        if (kind === 'month') {
+            btn.querySelector('.ant-picker-input').textContent = period.short;
+            host.firstElementChild.setAttribute('aria-label', `${title} month`);
+            host.querySelector('[data-act="month-next"]').disabled = DashPeriod.formatMonth(period.first) >= thisMonth();
+        } else {
+            const compact = period.kind === 'range' ? DashPeriod.PRESETS[period.preset].short : period.short;
+            btn.classList.toggle('has-short', compact !== period.short);
+            btn.querySelector('.dash-period-long').textContent = period.short;
+            btn.querySelector('.dash-period-short').textContent = compact;
+        }
+    }
+
+    /** The header: title and info tip, the period control, and an inline field
+     *  when the card has one. Rewritten only when what it shows has changed. */
     function syncChrome(rt, card) {
         const def = TYPES[card.type];
         const title = cardTitle(card);
         const period = resolvePeriod(card);
-        const sig = `${title}\u0000${period.short}\u0000${period.label}\u0000${card.color || ''}`;
+        const inline = def.fields.find((f) => f.inline);
+        const sig = [title, period.short, period.label, card.color || '', inline ? card.settings[inline.key] : ''].join('\u0000');
         if (rt.chrome === sig) return;
         rt.chrome = sig;
-        const info = def.info
-            ? `<span class="fc-info" tabindex="0" role="note" aria-label="${escapeHtml(def.info)}" data-tip="${escapeHtml(def.info)}">i</span>`
-            : '';
-        rt.el.querySelector('.dash-card-title').innerHTML = `<span class="dash-card-name">${escapeHtml(title)}</span>${info}`;
-        // The dates, and for a range or a look-ahead its short name as well,
-        // which narrow cards show instead (dashboard.css §3).
-        const compact = period.kind === 'month' ? period.short : DashPeriod.PRESETS[period.preset].short;
-        const btn = rt.el.querySelector('[data-act="period"]');
-        btn.closest('.dash-period').hidden = !!def.noPeriod;
+        const name = rt.el.querySelector('.dash-card-name');
+        name.textContent = title;
+        rt.el.querySelector('.ant-info-tip')?.remove();
+        if (def.info) {
+            name.insertAdjacentHTML('afterend', `<span class="ant-info-tip" tabindex="0" role="img" aria-label="${escapeHtml(def.info)}"
+                data-tip="${escapeHtml(def.info)}">${Ant.icon('info-circle-outlined')}</span>`);
+        }
+        rt.el.querySelector('.dash-remove').setAttribute('aria-label', `Remove ${title}`);
+
+        // The inline field (Recent Transactions' Show): Ant's small Segmented.
+        const inlineHost = rt.el.querySelector('.dash-inline');
+        inlineHost.hidden = !inline;
+        inlineHost.innerHTML = inline ? `<div class="ant-segmented ant-segmented-sm" role="group" aria-label="${escapeHtml(inline.label)}">${inline.options.map(([value, label, hint]) => {
+            const on = String(card.settings[inline.key]) === value;
+            return `<button type="button" class="ant-segmented-item" aria-pressed="${on}" data-field="${escapeHtml(inline.key)}"
+                data-value="${escapeHtml(value)}" title="${escapeHtml(hint || label)}">${escapeHtml(label)}</button>`;
+        }).join('')}</div>` : '';
+
+        const periodHost = rt.el.querySelector('.dash-period');
+        periodHost.hidden = !!def.noPeriod;
         if (def.noPeriod) {
             rt.el.setAttribute('aria-label', title);
             return;
         }
-        btn.classList.toggle('has-short', compact !== period.short);
-        btn.innerHTML = `<span class="dash-period-long">${escapeHtml(period.short)}</span>`
-            + (compact !== period.short ? `<span class="dash-period-short">${escapeHtml(compact)}</span>` : '')
-            + UI.PICKER_CARET;
-        btn.title = period.label;
-        btn.setAttribute('aria-label', `${title} period: ${period.label}${card.color ? `, ${COLORS[card.color]} link` : ''}`);
+        syncPeriodControl(periodHost, card, period, title);
         rt.el.setAttribute('aria-label', `${title}, ${period.label}`);
-        if (card.color) btn.dataset.color = card.color; else delete btn.dataset.color;
     }
 
     /** The card's own checkbox list, once its data gives it one; else null. */
@@ -453,15 +542,19 @@
         return gear && rt && rt.data !== undefined && !rt.error && gear.available({ card, data: rt.data }) ? gear : null;
     }
 
+    /** The settings that live in the gear: every field that is not inline. */
+    const gearFields = (def) => def.fields.filter((f) => !f.inline);
+
     /** The gear shows when the card has settings fields or a list to offer. */
     function syncGear(rt, card) {
         const def = TYPES[card.type];
         const list = gearList(card, rt);
         const btn = rt.el.querySelector('[data-act="gear"]');
-        btn.hidden = !list && def.fields.length === 0;
+        btn.hidden = !list && gearFields(def).length === 0;
         if (btn.hidden) return;
-        btn.title = list ? list.title : 'Settings';
-        btn.setAttribute('aria-label', list ? list.label : `${def.name} settings`);
+        const label = list ? list.label : `${def.name} settings`;
+        btn.dataset.tip = list ? list.title : 'Settings';
+        btn.setAttribute('aria-label', label);
     }
 
     /** What a card's data depends on: its type and its period. Settings change
@@ -526,7 +619,7 @@
         if (w < 24 || h < 24) return;
         if (hover.body === rt.body) hideChartTip();
         if (rt.error) {
-            rt.body.innerHTML = UI.emptyState({ icon: null, compact: true, title: 'Could not load this card' });
+            rt.body.innerHTML = Ant.empty({ compact: true, title: 'Could not load this card' });
         } else {
             const def = TYPES[card.type];
             try {
@@ -534,7 +627,7 @@
                 if (animate) holdEntrance(rt.body);
             } catch (err) {
                 console.error(`[dashboard] ${card.type} could not draw`, err);
-                rt.body.innerHTML = UI.emptyState({ icon: null, compact: true, title: 'Could not draw this card' });
+                rt.body.innerHTML = Ant.empty({ compact: true, title: 'Could not draw this card' });
             }
         }
         syncGear(rt, card);
@@ -639,136 +732,116 @@
     }
 
     // ─── Toolbar ─────────────────────────────────────────────────────────────
+    // The layouts are line Tabs; while customizing they are editable cards,
+    // each with a × (when there is another layout to fall back on) and the +
+    // after the last. The extra content is Customize, or while customizing the
+    // open layout's name, Add widgets, Cancel and Save.
     function renderTabs() {
+        const many = state.layouts.length > 1;
         const tabs = state.layouts.map((l) => {
             const on = l.id === state.active;
-            return `<button type="button" class="dash-tab" role="tab" data-layout="${escapeHtml(l.id)}"
-                aria-selected="${on}" tabindex="${on ? 0 : -1}">${escapeHtml(l.name)}</button>`;
+            const id = escapeHtml(l.id);
+            const tab = `role="tab" data-layout="${id}" aria-selected="${on}" tabindex="${on ? 0 : -1}"`;
+            if (!ui.editing) return `<button type="button" class="ant-tabs-tab dash-tab" ${tab}>${escapeHtml(l.name)}</button>`;
+            return `<div class="ant-tabs-tab"><button type="button" class="ant-tabs-tab-btn dash-tab" ${tab}>${escapeHtml(l.name)}</button>${many
+                ? `<button type="button" class="ant-tabs-tab-remove" data-act="delete-layout" data-layout="${id}"
+                    aria-label="${escapeHtml(`Delete the ${l.name} layout`)}">${Ant.icon('close')}</button>` : ''}</div>`;
         }).join('');
         const full = state.layouts.length >= MAX_LAYOUTS;
-        // New layout and Layout options are Customize tools, so they only show
-        // while customizing.
-        dom.tabs.innerHTML = `<div class="dash-tabs" role="tablist" aria-label="Layouts">${tabs}</div>
-            ${ui.editing ? `<button type="button" class="button-icon p-menu-btn" data-act="new-layout" title="New layout" aria-label="New layout"${full ? ' disabled' : ''}>${ICONS.plus}</button>
-            <button type="button" class="button-icon p-menu-btn" data-act="layout-menu" title="Layout options"
-                aria-label="Layout options" aria-haspopup="menu" aria-expanded="false">${ICONS.dots}</button>` : ''}`;
+        dom.tabs.innerHTML = `<div class="dash-tablist${ui.editing ? ' ant-tabs-card' : ''}" role="tablist" aria-label="Layouts">${tabs}</div>${ui.editing
+            ? `<button type="button" class="ant-tabs-nav-add" data-act="new-layout" aria-label="New layout" aria-haspopup="menu"
+                aria-expanded="false" data-tip="${full ? `Up to ${MAX_LAYOUTS} layouts` : 'New layout'}"${full ? ' disabled' : ''}>${Ant.icon('plus')}</button>` : ''}`;
     }
 
-    /** The Customize button, built once and then kept in step by syncControls,
-     *  so a click never replaces the button it landed on. */
+    /** The extra content, built once per mode and then kept in step by
+     *  syncControls, so a click never replaces the control it landed on and
+     *  the name being typed is never redrawn under the caret. */
     function buildControls() {
-        dom.actions.innerHTML = `<button type="button" class="button-icon dash-customize" data-act="customize"
-            aria-label="Customize" title="Customize" aria-pressed="false" disabled>${ICONS.sliders}</button>`;
-        dom.customize = dom.actions.firstElementChild;
+        if (!ui.editing) {
+            dom.actions.innerHTML = `<button type="button" class="ant-btn ant-btn-default dash-customize" data-act="customize" disabled>
+                ${Ant.icon('appstore-add')}<span>Customize</span></button>`;
+            dom.customize = dom.actions.querySelector('[data-act="customize"]');
+            dom.nameInput = null;
+            return;
+        }
+        dom.actions.innerHTML = `
+            <input type="text" class="ant-input dash-name-input" maxlength="${NAME_MAX}" aria-label="Layout name" spellcheck="false">
+            <button type="button" class="ant-btn ant-btn-default" data-act="widgets" aria-haspopup="dialog">${Ant.icon('appstore-add')}<span>Add widgets</span></button>
+            <button type="button" class="ant-btn ant-btn-default" data-act="cancel">Cancel</button>
+            <button type="button" class="ant-btn ant-btn-primary" data-act="save">Save</button>`;
+        dom.nameInput = dom.actions.querySelector('.dash-name-input');
+        dom.nameInput.addEventListener('focus', () => { renaming = false; });
+        dom.nameInput.addEventListener('input', onNameInput);
+        dom.nameInput.addEventListener('blur', syncNameInput);
+        dom.nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') dom.nameInput.blur(); });
+        syncNameInput();
     }
 
     function syncControls() {
-        dom.customize.disabled = !ui.loaded;
-        dom.customize.setAttribute('aria-pressed', String(ui.editing));
+        if (dom.customize && !ui.editing) dom.customize.disabled = !ui.loaded;
+        if (dom.nameInput && document.activeElement !== dom.nameInput) syncNameInput();
     }
 
     function renderAll(opts) {
         renderTabs();
         syncControls();
         renderCanvas(opts);
-        if (ui.drawerOpen) renderWidgets();
+        if (drawer) renderWidgets();
     }
 
-    // ─── Popovers ────────────────────────────────────────────────────────────
-    // One at a time: a dropdown menu, a card's period picker or its gear. Each
-    // is mounted on <body> and fixed to the viewport, because the cards and the
-    // .page scroll box would clip it, and is placed under its opener, flipping
-    // above it when there is no room below.
-    let pop = null;   // { el, anchor, align }
+    // Renaming: the name box renames the open layout as it is typed, one undo
+    // step per visit to the box. An emptied box names it Untitled.
+    let renaming = false;
 
-    function positionPopover() {
+    function onNameInput() {
+        if (!renaming) {
+            checkpoint();
+            renaming = true;
+        }
+        const layout = activeLayout();
+        layout.name = dom.nameInput.value.trim().slice(0, NAME_MAX) || 'Untitled';
+        const tab = dom.tabs.querySelector(`[data-layout="${CSS.escape(layout.id)}"][role="tab"]`);
+        if (tab) tab.textContent = layout.name;
+        dom.canvas.setAttribute('aria-label', layout.name);
+    }
+
+    function syncNameInput() {
+        if (dom.nameInput && ui.loaded) dom.nameInput.value = activeLayout().name;
+    }
+
+    // ─── Pop-ups ─────────────────────────────────────────────────────────────
+    // One at a time: the period picker or a card's gear (Ant.popover), the +
+    // menu (Ant.dropdown), each fixed to the viewport by ant.js so no card or
+    // scroll box clips it, and dismissed by Escape or a press outside it.
+    let pop = null;   // { handle, anchor }
+
+    function closePop() {
         if (!pop) return;
-        const { el, anchor, align } = pop;
-        const r = anchor.getBoundingClientRect();
-        const w = el.offsetWidth;
-        const h = el.offsetHeight;
-        const left = clamp(align === 'end' ? r.right - w : r.left, 8, window.innerWidth - w - 8);
-        let top = r.bottom + 6;
-        if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
-        el.style.left = `${Math.round(left)}px`;
-        el.style.top = `${Math.round(top)}px`;
-    }
-
-    function mountPopover(el, anchor, align = 'start') {
-        closePopover();
-        document.body.appendChild(el);
-        pop = { el, anchor, align };
-        positionPopover();
-        anchor.setAttribute('aria-expanded', 'true');
-        // Focus starts on the current choice when there is one.
-        requestAnimationFrame(() => {
-            if (!pop || pop.el !== el) return;
-            (el.querySelector('[aria-pressed="true"]:not(:disabled)') || el.querySelector('button:not(:disabled), input:not(:disabled)'))?.focus();
-        });
-    }
-
-    function closePopover(restoreFocus = false) {
-        if (!pop) return;
-        const { el, anchor } = pop;
+        const { handle } = pop;
         pop = null;
-        el.remove();
-        if (anchor.isConnected) {
-            anchor.setAttribute('aria-expanded', 'false');
-            if (restoreFocus) anchor.focus();
-        }
+        handle.close();
     }
 
-    /**
-     * A dropdown in the app's menu chrome (.p-table-dropdown, ui.css), in
-     * titled sections: [{ label?, items: [{ label, run, danger?, disabled? }] }].
-     * UI.openMenu mounts its menu inside the opener's parent, where the page's
-     * scroll box clips it; this one is fixed to the viewport instead.
-     */
-    function openMenu(anchor, sections, align = 'start') {
-        const el = document.createElement('div');
-        el.className = 'p-table-dropdown dash-menu';
-        el.setAttribute('role', 'menu');
-        const scroll = document.createElement('div');
-        scroll.className = 'p-dropdown-scroll';
-        for (const section of sections) {
-            if (section.label) {
-                const head = document.createElement('div');
-                head.className = 'tx-pop-group-label';
-                head.textContent = section.label;
-                scroll.appendChild(head);
-            }
-            for (const item of section.items) {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = `p-dropdown-item${item.danger ? ' p-dropdown-item-danger' : ''}`;
-                btn.setAttribute('role', 'menuitem');
-                btn.textContent = item.label;
-                btn.disabled = !!item.disabled;
-                btn.addEventListener('click', () => {
-                    closePopover();
-                    item.run();
-                });
-                scroll.appendChild(btn);
-            }
-        }
-        el.appendChild(scroll);
-        el.addEventListener('keydown', (e) => {
-            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-            e.preventDefault();
-            const items = [...el.querySelectorAll('.p-dropdown-item:not(:disabled)')];
-            const i = items.indexOf(document.activeElement);
-            items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
+    /** Open an Ant.popover from `anchor`, unless pressing it again closed it. */
+    function openPop(anchor, options) {
+        if (pop && pop.anchor !== anchor) closePop();
+        const handle = Ant.popover(anchor, {
+            ...options,
+            onClose: () => { if (pop && pop.handle === handle) pop = null; },
         });
-        mountPopover(el, anchor, align);
+        if (!handle) { pop = null; return null; }
+        pop = { handle, anchor };
+        return handle;
     }
 
     // ─── Layout commands ─────────────────────────────────────────────────────
     function switchLayout(id) {
         if (id === state.active || !state.layouts.some((l) => l.id === id)) return;
-        closePopover();
+        closePop();
         state.active = id;
         dom.scroller.scrollTop = 0;
         renderAll({ enter: true });
+        syncNameInput();
         saveSoon();
         announce(`${activeLayout().name} layout`);
     }
@@ -793,57 +866,44 @@
         state.active = layout.id;
         dom.scroller.scrollTop = 0;
         renderAll({ enter: true });
+        syncNameInput();
         if (kind === 'blank') openDrawer();
         announce(`${layout.name} layout created`);
     }
 
-    function renameLayout() {
-        const layout = activeLayout();
-        const { overlay, close } = UI.dialog(`
-            <p><strong>Rename layout</strong></p>
-            <input type="text" class="tx-input dash-rename-input" maxlength="${NAME_MAX}" aria-label="Layout name">
-            <div class="confirm-actions">
-                <button type="button" class="button-secondary confirm-cancel">Cancel</button>
-                <button type="button" class="button-primary confirm-add">Rename</button>
-            </div>`, { className: 'dash-rename-dialog' });
-        const input = overlay.querySelector('.dash-rename-input');
-        input.value = layout.name;
-        input.focus();
-        input.select();
-        const apply = () => {
-            const name = input.value.trim().slice(0, NAME_MAX);
-            close();
-            if (!name || name === layout.name) return;
-            checkpoint();
-            layout.name = name;
-            renderTabs();
-            dom.canvas.setAttribute('aria-label', name);
-            announce(`Renamed to ${name}`);
-        };
-        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(); });
-        overlay.querySelector('.confirm-add').addEventListener('click', apply);
+    /** The + after the tabs: a blank layout, or a copy of the open one. */
+    function openNewLayoutMenu(anchor) {
+        if (pop && pop.anchor !== anchor) closePop();
+        const handle = Ant.dropdown(anchor, {
+            items: [
+                { label: 'Blank layout', icon: 'plus' },
+                { label: `Copy of ${activeLayout().name}`, icon: 'appstore' },
+            ],
+            onPick: (_item, i) => createLayout(i === 0 ? 'blank' : 'copy'),
+        });
+        if (handle) pop = { handle, anchor };
     }
 
-    async function deleteLayout() {
-        if (state.layouts.length < 2) return;
-        const layout = activeLayout();
-        const ok = await UI.confirm({ message: `<p>Delete <strong>${escapeHtml(layout.name)}</strong>?</p>` });
-        if (!ok || !ui.editing || activeLayout() !== layout) return;
+    async function deleteLayout(id, anchor) {
+        const layout = state.layouts.find((l) => l.id === id);
+        if (!layout || state.layouts.length < 2) return;
+        closePop();
+        const ok = await Ant.popconfirm(anchor, {
+            title: `Delete ${layout.name}?`,
+            desc: 'The layout and its cards go. Cancel brings them back until you save.',
+            okText: 'Delete',
+            danger: true,
+        });
+        if (!ok || !ui.editing || !state.layouts.includes(layout)) return;
         checkpoint();
-        const mark = ui.undo[ui.undo.length - 1];
         const i = state.layouts.indexOf(layout);
         state.layouts.splice(i, 1);
-        state.active = state.layouts[Math.max(0, i - 1)].id;
+        if (state.active === id) state.active = state.layouts[Math.max(0, i - 1)].id;
         renderAll({ enter: true });
-        UI.toast(`Deleted ${layout.name}`, { action: { label: 'Undo', run: undoTo(mark) } });
-    }
-
-    function openLayoutMenu(anchor) {
-        openMenu(anchor, [{ items: [
-            { label: 'Rename', run: renameLayout },
-            { label: 'Duplicate', run: () => createLayout('copy'), disabled: state.layouts.length >= MAX_LAYOUTS },
-            { label: 'Delete layout', run: deleteLayout, danger: true, disabled: state.layouts.length < 2 },
-        ] }]);
+        syncNameInput();
+        dom.tabs.querySelector('[role="tab"][aria-selected="true"]')?.focus();
+        Ant.message.success(`Deleted ${layout.name}`);
+        announce(`${layout.name} layout deleted`);
     }
 
     // ─── Card commands ───────────────────────────────────────────────────────
@@ -866,7 +926,11 @@
      *  highest free spot. Returns the new card's id. */
     function addWidget(type, at = null) {
         const def = TYPES[type];
-        if (!def || cards().length >= MAX_CARDS) return null;
+        if (!def) return null;
+        if (cards().length >= MAX_CARDS) {
+            Ant.message.info(`A layout holds up to ${MAX_CARDS} cards`);
+            return null;
+        }
         if (!ui.editing) enterEdit();
         const layout = activeLayout();
         checkpoint();
@@ -879,8 +943,9 @@
             layout.cards = DashGrid.stack([...DashGrid.pack(layout.cards), { ...card, ...spot }]);
         }
         renderCanvas();
-        if (ui.drawerOpen) renderWidgets();
+        if (drawer) renderWidgets();
         flashCard(card.id);
+        Ant.message.success(`Added ${def.name}`);
         announce(`${def.name} added`);
         return card.id;
     }
@@ -890,13 +955,12 @@
         if (!card) return;
         const title = cardTitle(card);
         checkpoint();
-        const mark = ui.undo[ui.undo.length - 1];
         const layout = activeLayout();
         layout.cards = DashGrid.pack(layout.cards.filter((c) => c.id !== id));
         renderCanvas();
-        if (ui.drawerOpen) renderWidgets();
-        UI.toast(`Removed ${title}`, { action: { label: 'Undo', run: undoTo(mark) } });
-        announce(`${title} removed`);
+        if (drawer) renderWidgets();
+        Ant.message.success(`Removed ${title}`);
+        announce(`${title} removed. Ctrl+Z puts it back.`);
     }
 
     /** Merge `patch` into a card's settings and redraw it. */
@@ -949,7 +1013,26 @@
         }
         changed.forEach(refreshCard);
         saveSoon();
-        announce(`${cardTitle(card)}: ${resolvePeriod(card).label}`);
+        announce(`${cardTitle(card)}: ${resolvePeriod(card).label}${changed.length > 1 ? `, and ${changed.length - 1} linked card${changed.length > 2 ? 's' : ''}` : ''}`);
+    }
+
+    /** A month card's month: the current month follows the calendar (null),
+     *  any other is pinned. */
+    const monthSpec = (ym) => ({ preset: 'month', month: ym >= thisMonth() ? null : ym });
+
+    /** The previous or next month on a month card's arrows. */
+    function stepMonth(id, dir) {
+        const card = findCard(id);
+        if (!card || card.period.preset !== 'month') return;
+        const at = resolvePeriod(card).first;
+        const t = at.year * 12 + at.monthIdx + dir;
+        const next = DashPeriod.formatMonth({ year: Math.floor(t / 12), monthIdx: ((t % 12) + 12) % 12 });
+        if (next > thisMonth()) return;
+        setPeriod(id, monthSpec(next));
+        // Reaching this month disables Next; the focus then moves to the picker.
+        const el = live.get(id)?.el;
+        const arrow = el?.querySelector(`[data-act="${dir < 0 ? 'month-prev' : 'month-next'}"]`);
+        (arrow && !arrow.disabled ? arrow : el?.querySelector('[data-act="period"]'))?.focus();
     }
 
     /** Set (or clear, with null) a card's link colour. Joining a colour takes on
@@ -966,100 +1049,85 @@
         if (rt) syncChrome(rt, card);
         if (mate) refreshCard(card);
         saveSoon();
-        announce(next ? `${cardTitle(card)}: ${COLORS[next]} link` : `${cardTitle(card)}: no link`);
+        announce(next ? `${cardTitle(card)}: ${COLORS[next]} link${mate ? `, now ${resolvePeriod(card).label}` : ''}` : `${cardTitle(card)}: no link`);
     }
 
     // ─── Period picker ───────────────────────────────────────────────────────
-    // Opened from the button in a card's header row. Built from the Transactions
-    // filter popover's parts (.tx-filter-popover, its eyebrow labels and preset
-    // pills), so it reads as the app's own picker rather than a new one. Picking
-    // a month or a range closes it; stepping the year keeps it open.
-        /** The years the month stepper offers: the card's own data when it carries
-     *  statement years, else a decade back. */
-    function pickerYears(card) {
-        const years = live.get(card.id)?.data?.years;
-        const now = new Date().getFullYear();
-        const known = Array.isArray(years) ? years.filter(Number.isInteger) : [];
-        const first = known.length ? Math.min(now, ...known) : now - 10;
-        return Array.from({ length: now - first + 1 }, (_, i) => now - i);
-    }
-
-    /** Put the month stepper into the picker's Month field, if the card has one. */
-    function mountMonthStepper(el, card) {
-        const host = el.querySelector('.dash-pop-stepper');
-        if (!host) return;
-        const chosen = card.period.preset === 'month' ? resolvePeriod(card).first : null;
-        const following = card.period.preset === 'month' && !card.period.month;
-        MonthStepper.create(host, {
-            label: `${cardTitle(card)} month`,
-            yearOptions: () => pickerYears(card),
-            initial: chosen,
-            onChange: ({ year, monthIdx }) => {
-                setPeriod(card.id, { ...card.period, preset: 'month', month: DashPeriod.formatMonth({ year, monthIdx }) });
-                renderPicker(el, card.id, '[data-pick="month"]');
-            },
-        });
-        // Following the current month locks the picker until the box is unticked.
-        host.classList.toggle('is-locked', following);
-        if (following) host.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-    }
-
-    /** Redraw the open picker for the card's current period, then refocus. */
-    function renderPicker(el, id, focusSelector) {
-        const card = findCard(id);
-        if (!card) { closePopover(true); return; }
-        el.innerHTML = periodPickerHtml(card);
-        mountMonthStepper(el, card);
-        positionPopover();
-        el.querySelector(`${focusSelector}:not(:disabled)`)?.focus();
-    }
-
+    // DatePicker's dropdown, opened from the card's period control: the card's
+    // ranges or look-aheads as the presets list down the left, the month panel
+    // when the card offers single months, and a footer: Follow the current
+    // month (a month card that follows moves on by itself when the month
+    // turns), and the link colours. Picking a preset or a month closes it;
+    // the footer's choices keep it open.
     function periodPickerHtml(card) {
         const def = TYPES[card.type];
         const spec = card.period;
-        const now = new Date();
-        const current = { year: now.getFullYear(), monthIdx: now.getMonth() };
-        // The joined segmented control (.range-group, ui.css): one shape with
-        // rounded ends and an accent fill on the chosen segment.
-        const rangeButtons = (items) => items.map(({ action, text, on, title }) =>
-            `<button type="button" class="range-group-btn" data-pp="${action}" aria-pressed="${on}" title="${escapeHtml(title)}">${escapeHtml(text)}</button>`).join('');
-        const group = (label, items) => `<div class="tx-pop-field"><span class="tx-pop-label">${label}</span>
-            <div class="range-group" role="group" aria-label="${label}">${rangeButtons(items)}</div></div>`;
-        let html = '';
+        const presets = def.periods.filter((p) => DashPeriod.PRESETS[p].kind !== 'month');
+        const offersMonth = def.periods.includes('month');
+        let panels = '';
+        if (presets.length) {
+            panels += `<ul class="ant-picker-presets" role="group" aria-label="${offersMonth ? 'Ranges' : 'Periods'}">${presets.map((p) => {
+                const resolved = DashPeriod.resolve({ preset: p });
+                return `<li><button type="button" data-pp="preset:${p}" aria-pressed="${spec.preset === p}"
+                    title="${escapeHtml(resolved.label)}">${escapeHtml(DashPeriod.PRESETS[p].name)}</button></li>`;
+            }).join('')}</ul>`;
+        }
+        if (offersMonth) panels += '<div class="dash-period-panel"></div>';
 
-        if (def.periods.includes('month')) {
+        let footer = '';
+        if (offersMonth) {
             const following = spec.preset === 'month' && !spec.month;
-            html += `<div class="tx-pop-field">
-                <span class="tx-pop-label">Month</span>
-                <div class="dash-pop-stepper"></div>
-                <button type="button" class="tx-pop-option${following ? ' is-selected' : ''}" data-pp="latest" role="checkbox" aria-checked="${following}"
-                    title="${escapeHtml(DashPeriod.longLabel([current]))}">
-                    <span class="tx-pop-box">${ICONS.tick}</span><span class="tx-pop-option-label">Current month</span></button>
+            footer += `<label class="ant-checkbox-wrapper dash-follow">
+                <input type="checkbox" class="ant-checkbox" data-pp="follow"${following ? ' checked' : ''}>
+                <span>Follow the current month</span></label>`;
+        }
+        if (!def.noLink) {
+            const swatch = (key, name) => {
+                const on = (card.color || '') === key;
+                return `<button type="button" class="dash-swatch${key ? '' : ' is-none'}" data-pp="color:${key}"${key ? ` data-color="${key}"` : ''}
+                    role="radio" aria-checked="${on}" aria-label="${name}" data-tip="${name}" tabindex="${on ? 0 : -1}"></button>`;
+            };
+            footer += `<div class="dash-link">
+                <span class="dash-link-label">${Ant.icon('link')}<span>Link</span>
+                    <span class="ant-info-tip" tabindex="0" role="img" aria-label="Cards in the same colour share their period"
+                        data-tip="Cards in the same colour share their period: change it on one and the rest follow.">${Ant.icon('info-circle-outlined')}</span></span>
+                <div class="dash-swatches" role="radiogroup" aria-label="Link colour">${
+                    Object.entries(COLORS).map(([key, name]) => swatch(key, name)).join('')}${swatch('', 'No link')}</div>
             </div>`;
         }
+        return `<div class="ant-picker-panel-container dash-period-panels">${panels}</div>${footer ? `<div class="ant-picker-footer dash-period-footer">${footer}</div>` : ''}`;
+    }
 
-        const segments = (kind) => def.periods.filter((p) => DashPeriod.PRESETS[p].kind === kind).map((p) => ({
-            action: `preset:${p}`,
-            text: DashPeriod.PRESETS[p].short,
-            on: spec.preset === p,
-            title: kind === 'range' ? `${DashPeriod.PRESETS[p].name}: ${DashPeriod.resolve({ preset: p }).label}` : DashPeriod.resolve({ preset: p }).label,
-        }));
-        const ranges = segments('range');
-        if (ranges.length) html += `<div class="tx-pop-field"><div class="range-group" role="group" aria-label="Range">${rangeButtons(ranges)}</div></div>`;
-        const ahead = segments('ahead');
-        if (ahead.length) html += group('Ahead', ahead);
-
-        if (def.noLink) return html;
-
-        const swatch = (key, name) => {
-            const on = (card.color || '') === key;
-            return `<button type="button" class="dash-swatch${on ? ' is-selected' : ''}" data-pp="color:${key}" data-color="${key}"
-                role="radio" aria-checked="${on}" aria-label="${name}" title="${name}"></button>`;
-        };
-        html += `<div class="tx-pop-field"><span class="tx-pop-label dash-link-label">${ICONS.link}Link</span>
-            <div class="dash-swatches" role="radiogroup" aria-label="Link color">${
-                Object.entries(COLORS).map(([key, name]) => swatch(key, name)).join('')}${swatch('', 'No link')}</div></div>`;
-        return html;
+    /** Fill the open picker for the card's current period and mount its month
+     *  panel, then put the focus on `focusSelector` when given. */
+    function renderPicker(body, id, focusSelector = null) {
+        const card = findCard(id);
+        if (!card) { closePop(); return; }
+        // Following the month turned a range card into a month card, which
+        // redrew the control the picker hangs from: open it from the new one.
+        if (pop && !pop.anchor.isConnected) {
+            closePop();
+            const trigger = live.get(id)?.el.querySelector('[data-act="period"]');
+            if (trigger) openPeriodPicker(trigger, id, focusSelector);
+            return;
+        }
+        body.innerHTML = periodPickerHtml(card);
+        const host = body.querySelector('.dash-period-panel');
+        if (host) {
+            const current = card.period.preset === 'month' ? DashPeriod.formatMonth(resolvePeriod(card).first) : null;
+            const panel = Ant.monthPanel(host, {
+                value: current,
+                max: thisMonth(),
+                onPick: (ym) => {
+                    closePop();
+                    setPeriod(id, monthSpec(ym));
+                    live.get(id)?.el.querySelector('[data-act="period"]')?.focus();
+                },
+            });
+            if (focusSelector === 'month') panel.focus();
+        }
+        if (focusSelector && focusSelector !== 'month') body.querySelector(focusSelector)?.focus();
+        pop?.handle.reposition();
     }
 
     /** Run one picker action. Returns true when the picker stays open. */
@@ -1068,113 +1136,113 @@
         if (!card) return false;
         const [verb, arg] = action.split(':');
         switch (verb) {
-            case 'latest': {
-                // Ticked: follow the calendar. Unticked: pin today's month so the stepper unlocks on it.
+            case 'follow': {
+                // Ticked: follow the calendar. Unticked: pin the month on
+                // screen, so it stays put when the month turns.
                 const following = card.period.preset === 'month' && !card.period.month;
-                const now = new Date();
-                const pinned = DashPeriod.formatMonth({ year: now.getFullYear(), monthIdx: now.getMonth() });
-                setPeriod(id, { ...card.period, preset: 'month', month: following ? pinned : null });
+                setPeriod(id, { preset: 'month', month: following ? DashPeriod.formatMonth(resolvePeriod(card).first) : null });
                 return true;
             }
-            case 'month': setPeriod(id, { ...card.period, preset: 'month', month: arg }); return false;
-            case 'preset': setPeriod(id, { ...card.period, preset: arg, month: null }); return false;
+            case 'preset': setPeriod(id, { preset: arg, month: null }); return false;
             case 'color': setColor(id, arg || null); return true;
             default: return false;
         }
     }
 
-    function openPeriodPicker(anchor, id) {
+    function openPeriodPicker(anchor, id, focus = undefined) {
         const card = findCard(id);
         if (!card) return;
-        if (pop && pop.anchor === anchor) { closePopover(true); return; }
-        const el = document.createElement('div');
-        el.className = 'tx-filter-popover dash-pop dash-period-pop';
-        el.setAttribute('role', 'dialog');
-        el.setAttribute('aria-label', `${cardTitle(card)} period`);
-        el.innerHTML = periodPickerHtml(card);
-        mountMonthStepper(el, card);
-        el.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-pp]');
-            if (!btn || btn.disabled) return;
+        const handle = openPop(anchor, { className: 'dash-period-pop', placement: 'bottom', align: 'start', gap: 4 });
+        if (!handle) return;
+        handle.el.setAttribute('aria-label', `${cardTitle(card)} period`);
+        const body = handle.body;
+        body.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-pp]');
+            if (!btn) return;
             const action = btn.dataset.pp;
-            if (!periodAction(id, action)) { closePopover(true); return; }
-            renderPicker(el, id, `[data-pp="${action}"]`);
+            if (!periodAction(id, action)) {
+                closePop();
+                live.get(id)?.el.querySelector('[data-act="period"]')?.focus();
+                return;
+            }
+            renderPicker(body, id, `[data-pp="${CSS.escape(action)}"]`);
         });
-        mountPopover(el, anchor, 'end');
+        body.addEventListener('change', (e) => {
+            if (!e.target.matches('[data-pp="follow"]')) return;
+            periodAction(id, 'follow');
+            renderPicker(body, id, '[data-pp="follow"]');
+        });
+        // The swatches are one radio group: the arrows move along it.
+        body.addEventListener('keydown', (e) => {
+            const swatch = e.target.closest('.dash-swatch');
+            const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+            if (!swatch || !step) return;
+            e.preventDefault();
+            const all = [...body.querySelectorAll('.dash-swatch')];
+            all[(all.indexOf(swatch) + step + all.length) % all.length].click();
+        });
+        const start = focus !== undefined ? focus
+            : card.period.preset === 'month' ? 'month' : '[data-pp][aria-pressed="true"]';
+        renderPicker(body, id, start);
     }
 
     // ─── Gear ────────────────────────────────────────────────────────────────
-    // A card's header menu: its settings fields (a segmented choice, or a
-    // percent typed into a box), then its own checkbox list when it has one
-    // (Account Balances: which accounts its chips offer), in the Transactions
-    // filter popover's style.
-    function choiceFieldHtml(card, f) {
-        return `<div class="seg-switch" role="group" aria-label="${escapeHtml(f.label)}">${f.options.map(([value, label]) => {
-            const on = String(card.settings[f.key]) === value;
-            return `<button type="button" class="seg-switch-btn${on ? ' active' : ''}" aria-pressed="${on}"
-                data-field="${escapeHtml(f.key)}" data-value="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
-        }).join('')}</div>`;
-    }
-
+    // A card's settings, in a titled Popover from its header gear: the savings
+    // goal as a number with a % addon, or a card's own checkbox list (Account
+    // Balances: which accounts its chips offer).
     function percentFieldHtml(card, f) {
-        return `<div class="dash-percent-field">
-            <span class="dash-percent-sign" aria-hidden="true">%</span>
-            <input type="number" class="tx-input tx-input-amount dash-percent-input" inputmode="decimal"
-                min="${f.min}" max="${f.max}" step="any" value="${escapeHtml(card.settings[f.key])}"
-                data-percent="${escapeHtml(f.key)}" aria-label="${escapeHtml(f.label)} percent"></div>`;
+        return `<div class="ant-form-item dash-gear-field">
+            <span class="ant-form-item-label">${escapeHtml(f.label)}</span>
+            <div class="ant-space-compact dash-percent">
+                <input type="number" class="ant-input" inputmode="decimal" min="${f.min}" max="${f.max}" step="any"
+                    value="${escapeHtml(card.settings[f.key])}" data-percent="${escapeHtml(f.key)}" aria-label="${escapeHtml(f.label)}, percent of income">
+                <span class="ant-input-addon">%</span>
+            </div>
+        </div>`;
     }
 
     function gearHtml(card) {
         const rt = live.get(card.id);
-        const fields = TYPES[card.type].fields.map((f) => `<div class="tx-pop-field">
-                <span class="tx-pop-label">${escapeHtml(f.label)}</span>
-                ${f.type === 'percent' ? percentFieldHtml(card, f) : choiceFieldHtml(card, f)}
-            </div>`).join('');
+        const fields = gearFields(TYPES[card.type]).map((f) => percentFieldHtml(card, f)).join('');
         const list = gearList(card, rt);
         if (!list) return fields;
         const options = list.options({ card, data: rt.data });
-        return `${fields}<div class="tx-pop-label">${escapeHtml(list.heading)}</div>
-            <div class="tx-pop-options" role="listbox" aria-multiselectable="true" aria-label="${escapeHtml(list.heading)}">${options.map((o) =>
-                `<button type="button" class="tx-pop-option${o.on ? ' is-selected' : ''}" role="option" aria-selected="${o.on}" data-key="${escapeHtml(o.key)}">
-                    <span class="tx-pop-box">${ICONS.tick}</span><span class="tx-pop-option-label">${escapeHtml(o.label)}</span></button>`).join('')}</div>`;
+        return `${fields}<div class="dash-gear-list" role="group" aria-label="${escapeHtml(list.heading)}">${options.map((o) =>
+            `<label class="ant-checkbox-wrapper"><input type="checkbox" class="ant-checkbox" data-key="${escapeHtml(o.key)}"${o.on ? ' checked' : ''}>
+                <span>${escapeHtml(o.label)}</span></label>`).join('')}</div>`;
     }
 
     function openGear(anchor, id) {
         const card = findCard(id);
         if (!card || !live.has(id) || anchor.hidden) return;
-        if (pop && pop.anchor === anchor) { closePopover(true); return; }
-        const el = document.createElement('div');
-        el.className = 'tx-filter-popover dash-pop dash-gear-pop';
-        el.setAttribute('role', 'dialog');
-        el.setAttribute('aria-label', anchor.title);
-        el.innerHTML = gearHtml(card);
-        el.addEventListener('click', (e) => {
+        const list = gearList(card, live.get(id));
+        const handle = openPop(anchor, {
+            title: list ? list.heading : `${cardTitle(card)} settings`,
+            className: 'dash-gear-pop',
+            placement: 'bottom',
+            align: 'center',
+        });
+        if (!handle) return;
+        const body = handle.body;
+        body.innerHTML = gearHtml(card);
+        body.addEventListener('change', (e) => {
             const now = findCard(id);
             if (!now) return;
-            const field = e.target.closest('[data-field]');
-            const option = e.target.closest('.tx-pop-option');
-            let refocus;
-            if (field) {
-                const { field: key, value } = field.dataset;
-                if (String(now.settings[key]) === value) return;
-                updateSettings(id, { [key]: value });
-                refocus = `[data-field="${CSS.escape(key)}"][data-value="${CSS.escape(value)}"]`;
-            } else if (option) {
-                const list = gearList(now, live.get(id));
-                if (!list) return;
-                updateSettings(id, list.toggle({ card: now, data: live.get(id).data }, option.dataset.key));
-                refocus = `.tx-pop-option[data-key="${CSS.escape(option.dataset.key)}"]`;
-            } else {
+            const box = e.target.closest('[data-key]');
+            if (box) {
+                const gear = gearList(now, live.get(id));
+                if (!gear) return;
+                updateSettings(id, gear.toggle({ card: now, data: live.get(id).data }, box.dataset.key));
+                body.innerHTML = gearHtml(findCard(id));
+                body.querySelector(`[data-key="${CSS.escape(box.dataset.key)}"]`)?.focus();
                 return;
             }
-            el.innerHTML = gearHtml(findCard(id));
-            el.querySelector(refocus)?.focus();
+            if (e.target.matches('[data-percent]')) commitPercent(id, e.target);
         });
-        el.addEventListener('change', (e) => commitPercent(id, e.target));
-        el.addEventListener('keydown', (e) => {
+        body.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.target.matches('[data-percent]')) commitPercent(id, e.target);
         });
-        mountPopover(el, anchor, 'end');
+        body.querySelector('input')?.focus();
     }
 
     /** Save a percent box's value. A blank or out-of-range entry snaps to the
@@ -1200,91 +1268,83 @@
         const def = card && TYPES[card.type];
         if (!def || !def.chip || !rt || rt.data === undefined) return;
         updateSettings(id, def.chip({ card, data: rt.data }, key));
+        live.get(id)?.el.querySelector(`[data-chip="${CSS.escape(key)}"]`)?.focus();
     }
 
-    // ─── Customize panel ─────────────────────────────────────────────────────
-    // A panel on the right, hanging from the Customize button, that pushes the
-    // grid over rather than covering it. It is open exactly while customizing:
-    // every widget in collapsible groups, then Save in the header. Undo and redo
-    // are Ctrl+Z and Ctrl+Y, and the layout tools sit beside the layout tabs.
-    // A card's period and settings are not in here: both are set from the card
-    // itself, the period picker and the gear in its header.
+    /** An inline Segmented in a card's header chose a value. */
+    function setField(id, key, value) {
+        const card = findCard(id);
+        if (!card || String(card.settings[key]) === value) return;
+        updateSettings(id, { [key]: value });
+        live.get(id)?.el.querySelector(`[data-field="${CSS.escape(key)}"][data-value="${CSS.escape(value)}"]`)?.focus();
+    }
+
+    // ─── Widget Drawer ───────────────────────────────────────────────────────
+    // Add widgets opens Ant's Drawer of every widget, in its groups: a card per
+    // widget with its schematic, its name, whether the open layout already has
+    // one, and Add, which puts it in the highest free spot. A widget can also be
+    // dragged out of the Drawer: the Drawer slides away, a placeholder shows
+    // where it would land and the cards make room, as they do for a moved card.
+    let drawer = null;
+
     function openDrawer() {
-        ui.drawerOpen = true;
-        dom.drawer.classList.add('is-open');
-        dom.drawer.inert = false;
+        if (drawer) return;
+        if (!ui.editing) enterEdit();
+        closePop();
+        drawer = Ant.drawer({
+            title: 'Widgets',
+            className: 'dash-drawer',
+            width: 380,
+            onClose: () => {
+                drawer = null;
+                endLibraryDrag(false);
+            },
+        });
+        drawer.body.addEventListener('click', (e) => {
+            const add = e.target.closest('[data-add]');
+            if (add) addWidget(add.dataset.add);
+        });
+        drawer.body.addEventListener('pointerdown', onLibraryPointerDown);
         renderWidgets();
     }
 
     function closeDrawer() {
-        ui.drawerOpen = false;
-        dom.drawer.classList.remove('is-open');
-        dom.drawer.inert = true;
+        drawer?.close();
+        drawer = null;
     }
 
-    /** The groups folded away, kept for the window's session. Until the user
-     *  folds or opens one, every group but the first starts collapsed. */
-    function collapsedGroups() {
-        const saved = ViewState.get(VIEW_KEY);
-        if (saved && Array.isArray(saved.collapsed)) return new Set(saved.collapsed);
-        return new Set(GROUPS.slice(1).map((group) => group.name));
-    }
-
-    function setGroupCollapsed(name, collapsed) {
-        const set = collapsedGroups();
-        if (collapsed) set.add(name);
-        else set.delete(name);
-        ViewState.set(VIEW_KEY, { collapsed: [...set] });
-    }
-
-    const groupDomId = (name) => `dash-group-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-
-    /** The widget groups, each folded or open as the user left it. */
+    /** The widget groups, each a caption over its widget cards. */
     function renderWidgets() {
-        const collapsed = collapsedGroups();
+        if (!drawer) return;
         const onLayout = new Set(cards().map((c) => c.type));
-        const groups = GROUPS.map((group) => {
-            const open = !collapsed.has(group.name);
-            const id = groupDomId(group.name);
-            const items = group.types.map((t) => {
-                const def = TYPES[t];
-                return `<li class="dash-widget" data-type="${t}">
-                    <span class="dash-widget-thumb">${thumbHtml(t)}</span>
-                    <span class="dash-widget-text">
-                        <span class="dash-widget-name">${escapeHtml(def.name)}</span>
-                        ${onLayout.has(t) ? '<span class="dash-widget-meta">On this layout</span>' : ''}
-                    </span>
-                </li>`;
-            }).join('');
-            return `<section class="cat-group dash-group">
-                <button type="button" class="cat-group-head" data-group="${escapeHtml(group.name)}" aria-expanded="${open}"
-                    aria-controls="${id}">
-                    <span class="cat-group-title">${escapeHtml(group.name)}</span>
-                    <span class="cat-group-meta">${group.types.length} widget${group.types.length === 1 ? '' : 's'}</span>
-                    ${ICONS.chevron}
-                </button>
-                <ul class="dash-widget-list" id="${id}"${open ? '' : ' hidden'}>${items}</ul>
-            </section>`;
-        }).join('');
-        dom.drawerBody.innerHTML = `<div class="cat-groups dash-groups">${groups}</div>`;
-    }
-
-    function toggleGroup(head) {
-        const open = head.getAttribute('aria-expanded') !== 'true';
-        head.setAttribute('aria-expanded', String(open));
-        document.getElementById(head.getAttribute('aria-controls')).hidden = !open;
-        setGroupCollapsed(head.dataset.group, !open);
+        const full = cards().length >= MAX_CARDS;
+        const focused = document.activeElement?.closest?.('[data-add]')?.dataset.add;
+        drawer.body.innerHTML = `<p class="dash-widgets-hint">Add a widget, or drag one onto the grid.</p>${GROUPS.map((group) => `
+            <section class="dash-widget-group" aria-label="${escapeHtml(group.name)}">
+                <h3 class="dash-widget-group-title">${escapeHtml(group.name)}</h3>
+                <ul class="dash-widget-list">${group.types.map((t) => {
+                    const def = TYPES[t];
+                    return `<li class="ant-card ant-card-small dash-widget" data-type="${t}">
+                        <div class="ant-card-body dash-widget-body">
+                            <span class="dash-widget-thumb">${thumbHtml(t)}</span>
+                            <span class="dash-widget-text">
+                                <span class="dash-widget-name">${escapeHtml(def.name)}</span>
+                                ${onLayout.has(t) ? `<span class="dash-widget-meta">${Ant.icon('check')}On this layout</span>` : ''}
+                            </span>
+                            <button type="button" class="ant-btn ant-btn-default" data-add="${t}" aria-label="Add ${escapeHtml(def.name)}"${full ? ' disabled' : ''}>
+                                ${Ant.icon('plus')}<span>Add</span></button>
+                        </div></li>`;
+                }).join('')}</ul>
+            </section>`).join('')}`;
+        if (focused) drawer.body.querySelector(`[data-add="${CSS.escape(focused)}"]`)?.focus();
     }
 
     // ─── Dragging a widget onto the grid ─────────────────────────────────────
-    // Press a widget in the panel and drag it over the grid: a placeholder shows
-    // where it would land and the cards make room, as they do for a moved card.
-    // A press without a drag adds it in the highest free spot.
     let libDrag = null;
 
     function onLibraryPointerDown(e) {
         const item = e.target.closest('.dash-widget');
-        if (!item || e.button !== 0 || gesture || libDrag) return;
+        if (!item || e.button !== 0 || gesture || libDrag || e.target.closest('button')) return;
         if (cards().length >= MAX_CARDS) return;
         e.preventDefault();
         libDrag = { type: item.dataset.type, item, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY, started: false };
@@ -1307,9 +1367,10 @@
             d.card = { id: '__new', type: d.type, x: 0, y: 0, w, h };
             d.base = cards().map((c) => ({ ...c }));
             d.ghost = document.createElement('div');
-            d.ghost.className = 'dash-drag-ghost';
+            d.ghost.className = 'dash-drag-ghost ant-scope';
             d.ghost.innerHTML = `<span class="dash-widget-thumb">${thumbHtml(d.type)}</span><span class="dash-widget-name">${escapeHtml(def.name)}</span>`;
             document.body.appendChild(d.ghost);
+            drawer?.setAway(true);
             hideChartTip();
             startAutoScroll();
         }
@@ -1321,8 +1382,7 @@
         d.ghost.style.transform = `translate(${d.lastX + 12}px, ${d.lastY + 12}px)`;
         const cr = dom.canvas.getBoundingClientRect();
         const sr = dom.scroller.getBoundingClientRect();
-        const over = d.lastX >= cr.left && d.lastX <= cr.right && d.lastY >= sr.top && d.lastY <= sr.bottom
-            && !dom.drawer.contains(document.elementFromPoint(d.lastX, d.lastY));
+        const over = d.lastX >= cr.left && d.lastX <= cr.right && d.lastY >= sr.top && d.lastY <= sr.bottom;
         d.ghost.classList.toggle('is-over', over);
         if (!over) {
             if (d.preview) {
@@ -1352,17 +1412,17 @@
         d.item.removeEventListener('pointercancel', onLibraryCancel);
         if (d.item.hasPointerCapture?.(d.pointerId)) d.item.releasePointerCapture(d.pointerId);
         stopAutoScroll();
-        if (!d.started) {
-            if (commit) addWidget(d.type);
-            return;
-        }
+        if (!d.started) return;
         d.ghost.remove();
         hidePlaceholder();
         if (commit && d.preview) {
             const placed = d.preview.find((c) => c.id === '__new');
+            // Dropped: the Drawer stays out of the way so the new card shows.
+            closeDrawer();
             addWidget(d.type, { x: placed.x, y: placed.y });
         } else {
             applyLayout(cards());
+            drawer?.setAway(false);
         }
     }
 
@@ -1389,7 +1449,7 @@
         if (!ui.editing || e.button !== 0 || gesture || libDrag) return;
         const el = e.target.closest('.dash-card');
         if (!el) return;
-        if (e.target.closest('.dash-card-tools, .dash-card-controls, .fc-info')) return;
+        if (e.target.closest('.dash-card-controls, .ant-info-tip')) return;
         const mode = e.target.closest('.dash-resize') ? 'resize' : 'move';
         e.preventDefault();
         el.focus({ preventScroll: true });
@@ -1438,7 +1498,7 @@
             g.el.appendChild(g.badge);
         }
         hideChartTip();
-        closePopover();
+        closePop();
         showPlaceholder(g.rect);
         startAutoScroll();
     }
@@ -1589,19 +1649,19 @@
 
     // ─── Reading a line chart ────────────────────────────────────────────────
     // Moving across a line chart names the month under the pointer and prints
-    // what every plotted series was worth in it. The month columns, the guide
-    // and the dots come out of FinanceChart.buildLine; this half moves the
-    // guide, raises the hovered month's dots and fills the one floating reading
-    // every card shares. Everything it prints is read back off the dots
-    // (data-name, data-amount, fill), so there is no second copy of a series
-    // here to fall out of step with the chart. One delegated listener on the
-    // canvas covers every card, including cards added later.
+    // what every plotted series was worth in it, in G2's tooltip. The month
+    // columns, the guide and the dots come out of FinanceChart.buildLine; this
+    // half moves the guide, raises the hovered month's dots and fills the one
+    // floating reading every card shares. Everything it prints is read back off
+    // the dots (data-name, data-amount, fill), so there is no second copy of a
+    // series here to fall out of step with the chart. One delegated listener on
+    // the canvas covers every card, including cards added later.
     const hover = { tip: null, hit: null, dots: [], body: null };
 
     function chartTipEl() {
         if (!hover.tip) {
             hover.tip = document.createElement('div');
-            hover.tip.className = 'chart-tip';
+            hover.tip.className = 'chart-tip dash-chart-tip ant-scope';
             hover.tip.setAttribute('role', 'tooltip');
             document.body.appendChild(hover.tip);
         }
@@ -1750,61 +1810,70 @@
 
     // ─── Wiring ──────────────────────────────────────────────────────────────
     const isTyping = (el) => !!el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-    const dialogOpen = () => !!document.querySelector('.confirm-overlay, .onb-overlay, .settings-modal-overlay, .db-modal-overlay');
+    // The Settings and database modals live in the page hidden, so only an
+    // overlay that is showing counts.
+    const dialogOpen = () => !!document.querySelector(
+        ':is(.confirm-overlay, .onb-overlay, .settings-modal-overlay, .db-modal-overlay):not([hidden])');
 
     function onCanvasClick(e) {
         const act = e.target.closest('[data-act]');
         const el = e.target.closest('.dash-card');
         const id = el && el.dataset.id;
-        if (act && id) {
+        if (!id) return;
+        if (act && !act.disabled) {
             switch (act.dataset.act) {
                 case 'period': openPeriodPicker(act, id); return;
+                case 'month-prev': stepMonth(id, -1); return;
+                case 'month-next': stepMonth(id, 1); return;
                 case 'gear': openGear(act, id); return;
                 case 'remove': removeCard(id); return;
                 default: break;
             }
         }
+        const field = e.target.closest('.dash-inline [data-field]');
+        if (field) { setField(id, field.dataset.field, field.dataset.value); return; }
         const chip = !ui.editing && e.target.closest('[data-chip]');
-        if (chip && id) toggleChip(id, chip.dataset.chip);
+        if (chip) toggleChip(id, chip.dataset.chip);
     }
 
     function onToolbarClick(e) {
-        const tab = e.target.closest('.dash-tab[data-layout]');
+        const tab = e.target.closest('[role="tab"][data-layout]');
         if (tab) { switchLayout(tab.dataset.layout); return; }
         const btn = e.target.closest('[data-act]');
         if (!btn || btn.disabled) return;
         switch (btn.dataset.act) {
-            case 'new-layout': createLayout('blank'); break;
-            case 'layout-menu': if (pop?.anchor === btn) closePopover(true); else openLayoutMenu(btn); break;
-            // Pressed, the button ends Customize the way Save does.
-            case 'customize': if (ui.editing) exitEdit(); else enterEdit(); break;
+            case 'customize': enterEdit(); break;
+            case 'new-layout': openNewLayoutMenu(btn); break;
+            case 'delete-layout': deleteLayout(btn.dataset.layout, btn); break;
+            case 'widgets': openDrawer(); break;
+            case 'cancel': cancelEdit(btn); break;
+            case 'save': exitEdit(true); break;
             default: break;
         }
     }
 
     function onTabsKeydown(e) {
-        if (!e.target.classList.contains('dash-tab') || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
-        e.preventDefault();
+        if (!e.target.matches('[role="tab"]')) return;
+        const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+        let next = null;
         const i = state.layouts.findIndex((l) => l.id === state.active);
-        const next = state.layouts[(i + (e.key === 'ArrowRight' ? 1 : -1) + state.layouts.length) % state.layouts.length];
-        switchLayout(next.id);
-        dom.tabs.querySelector(`.dash-tab[data-layout="${CSS.escape(next.id)}"]`)?.focus();
-    }
-
-    function onDrawerClick(e) {
-        const act = e.target.closest('[data-act]');
-        if (act) {
-            if (act.dataset.act === 'done') exitEdit();
+        if (step) next = state.layouts[(i + step + state.layouts.length) % state.layouts.length];
+        else if (e.key === 'Home') next = state.layouts[0];
+        else if (e.key === 'End') next = state.layouts[state.layouts.length - 1];
+        else if ((e.key === 'Delete' || e.key === 'Backspace') && ui.editing) {
+            const remove = e.target.parentElement.querySelector('[data-act="delete-layout"]');
+            if (remove) { e.preventDefault(); deleteLayout(remove.dataset.layout, remove); }
             return;
         }
-        const head = e.target.closest('.cat-group-head');
-        if (head) { toggleGroup(head); return; }
+        if (!next) return;
+        e.preventDefault();
+        switchLayout(next.id);
+        dom.tabs.querySelector(`[role="tab"][data-layout="${CSS.escape(next.id)}"]`)?.focus();
     }
 
     function onKeydown(e) {
         if (dialogOpen()) return;
         if (e.key === 'Escape') {
-            if (pop) { closePopover(true); return; }
             if (gesture) { endGesture(false); return; }
             if (libDrag) endLibraryDrag(false);
             return;
@@ -1816,7 +1885,7 @@
         }
     }
 
-    // The grid follows the canvas width (the window, the panel opening) without
+    // The grid follows the canvas width (the window, the sidebar) without
     // animating every card into place.
     let resizeFrame = 0;
     let settleTimer = 0;
@@ -1848,28 +1917,20 @@
         });
         dom.canvas.addEventListener('pointerleave', hideChartTip);
         dom.empty.addEventListener('click', (e) => {
-            if (!e.target.closest('[data-empty-action="add-widgets"]')) return;
-            if (!ui.editing) enterEdit();
-            else openDrawer();
+            if (e.target.closest('[data-empty-action="add-widgets"]')) openDrawer();
         });
 
         dom.toolbar.addEventListener('click', onToolbarClick);
         dom.tabs.addEventListener('keydown', onTabsKeydown);
 
-        dom.drawer.addEventListener('click', onDrawerClick);
-        dom.drawerBody.addEventListener('pointerdown', onLibraryPointerDown);
-
-        document.addEventListener('pointerdown', (e) => {
-            if (pop && !pop.el.contains(e.target) && !pop.anchor.contains(e.target)) closePopover();
-        }, true);
         document.addEventListener('keydown', onKeydown);
         // .page scrolls, not the window; capture, because that scroll does not bubble.
         document.addEventListener('scroll', () => {
-            if (pop) positionPopover();
+            if (pop) pop.handle.reposition?.();
             if (hover.hit) positionChartTip();
         }, { capture: true, passive: true });
         window.addEventListener('resize', () => {
-            closePopover();
+            closePop();
             hideChartTip();
         });
         window.addEventListener('themechange', repaintAll);
@@ -1890,17 +1951,14 @@
         dom.canvas = document.getElementById('dash-canvas');
         dom.placeholder = document.getElementById('dash-placeholder');
         dom.empty = document.getElementById('dash-empty');
-        dom.drawer = document.getElementById('dash-drawer');
-        dom.drawerBody = document.getElementById('dash-drawer-body');
         dom.live = document.getElementById('dash-live');
         dom.preemptable = document.querySelectorAll('.dash-shell');
         if (!dom.canvas) return;
 
-        dom.drawer.inert = true;
-        dom.empty.innerHTML = UI.emptyState({
-            icon: null,
-            title: 'This layout is empty',
-            action: { label: 'Add widgets', name: 'add-widgets', primary: true },
+        dom.empty.innerHTML = Ant.empty({
+            title: 'This layout has no cards yet',
+            desc: 'Add widgets to it from the widget list.',
+            action: { label: 'Add widgets', name: 'add-widgets' },
         });
         buildControls();
         wire();

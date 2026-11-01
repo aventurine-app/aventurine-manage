@@ -16,6 +16,8 @@
    hover surfaces read better stepping UP toward white in both themes. */
 :root {
     --titlebar-frost:        rgba(255,255,255, 0.60);
+    /* Read by ant.css too: the Drawer's panel starts below the bar. */
+    --titlebar-height:       40px;
 }
 
 /* Dark theme: --surface3 is already near-black, so the same white tints only
@@ -27,7 +29,7 @@ html[data-theme="dark"] {
 .titlebar {
     display: flex;
     align-items: stretch;
-    height: 40px;
+    height: var(--titlebar-height);
     flex-shrink: 0;
     /* Slightly heavier than the standard glass treatment so the title bar
        reads as a distinct chrome layer above page content. */

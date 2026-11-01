@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Aventurine Manage | Portfolio</title>
     <!-- @include head -->
-    <link rel="stylesheet" href="/static/css/tables.css">
+    <link rel="stylesheet" href="/static/css/ant.css">
     <link rel="stylesheet" href="/static/css/donut.css">
     <link rel="stylesheet" href="/static/css/portfolio.css">
 </head>
@@ -15,29 +15,53 @@
         <!-- @include sidebar -->
 
         <div class="page">
-             
-<div class="db-page">
-    <div class="portfolio-layout">
-        <aside class="portfolio-summary" aria-labelledby="portfolio-summary-title">
-            <h2 class="portfolio-summary-title" id="portfolio-summary-title">Allocation</h2>
-            <div id="portfolio-pie" class="accounts-pie"></div>
-            <div id="portfolio-legend" class="accounts-legend"></div>
-        </aside>
-        <div class="portfolio-main">
-            <div class="db-tables-container"></div>
-            <div class="db-actions">
-                <button class="button-primary">Add Account</button>
-            </div>
-        </div>
+
+<!-- The workspace is drawn in Ant Design (ant.css, ant.js): Add account, the
+     portfolio's totals as three Statistic cards, then the allocation and one
+     card per account. The app chrome around it keeps its own design. -->
+<div class="pf-page ant-scope">
+
+    <!-- Hard left, like the month controls on Recurring. No page heading: the
+         sidebar's active link already names the page, as on every other page. -->
+    <div class="pf-toolbar">
+        <button type="button" class="ant-btn ant-btn-primary" id="pf-add-account">
+            <span class="anticon" data-ant-icon="plus" aria-hidden="true"></span><span>Add account</span>
+        </button>
     </div>
+
+    <!-- Market value, cost basis and unrealized gain across every account.
+         Empty until portfolio.js has the holdings. -->
+    <div class="pf-stats" id="pf-summary"></div>
+
+    <div class="pf-main">
+        <section class="ant-card pf-alloc" aria-labelledby="pf-alloc-title">
+            <div class="ant-card-head"><div class="ant-card-head-wrapper">
+                <h2 class="ant-card-head-title" id="pf-alloc-title">Allocation</h2>
+                <div class="ant-card-extra">
+                    <div class="ant-segmented ant-segmented-sm" role="group" aria-label="Allocate by">
+                        <button type="button" class="ant-segmented-item" data-by="holding" aria-pressed="true">Holding</button>
+                        <button type="button" class="ant-segmented-item" data-by="account" aria-pressed="false">Account</button>
+                    </div>
+                </div>
+            </div></div>
+            <div class="ant-card-body" id="pf-alloc-body"></div>
+        </section>
+
+        <!-- One card per account, its holdings an editable table. -->
+        <div class="pf-accounts" id="pf-accounts"></div>
+    </div>
+
 </div>
+
         </div>
     </div>
 
     <!-- @include scripts -->
     <script src="/static/js/widgets/donut.js"></script>
     <script src="/static/js/widgets/cellselect.js"></script>
-    <script src="/static/js/widgets/tables.js"></script>
+    <!-- Ant Design's interactive pieces. After the shared block: its Modal is
+         UI.dialog underneath. -->
+    <script src="/static/js/widgets/ant.js"></script>
     <script src="/static/js/pages/portfolio.js"></script>
 </body>
 </html>

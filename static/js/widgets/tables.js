@@ -1,1434 +1,648 @@
 'use strict';
 
 // ============================================================================
-// tables.js — Shared table behavior for Aventurine Manage spreadsheet pages.
+// tables.js — the Statements grid: one Ant Design table per statement year.
 // ============================================================================
 //
-// Loaded BEFORE each spreadsheet page's script. Provides two layers:
+// Loaded by the Statements page only, before statements.js, which starts one
+// controller per tab (Cash Flow, Balance Sheet) with bootstrapYearTablePage().
 //
-//   (1) Low-level helpers used by every spreadsheet-like page (Income &
-//       Expenses, Balance Sheet, Savings & Investing, Portfolio):
-//         - generic modal builders (confirmDelete, promptAddYear,
-//           confirmColumnDelete)
-//         - sortTables for DOM-level newest-first sort
-//       (escapeHtml lives in core/escape.js; debounce + the plain-number
-//       formatters applyCommaFormat/formatDisplay in core/format.js; the ⋮
-//       dropdown is UI.openMenu in shell/ui.js)
+// Each statement year is one card holding an Ant bordered table: the columns
+// grouped under their type (Income / Expenses / Transfers, or Cash /
+// Investment / Retirement / Debt), the Month column pinned left and a summary
+// column pinned right (Net, or Net Worth), then a footer note. Every year is in
+// the DOM; the page shows one at a time by toggling [hidden] on the cards.
 //
-//   (2) A full "year-table" controller used by the Statements page (Cash Flow
-//       + Balance Sheet tabs). Each tab reduces to a single
-//       bootstrapYearTablePage(opts) call with a config object describing its
-//       API prefix, column types, and minor UI variations — the Statements
-//       page runs two controllers side by side, kept separate via the
-//       *Selector options. See bootstrapYearTablePage() at the bottom for the
-//       full option list.
+// Cells are always-editable inputs that behave like a spreadsheet's: entering
+// a cell (click, arrow, Enter or Tab) selects it, and typing replaces its
+// value; double-click or F2 edits it in place. Typing saves after a short
+// pause or on leaving the cell, and cellselect.js adds range selection with
+// copy, paste and delete, and draws the border that marks the current cell.
 //
-// Portfolio uses layer (1) but has a separate controller (portfolio.js) because
-// it operates on accounts rather than calendar years and has no column manager.
-
-// ─── Constants ──────────────────────────────────────────────────────────────
+// Cash Flow cells blend per cell (CLAUDE.md, rule 10): a cell shows the
+// month's transaction sum, in the primary colour, until a typed value
+// overrides it; the ↺ button clears the override. Balance Sheet cells are
+// typed balances; an empty month at or before this one shows, faded, the
+// balance carried forward from the last month that has one, the same
+// carry-forward the Dashboard's net worth uses.
+//
+// Globals used: apiFetch, Store, Ant, escapeHtml, formatCurrency,
+// stripCurrencyValue, applyCurrencyFormat, enableCellSelection (optional).
 
 (function () {
-    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+        'August', 'September', 'October', 'November', 'December'];
 
-    // Six-dot "grip" glyph shown as the drag handle on each column-manager row.
-    // The handle (not the whole row) is the draggable element, so the rename
-    // input and the × delete button keep working without the drag interaction
-    // stealing their pointer events.
-    const _GRIP = `<svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>`;
-
-    /**
-     * Given a drop-target list and the pointer's Y, return the row the dragged
-     * element should be inserted BEFORE (or null to append at the end). Standard
-     * native-DnD pattern: pick the not-being-dragged row whose vertical midpoint is
-     * just below the cursor. Used to live-reorder the DOM during dragover.
-     */
-    function _dragAfterRow(listEl, y) {
-        const rows = [...listEl.querySelectorAll('.cat-row:not(.cat-dragging)')];
-        let closest = { offset: -Infinity, el: null };
-        for (const row of rows) {
-            const box = row.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) closest = { offset, el: row };
-        }
-        return closest.el;
-    }
-
-    // escapeHtml is a global from escape.js (loaded by pages/partials/scripts.html before this
-    // file). ALL column labels, year strings, account names, and other user-
-    // controlled values MUST pass through it when building HTML via template
-    // literals.
-
-    // ─── UI helpers ─────────────────────────────────────────────────────────────
-    // (debounce + the plain-number input formatters moved to core/format.js.)
-
-    /**
-     * Report a write that did not reach the database. A dropped save with no
-     * message is data loss: the value is on screen but was never stored. Every
-     * failed year-table write routes here (wrapWrite below, plus the
-     * column-delete flow, which inspects its result directly).
-     */
-    function reportSaveFailure() {
-        window.UI?.toast?.("Couldn't save your change — it hasn't been stored.", { type: 'error' });
-    }
-
-    /**
-     * Modal dialog confirming a destructive delete of a year table. `year` is a
-     * parsed integer (safe to interpolate without escaping); no user-controlled
-     * text is injected here, so this stays simple.
-     *
-     * `opts.zIndex` stacks the dialog above a modal that is already open — the
-     * Statements "Manage Years" manager deletes from inside itself and stays
-     * open behind the confirmation, the same way confirmColumnDelete stacks
-     * above the column manager.
-     */
-    async function confirmDelete(year, onConfirm, opts = {}) {
-        const ok = await UI.confirm({
-            message: `<p>Remove <strong>${year}</strong> and all its data?<br>This cannot be undone.</p>`,
-            confirmLabel: 'Remove',
-            zIndex: opts.zIndex,
-        });
-        if (ok) onConfirm();
-    }
-
-    /**
-     * Modal prompt for a year. Validates client-side (4-digit number in
-     * [1000, 9999], not already present in `existingYears`). The backend
-     * re-validates with _validate_year so a tampered request still gets rejected.
-     *
-     * `opts` customizes the copy for reuse beyond "add": { message?, confirmLabel? }.
-     * `message` is trusted HTML — pass literals only, never user input.
-     */
-    function promptAddYear(existingYears, onConfirm, opts = {}) {
-        const message      = opts.message || 'Enter a <strong>4-digit year</strong> to add:';
-        const confirmLabel = opts.confirmLabel || 'Add';
-        const { overlay, close } = UI.dialog(`
-            <p>${message}</p>
-            <input type="number" class="year-prompt-input" min="1000" max="9999" placeholder="e.g. 2024">
-            <div class="confirm-actions">
-                <button class="button-secondary confirm-cancel">Cancel</button>
-                <button class="button-primary confirm-add">${escapeHtml(confirmLabel)}</button>
-            </div>`);
-
-        const input  = overlay.querySelector('.year-prompt-input');
-        const addBtn = overlay.querySelector('.confirm-add');
-        input.focus();
-
-        const tryAdd = () => {
-            const year = parseInt(input.value);
-            if (isNaN(year) || year < 1000 || year > 9999 || existingYears.includes(year)) {
-                input.classList.add('invalid');
-                return;
-            }
-            close();
-            onConfirm(year);
-        };
-
-        input.addEventListener('input', () => {
-            // Some browsers ignore maxlength on type="number". Enforce 4-digit cap.
-            if (input.value.length > 4) input.value = input.value.slice(0, 4);
-            input.classList.remove('invalid');
-        });
-        input.addEventListener('keydown', e => {
-            if (e.key === 'Enter') tryAdd();
-        });
-        addBtn.addEventListener('click', tryAdd);
-    }
-
-    /**
-     * Secondary confirmation shown when deleting a column that still has saved
-     * data. Stacks ABOVE the column manager modal (z-index 1100 vs the manager's
-     * 1000). `label` is user-controlled, so it is escapeHtml'd.
-     */
-    async function confirmColumnDelete(label, onConfirm) {
-        const ok = await UI.confirm({
-            message: `<p><strong>${escapeHtml(label)}</strong> has saved data.<br>Deleting it will permanently erase all values for this column. This cannot be undone.</p>`,
-            confirmLabel: 'Delete Anyway',
-            zIndex: 1100,
-        });
-        if (ok) onConfirm();
-    }
-
-    /**
-     * Open the app's manager modal: the .cat-manager shell (header, info tip,
-     * close ×) wrapped around one or more editor panels.
-     *
-     * Two or more panels grow a segmented switch under the header, which swaps
-     * the visible panel without closing the modal. That is how the Statements
-     * page's Manage Columns button shows the categories editor and the Balance
-     * Sheet's column editor: they are the same editor over different data, so
-     * they are two panels of one modal rather than two modals that happen to
-     * look alike.
-     *
-     * opts:
-     *   title     string — header text
-     *   className string — extra class on the overlay, and the toggle hook: a
-     *                      second call while it is open closes it instead
-     *   panels    [{ id, label, tip, mount(panelEl, modal) }] — `label` names
-     *             the segment (unused with one panel), `tip` fills the header's
-     *             info glyph while that panel is showing, and `mount` runs the
-     *             FIRST time the panel is shown, so an unvisited panel costs
-     *             neither a fetch nor a render. `modal` is this function's own
-     *             return value, for a panel that has to close or switch itself.
-     *   active    string? — id of the panel to open on (default: the first)
-     *   onClose   fn?     — runs after the overlay is removed
-     *
-     * Returns { overlay, show, close }, or null when the call closed an
-     * already-open modal (the toggle above).
-     */
-    function openManagerModal({ title, className, panels, active, onClose }) {
-        const open = document.querySelector(`.${className}`);
-        if (open) { open.remove(); return null; }
-
-        const tabbed = panels.length > 1;
-        const panelId = (id) => `mgr-panel-${id}`;
-        const tabId   = (id) => `mgr-tab-${id}`;
-
-        const tabsHtml = !tabbed ? '' : `
-            <div class="mgr-tabs" role="tablist" aria-label="${escapeHtml(title)}">
-                ${panels.map(p => `
-                <button type="button" class="mgr-tab" role="tab"
-                        id="${escapeHtml(tabId(p.id))}" data-panel="${escapeHtml(p.id)}"
-                        aria-controls="${escapeHtml(panelId(p.id))}"
-                        aria-selected="false" tabindex="-1">${escapeHtml(p.label)}</button>`).join('')}
-            </div>`;
-
-        const panelsHtml = panels.map(p => `
-            <div class="mgr-panel" id="${escapeHtml(panelId(p.id))}" data-panel="${escapeHtml(p.id)}"
-                 ${tabbed ? `role="tabpanel" aria-labelledby="${escapeHtml(tabId(p.id))}"` : ''} hidden></div>`).join('');
-
-        const overlay = document.createElement('div');
-        // .cat-manager-overlay carries the shared visual treatment; the caller's
-        // className is only the query hook the toggle above looks for.
-        overlay.className = `confirm-overlay cat-manager-overlay ${className}`;
-        overlay.innerHTML = `
-            <div class="cat-manager">
-                <div class="cat-manager-header">
-                    <span>${escapeHtml(title)}<span class="fc-info" tabindex="0" role="note">i</span></span>
-                    <button class="cat-manager-close" aria-label="Close">×</button>
-                </div>
-                ${tabsHtml}
-                <div class="cat-manager-body">${panelsHtml}</div>
-            </div>`;
-        document.body.appendChild(overlay);
-
-        const info    = overlay.querySelector('.fc-info');
-        const mounted = new Set();
-        // Named before show() runs, so a panel's mount can be handed the same
-        // object this function returns.
-        const modal   = { overlay, show: (id) => show(id), close: () => close() };
-
-        const close = () => {
-            overlay.remove();
-            onClose?.();
-        };
-        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-        overlay.querySelector('.cat-manager-close').addEventListener('click', close);
-
-        const show = (id) => {
-            for (const p of panels) {
-                const on    = p.id === id;
-                const panel = overlay.querySelector(`.mgr-panel[data-panel="${p.id}"]`);
-                const tab   = overlay.querySelector(`.mgr-tab[data-panel="${p.id}"]`);
-                panel.hidden = !on;
-                if (tab) {
-                    tab.classList.toggle('active', on);
-                    tab.setAttribute('aria-selected', on ? 'true' : 'false');
-                    tab.tabIndex = on ? 0 : -1;
-                }
-                if (!on) continue;
-                // setAttribute escapes, so the tip needs no pass through escapeHtml.
-                info.setAttribute('data-tip', p.tip);
-                info.setAttribute('aria-label', p.tip);
-                if (!mounted.has(p.id)) {
-                    mounted.add(p.id);
-                    p.mount(panel, modal);
-                }
-            }
-        };
-
-        // Standard ARIA tablist keys, matching the page's own tab bar.
-        overlay.querySelector('.mgr-tabs')?.addEventListener('keydown', e => {
-            const tabs = [...overlay.querySelectorAll('.mgr-tab')];
-            const i = tabs.indexOf(document.activeElement);
-            if (i < 0) return;
-            let j = -1;
-            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % tabs.length;
-            else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + tabs.length) % tabs.length;
-            else if (e.key === 'Home') j = 0;
-            else if (e.key === 'End') j = tabs.length - 1;
-            if (j < 0) return;
-            e.preventDefault();
-            show(tabs[j].dataset.panel);
-            tabs[j].focus();
-        });
-        overlay.querySelectorAll('.mgr-tab').forEach(tab => {
-            tab.addEventListener('click', () => show(tab.dataset.panel));
-        });
-
-        show(panels.some(p => p.id === active) ? active : panels[0].id);
-        return modal;
-    }
-
-    /**
-     * Reorder year-tables newest-first in the DOM without re-rendering. Used
-     * after adding a new year so it slots into the correct visual position
-     * without paying the cost of rebuilding every other table.
-     */
-    function sortTables(container) {
-        const tables = Array.from(container.querySelectorAll('.db-outer[data-year]'));
-        tables.sort((a, b) => parseInt(b.dataset.year) - parseInt(a.dataset.year));
-        tables.forEach(t => container.appendChild(t));
-    }
-
-    // ============================================================================
-    // Year-table controller — shared by the Statements tabs (Cash Flow, Balance
-    // Sheet)
-    // ============================================================================
-    //
-    // Each year-table config calls bootstrapYearTablePage(opts) once at the top
-    // of the page's script (statements.js). Everything below this point implements that
-    // controller and is parameterized by a `ctx` object passed around between
-    // functions. `ctx` holds:
-    //
-    //   Immutable config (set once in bootstrap):
-    //     api                 → object from makeYearTableApi(apiPrefix)
-    //     types               → null OR [{key, label}, ...] of column types
-    //     typeSectionSuffix   → string appended to type labels in section headers
-    //     includeTotals       → bool — render a totals tfoot?
-    //     itemNoun            → what one column is called in the Manage Columns
-    //                           modal's copy ('column' | 'account')
-    //
-    //   Mutable state (rewritten by reloadYearTables):
-    //     columns             → [{key, label, type?}, ...]
-    //     years               → [int, ...]
-    //     entries             → { [yearStr]: { [month]: { [colKey]: number }}}
-    //     container           → the .db-tables-container DOM element
-
-    // ─── API helpers factory ────────────────────────────────────────────────────
-
-    /**
-     * Build a thin object wrapping every year-table API call. `prefix` is the
-     * mount point on the backend (e.g. '/api', '/api/balance').
-     * Call sites stay try/catch-free: every write settles through wrapWrite,
-     * which surfaces failures as an error toast (a silently dropped save is
-     * data loss — the user saw their number in the cell but the DB never got
-     * it) and resolves to { ok: false } instead of rejecting, so awaiting
-     * callers can keep checking `.ok` without exception handling.
-     *
-     * The shapes mirror the backend endpoints (electron/backend/routes.js) exactly.
-     */
-    // Map each API prefix to its Store dataset name. Writes through the API
-    // invalidate the matching cached dataset, so aggregator pages (Dashboard,
-    // Insights, Yearly Review) do not read stale data after a tracker edit.
-    // Tracker pages do not read through the Store: a background revalidation
-    // arriving mid-edit would reset focus and scroll position.
-    const _STORE_NAME_BY_PREFIX = {
-        '/api':         'ie',
-        '/api/balance': 'balance',
+    /** Months since year 0, so two months compare as plain numbers. */
+    const monthIndex = (year, monthIdx) => year * 12 + monthIdx;
+    const thisMonthIndex = () => {
+        const now = new Date();
+        return monthIndex(now.getFullYear(), now.getMonth());
     };
 
+    /** A cell's number, or null when it is empty or unreadable. */
+    function cellNumber(input) {
+        if (input.value === '') return null;
+        const v = parseFloat(stripCurrencyValue(input.value));
+        return Number.isNaN(v) ? null : v;
+    }
+
+    /** A write that did not reach the database is data loss unless it is
+     *  reported: the value is on screen but was never stored. */
+    function reportSaveFailure() {
+        Ant.message.error("Couldn't save your change — it hasn't been stored.");
+    }
+
+    // ─── API ────────────────────────────────────────────────────────────────
+    // One wrapper per statement. Every write settles through wrapWrite, which
+    // reports a failure (a rejected call or an ok:false body) and resolves to
+    // { ok: false } instead of rejecting, so callers check `.ok` without
+    // try/catch. Writes also drop the matching Store dataset, so the pages that
+    // read through the Store (Dashboard, Reports) do not show stale figures.
+    // The statement itself reads straight from the API: a background
+    // revalidation landing mid-edit would reset focus and scroll.
+
+    const STORE_NAME_BY_PREFIX = { '/api': 'ie', '/api/balance': 'balance' };
+
     function makeYearTableApi(prefix) {
-        const jsonHeaders = { 'Content-Type': 'application/json' };
-        const storeName   = _STORE_NAME_BY_PREFIX[prefix];
-        const invalidate  = () => {
+        const storeName = STORE_NAME_BY_PREFIX[prefix];
+        const invalidate = () => {
             if (storeName && window.Store) window.Store.invalidate(storeName);
         };
-        const sendJson = (url, method, body) =>
-            apiFetch(url, { method, headers: jsonHeaders, body: JSON.stringify(body) });
-        // Wrap a write so (a) the Store cache for this feature is dropped once the
-        // request settles and (b) a failure shows a toast instead of being
-        // discarded. A failure is either a rejected fetch (backend unreachable) or
-        // an ok:false result — both the raw response-likes (upsertEntry et al.) and
-        // the .json()-ed bodies (column ops) carry `ok`. A rejection resolves to
-        // { ok: false } so callers need no try/catch (see the doc above).
-        // `report: false` is for writes whose caller displays the failure itself
-        // (deleteColumn's expected 'has_data' refusal → confirmColumnDelete).
-        const wrapWrite = (promise, { report = true } = {}) => promise
+        const sendJson = (url, method, body) => apiFetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const wrapWrite = (promise) => promise
             .then(
                 (res) => {
-                    if (report && res && res.ok === false) reportSaveFailure();
+                    if (res && res.ok === false) reportSaveFailure();
                     return res;
                 },
                 (err) => {
-                    if (report) reportSaveFailure();
+                    console.error(`[statements] write to ${prefix} failed:`, err);
+                    reportSaveFailure();
                     return { ok: false, error: String(err?.message || err) };
                 },
             )
             .finally(invalidate);
+        const json = (res) => res.json();
         return {
-            get:           ()                        => apiFetch(`${prefix}/data`).then(r => r.json()),
-            upsertEntry:   (year, month, cat, value) => wrapWrite(sendJson(`${prefix}/entry`,  'POST',   { year, month, category: cat, value })),
-            deleteEntry:   (year, month, cat)        => wrapWrite(sendJson(`${prefix}/entry`,  'DELETE', { year, month, category: cat })),
-            addYear:       (year)                    => wrapWrite(sendJson(`${prefix}/year`,   'POST',   { year })),
-            deleteYear:    (year)                    => wrapWrite(apiFetch(`${prefix}/year/${year}`, { method: 'DELETE' })),
-            duplicateYear: (src, tgt)                => wrapWrite(sendJson(`${prefix}/year/${src}/duplicate`, 'POST', { target_year: tgt })),
-            addColumn:     (body)                    => wrapWrite(sendJson(`${prefix}/columns`, 'POST', body).then(r => r.json())),
-            updateColumn:  (key, updates)            => wrapWrite(sendJson(`${prefix}/columns/${key}`, 'PUT', updates).then(r => r.json())),
-            moveColumn:    (key, direction)          => wrapWrite(sendJson(`${prefix}/columns/${key}/move`, 'POST', { direction }).then(r => r.json())),
-            reorderColumns:(order)                    => wrapWrite(sendJson(`${prefix}/columns/reorder`, 'POST', { order }).then(r => r.json())),
-            deleteColumn:  (key, force = false) => {
-                const url = force ? `${prefix}/columns/${key}?force=true` : `${prefix}/columns/${key}`;
-                // report:false — the caller inspects the body: a 'has_data'
-                // refusal is the normal path into confirmColumnDelete, not an
-                // error to report.
-                return wrapWrite(apiFetch(url, { method: 'DELETE' }).then(r => r.json()), { report: false });
-            },
+            get: () => apiFetch(`${prefix}/data`).then((res) => {
+                if (!res.ok) throw new Error(`${prefix}/data: ${res.status}`);
+                return res.json();
+            }),
+            upsertEntry: (year, month, category, value) =>
+                wrapWrite(sendJson(`${prefix}/entry`, 'POST', { year, month, category, value })),
+            deleteEntry: (year, month, category) =>
+                wrapWrite(sendJson(`${prefix}/entry`, 'DELETE', { year, month, category })),
+            addYear: (year) => wrapWrite(sendJson(`${prefix}/year`, 'POST', { year })),
+            deleteYear: (year) => wrapWrite(apiFetch(`${prefix}/year/${year}`, { method: 'DELETE' })),
+            duplicateYear: (from, to) =>
+                wrapWrite(sendJson(`${prefix}/year/${from}/duplicate`, 'POST', { target_year: to })),
+            // Column writes (the Balance Sheet's accounts). Their bodies carry
+            // `ok`, so they are parsed before wrapWrite looks at them.
+            addColumn: (body) => wrapWrite(sendJson(`${prefix}/columns`, 'POST', body).then(json)),
+            updateColumn: (key, patch) =>
+                wrapWrite(sendJson(`${prefix}/columns/${encodeURIComponent(key)}`, 'PUT', patch).then(json)),
+            moveColumn: (key, direction) =>
+                wrapWrite(sendJson(`${prefix}/columns/${encodeURIComponent(key)}/move`, 'POST', { direction }).then(json)),
+            deleteColumn: (key, { force = false } = {}) => wrapWrite(apiFetch(
+                `${prefix}/columns/${encodeURIComponent(key)}${force ? '?force=true' : ''}`,
+                { method: 'DELETE' }).then(json)),
         };
     }
 
-    // ─── Render / reload ────────────────────────────────────────────────────────
+    // ─── Layout ─────────────────────────────────────────────────────────────
 
-    /**
-     * Rebuild every year-table from ctx.years/ctx.entries/ctx.columns. Tables
-     * render newest-first; which year is visible is set by the page (the
-     * Statements year stepper toggles [hidden] on the .db-outer cards).
-     */
-    function renderYearTables(ctx) {
-        // Commit any edits still inside their debounce window BEFORE removing the
-        // inputs. fire() writes through to ctx.entries synchronously (see
-        // fireSaveFor), so the rebuild below reads those values even while the API
-        // call is still in flight.
-        flushAllPendingCellSaves();
-        ctx.container.innerHTML = '';
-        [...ctx.years].sort((a, b) => b - a).forEach(year => {
-            const outerEl = createYearTable(year, ctx);
-            ctx.container.appendChild(outerEl);
-            initYearTable(outerEl, ctx.entries[String(year)] || {}, ctx);
-        });
+    /** The columns under their types, in the statement's type order. A type
+     *  with no columns has no group. */
+    function columnGroups(ctx) {
+        return ctx.types
+            .map((t) => ({ ...t, columns: ctx.columns.filter((c) => c.type === t.key) }))
+            .filter((g) => g.columns.length);
     }
 
-    /**
-     * Pull fresh data from the API, write it into ctx, and re-render. Called
-     * after any change that touches multiple tables at once — column add/edit/
-     * delete/reorder/type-change, year duplicate, etc.
-     */
+    /** One year's card. Every label is user-controlled and escaped. */
+    function yearCardHtml(year, ctx) {
+        const groups = columnGroups(ctx);
+        const columns = groups.flatMap((g) => g.columns);
+        const now = thisMonthIndex();
+        const cells = (month) => columns.map((c) => `<td class="data-cell"><input type="text"
+            class="stmt-input" inputmode="decimal" data-month="${month}" data-col="${escapeHtml(c.key)}"
+            aria-label="${escapeHtml(c.label)}, ${month} ${year}"></td>`).join('');
+        const rows = MONTHS.map((month, i) => `
+            <tr${monthIndex(year, i) > now ? ' class="stmt-future"' : ''}>
+                <th class="stmt-month stmt-fixed-start" scope="row">${month}</th>
+                ${cells(month)}
+                <td class="stmt-summary stmt-fixed-end"></td>
+            </tr>`).join('');
+        const totals = !ctx.includeTotals ? '' : `
+            <tfoot><tr class="stmt-total">
+                <th class="stmt-month stmt-fixed-start" scope="row">Total</th>
+                ${columns.map((c) => `<td class="stmt-total-cell" data-total-col="${escapeHtml(c.key)}"></td>`).join('')}
+                <td class="stmt-summary stmt-fixed-end"></td>
+            </tr></tfoot>`;
+        return `
+            <div class="stmt-scroll">
+                <table class="ant-table stmt-grid">
+                    <thead>
+                        <tr>
+                            <th class="stmt-month stmt-fixed-start" rowspan="2" scope="col">Month</th>
+                            ${groups.map((g) => `<th class="stmt-group" colspan="${g.columns.length}" scope="colgroup"
+                                data-type="${g.key}">${escapeHtml(g.label)}</th>`).join('')}
+                            <th class="stmt-summary stmt-fixed-end" rowspan="2" scope="col">${ctx.summaryHead}</th>
+                        </tr>
+                        <tr>${columns.map((c) => `<th class="stmt-col" scope="col"
+                            data-type="${escapeHtml(c.type)}">${escapeHtml(c.label)}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                    ${totals}
+                </table>
+            </div>
+            <div class="stmt-footer">${ctx.footer()}</div>`;
+    }
+
+    function createYearCard(year, ctx) {
+        const card = document.createElement('section');
+        card.className = 'ant-card stmt-year';
+        card.dataset.year = year;
+        card.setAttribute('aria-label', `${ctx.title}, ${year}`);
+        card.hidden = true;   // the page shows the selected year
+        card.innerHTML = yearCardHtml(year, ctx);
+        return card;
+    }
+
+    // ─── Pinned columns' shadows ────────────────────────────────────────────
+    // Ant shades the edge of a pinned column while cells are scrolled under
+    // it. The scroll box carries one class per side; a ResizeObserver re-reads
+    // them when a card is shown (it has no width while hidden) or the window
+    // resizes.
+    function updatePing(scroller) {
+        const max = scroller.scrollWidth - scroller.clientWidth;
+        scroller.classList.toggle('stmt-ping-start', scroller.scrollLeft > 0);
+        scroller.classList.toggle('stmt-ping-end', scroller.scrollLeft < max - 1);
+    }
+
+    const pingObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) updatePing(entry.target);
+    });
+
+    // ─── Render / reload ────────────────────────────────────────────────────
+
+    /** Rebuild every year's card from ctx, newest first. */
+    function renderYearTables(ctx) {
+        // Commit edits still inside their debounce window before the inputs go.
+        // fire() writes through to ctx.entries synchronously, so the rebuild
+        // reads those values even while the request is in flight.
+        flushAllPendingCellSaves();
+        ctx.container.querySelectorAll('.stmt-scroll').forEach((s) => pingObserver.unobserve(s));
+        ctx.container.replaceChildren();
+        [...ctx.years].sort((a, b) => b - a).forEach((year) => {
+            const card = createYearCard(year, ctx);
+            ctx.container.appendChild(card);
+            initYearCard(card, ctx);
+        });
+        if (ctx.summary === 'networth') refreshBalances(ctx);
+        ctx.onRender();
+    }
+
     async function reloadYearTables(ctx) {
-        const data    = await ctx.api.get();
-        ctx.columns   = data.columns;
-        ctx.years     = data.years;
-        ctx.entries   = data.entries;
-        // Provenance layers — only the Cash Flow page ships them. `computed` is
-        // the per-cell transaction sums, `manual` the stored per-cell overrides;
-        // entries is the blend (manual ?? computed). Pages without the layers
-        // (Balance Sheet) render every cell as a plain hand-entered value.
-        ctx.computed  = data.computed || null;
-        ctx.manual    = data.manual   || null;
+        const data = await ctx.api.get();
+        ctx.columns = data.columns;
+        ctx.years = data.years;
+        ctx.entries = data.entries;
+        // Provenance layers: only Cash Flow ships them. `computed` is the
+        // per-cell transaction sums, `manual` the stored overrides; entries is
+        // the blend (manual ?? computed).
+        ctx.computed = data.computed || null;
+        ctx.manual = data.manual || null;
+        ctx.typeOf = new Map(ctx.columns.map((c) => [c.key, c.type]));
         renderYearTables(ctx);
     }
 
-    // ─── Table builder ──────────────────────────────────────────────────────────
-
-    /**
-     * Build the DOM for one year's table:
-     *   - thead:        column labels (Month | col1 | col2 | …); typed columns
-     *                   carry data-type, which draws the type's accent bar
-     *                   along the cell bottom (tables.css); the Month header
-     *                   gets the same bar in neutral border-grey via CSS alone
-     *   - tbody:        twelve month rows of editable currency inputs
-     *   - tfoot:        optional totals row (when ctx.includeTotals is true)
-     *
-     * No per-table chrome: the year caption and the actions are on the Statements
-     * sheet's toolbar (statements.js), which shows one year at a time and acts on
-     * that year across BOTH datasets. The card's visual top is the page's tab bar, styled to
-     * join the .db-wrapper below it (see statements.css).
-     *
-     * Uses createElement + textContent rather than innerHTML for any
-     * user-controlled label (column names, year), removing the HTML-injection risk
-     * without needing escapeHtml.
-     */
-    function createYearTable(year, ctx) {
-        const outer = document.createElement('div');
-        outer.className = 'db-outer';
-        outer.dataset.year = year;
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'db-wrapper';
-
-        const table = document.createElement('table');
-        table.className = 'db-table';
-
-        // ── thead: column headers ───────────────────────────────────────────────
-        const thead = document.createElement('thead');
-        // Cell provenance (computed vs hand-entered) is per cell and shown by the
-        // value's styling, so headers carry no indicator for it.
-        const headerRow = document.createElement('tr');
-        headerRow.className = 'db-header-row';
-        const monthTh = document.createElement('th');
-        monthTh.className = 'col-month';
-        monthTh.textContent = 'Month';
-        headerRow.appendChild(monthTh);
-        ctx.columns.forEach(col => {
-            const th = document.createElement('th');
-            // A typed column's header wears its type's accent as a bar hugging
-            // the cell bottom (th[data-type]::after, tables.css) — the same
-            // per-type colour that marks the type cards in both panels of the
-            // Manage Columns modal — so a header shows the group its
-            // column belongs to. Colour alone shouldn't carry the meaning: the
-            // title names the group (e.g. "Cash Accounts") on hover.
-            if (col.type) {
-                const group = ctx.types?.find(t => t.key === col.type);
-                th.dataset.type = col.type;
-                th.title = (group?.label || col.type) + (ctx.typeSectionSuffix || '');
-            }
-            th.textContent = col.label;
-            headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        // ── tbody: one row per month, one cell per column ──────────────────────
-        const tbody = document.createElement('tbody');
-        MONTHS.forEach(month => {
-            const tr = document.createElement('tr');
-            const monthTd = document.createElement('td');
-            monthTd.className = 'month-label';
-            monthTd.textContent = month;
-            tr.appendChild(monthTd);
-            ctx.columns.forEach(col => {
-                tr.appendChild(_buildDataCell(month, col));
-            });
-            tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-
-        // ── tfoot: optional totals row (only when includeTotals is true) ───────
-        if (ctx.includeTotals) {
-            const tfoot = document.createElement('tfoot');
-            const totalRow = document.createElement('tr');
-            totalRow.className = 'total-row';
-            // First cell is a "Total" label, styled like the month labels above
-            // so it visually anchors the same column.
-            const totalLabelTd = document.createElement('td');
-            totalLabelTd.className = 'month-label';
-            totalLabelTd.textContent = 'Total';
-            totalRow.appendChild(totalLabelTd);
-            ctx.columns.forEach(col => {
-                totalRow.appendChild(_buildTotalCell(col));
-            });
-            tfoot.appendChild(totalRow);
-            table.appendChild(tfoot);
-        }
-
-        wrapper.appendChild(table);
-        outer.appendChild(wrapper);
-        return outer;
-    }
-
-    /**
-     * Build one body cell: an editable <input>. The input carries the currency
-     * symbol as a prefix once content is present (e.g. "$1,234"); see currency.js
-     * for the editing model. On the Cash Flow page a cell whose value is computed
-     * from transactions gets the .cell-computed treatment (accent-info italics)
-     * from applyCellPresentation — an empty cell is blank, so the accent colour is
-     * the only indicator that a computed value is present.
-     */
-    function _buildDataCell(month, col) {
-        const td = document.createElement('td');
-        td.className = 'data-cell';
-
-        const input = document.createElement('input');
-        input.type          = 'text';        // not number, so symbol + commas can show
-        input.inputMode     = 'decimal';     // numeric keypad on mobile
-        input.className     = 'db-input';
-        input.dataset.month = month;
-        input.dataset.col   = col.key;
-        td.appendChild(input);
-        return td;
-    }
-
-    /**
-     * Build one read-only total cell (used when includeTotals is true). The
-     * span starts blank and updateYearTotals() rewrites it to "$<sum>" (with
-     * the user's chosen symbol baked in via formatCurrency) once the column
-     * has a value.
-     */
-    function _buildTotalCell(col) {
-        const td = document.createElement('td');
-        td.className = 'data-cell';
-        td.dataset.totalCol = col.key;
-        const valSpan = document.createElement('span');
-        valSpan.className = 'total-value';
-        td.appendChild(valSpan);
-        return td;
-    }
-
-    // ─── Cell-save scheduler ────────────────────────────────────────────────────
-    // One debounce timer per input. A previous version shared one timer across
-    // every input in a table, which meant typing in cell B would CANCEL cell A's
-    // pending save — rapid bulk edits silently lost all but the last keystroke.
-    //
-    // The map is module-level (shared by every table on the page) so ONE
-    // pagehide listener flushes everything; registering a listener inside
-    // initYearTable leaked a new window listener on every re-render.
-
+    // ─── Cell-save scheduler ────────────────────────────────────────────────
+    // One debounce timer per input: a shared timer would let typing in one cell
+    // cancel another's pending save. Module-level, so one pagehide listener
+    // flushes every table on the page.
     const SAVE_DEBOUNCE_MS = 600;
-    const _pendingCellSaves = new Map();   // input -> { timer, fire }
+    const pendingCellSaves = new Map();   // input → { timer, fire }
 
     function flushAllPendingCellSaves() {
-        for (const { timer, fire } of _pendingCellSaves.values()) {
+        for (const { timer, fire } of pendingCellSaves.values()) {
             clearTimeout(timer);
             fire();
         }
-        _pendingCellSaves.clear();
+        pendingCellSaves.clear();
     }
 
-    // Each save is handed to IPC synchronously inside this handler, so the main
-    // process completes it even though the page is unloading.
+    // Each save is handed to IPC synchronously inside this handler, so the
+    // main process completes it even though the page is unloading.
     window.addEventListener('pagehide', flushAllPendingCellSaves);
 
-    // ─── Cell provenance presentation (Cash Flow) ───────────────────────────────
-    // On pages that ship the provenance layers (ctx.computed / ctx.manual), a
-    // cell is in one of two states:
-    //   computed — no stored entry: the value is the month's transaction sum,
-    //              rendered in accent-info italics (.cell-computed). An empty
-    //              computed cell is simply blank — the accent colour is the
-    //              ONLY signal that a computation is present.
-    //   yours    — a stored entry overrides the cell: plain text like any other
-    //              input. When a computed value exists underneath, the cell
-    //              also grows a hover-revealed ↺ button that clears the entry.
-    // Tooltips carry the education (including the shadowed computed value), so
-    // the resting grid gains no extra chrome.
+    // ─── Cell provenance (Cash Flow) ────────────────────────────────────────
+    // A cell is either computed (no stored entry: the month's transaction sum,
+    // in the primary colour; blank when there is none) or the user's (a stored
+    // entry: plain text). A user value over a computed one grows the ↺ button,
+    // which clears the entry and hands the cell back to the transactions.
 
-    const cellLayerValue = (layer, year, month, col) =>
-        layer?.[String(year)]?.[month]?.[col];
+    const layerValue = (layer, year, month, col) => layer?.[String(year)]?.[month]?.[col];
 
-    /**
-     * Re-render a settled cell at full precision: "$1,240" becomes "$1,240.00".
-     *
-     * A statement column is read down its decimal point, so every amount must
-     * break at the same character position — one whole-dollar cell without cents
-     * shifts its digits one character right and breaks the alignment.
-     * Backend-loaded values already pass through formatCurrency and carry the
-     * cents; a typed value does not, because applyCurrencyFormat echoes back
-     * exactly what was typed (padding mid-keystroke would move the caret). So the
-     * padding is applied here instead, once the cell is settled — on blur, and on
-     * the re-render after a save.
-     *
-     * No-op on an empty cell (the placeholder must show through) and on anything
-     * that does not parse, which is left as typed. Provenance pages get the same
-     * padding from applyCellPresentation, which rebuilds the value from the
-     * layers.
-     */
+    /** Pad a settled value to cents, "$1,240" → "$1,240.00", so a column of
+     *  amounts lines up on its decimal point. Typing echoes exactly what was
+     *  typed (padding mid-keystroke would move the caret), so this runs once
+     *  the cell settles. */
     function normaliseCellValue(input) {
-        if (input.value === '') return;
-        const val = parseFloat(stripCurrencyValue(input.value));
-        if (isNaN(val)) return;
-        input.value = formatCurrency(val, false, { editable: true });
+        const v = cellNumber(input);
+        if (v !== null) input.value = formatCurrency(v, false, { editable: true });
     }
 
-    // Shown once, the first time a computed cell is overridden, describing both
-    // halves of the model at the point the change happens.
-    const OVERRIDE_HINT_KEY = 'cf-override-hint-shown';
-    function maybeShowOverrideHint(ctx, year, month, col) {
-        if (cellLayerValue(ctx.computed, year, month, col) === undefined) return;
-        if (localStorage.getItem(OVERRIDE_HINT_KEY)) return;
-        localStorage.setItem(OVERRIDE_HINT_KEY, '1');
-        UI.toast(
-            'This cell now holds your value and won’t update from transactions. '
-            + 'Clear it anytime to return to the computed figure.',
-            { type: 'info', duration: 8000 }
-        );
+    function revertButton(computed) {
+        const amount = formatCurrency(computed);
+        return `<button type="button" class="ant-btn ant-btn-text ant-btn-sm ant-btn-icon-only stmt-revert"
+            data-tip="Typed over. From transactions: ${escapeHtml(amount)}. Click to use that instead."
+            aria-label="Use ${escapeHtml(amount)} from transactions">${Ant.icon('undo')}</button>`;
     }
 
-    /**
-     * Sync one cell's value, styling, tooltip, and revert affordance to the
-     * provenance layers. No-op on pages without them. `flash` replays the
-     * fade-in on a value returning to its computed state (tables.css §computed);
-     * `onRevert` wires the ↺ button through the same save path as typing.
-     */
-    function applyCellPresentation(input, year, month, col, ctx, { flash = false, onRevert } = {}) {
-        if (!ctx.computed) return;
-        const td       = input.closest('td');
-        const manual   = cellLayerValue(ctx.manual, year, month, col);
-        const computed = cellLayerValue(ctx.computed, year, month, col);
-        let revertBtn  = td.querySelector('.cell-revert');
-
-        input.classList.remove('cell-flash');
+    /** Sync a cell's value, colour and ↺ to the layers. `flash` fades in a
+     *  value returning to its computed state. */
+    function applyCellPresentation(input, year, ctx, { flash = false } = {}) {
+        const { month, col } = input.dataset;
+        const td = input.closest('td');
+        const manual = layerValue(ctx.manual, year, month, col);
+        const computed = layerValue(ctx.computed, year, month, col);
+        td.querySelector('.stmt-revert')?.remove();
+        input.classList.remove('cell-computed', 'cell-flash');
 
         if (manual !== undefined) {
-            // Overridden: the user's value, plain chrome.
             input.value = formatCurrency(manual, false, { editable: true });
-            input.classList.remove('cell-computed');
-            if (computed !== undefined) {
-                input.title = 'Entered by hand — clear the cell to return to the '
-                    + `computed value (${formatCurrency(computed)})`;
-                if (!revertBtn && onRevert) {
-                    revertBtn = document.createElement('button');
-                    revertBtn.type = 'button';
-                    revertBtn.className = 'cell-revert';
-                    revertBtn.textContent = '↺';
-                    revertBtn.title = `Restore the computed value (${formatCurrency(computed)})`;
-                    revertBtn.setAttribute('aria-label', 'Restore the computed value');
-                    revertBtn.addEventListener('click', () => onRevert(input, month, col));
-                    td.appendChild(revertBtn);
-                } else if (revertBtn) {
-                    revertBtn.title = `Restore the computed value (${formatCurrency(computed)})`;
-                }
-            } else {
-                input.title = '';
-                revertBtn?.remove();
-            }
+            if (computed !== undefined) td.insertAdjacentHTML('beforeend', revertButton(computed));
             return;
         }
-
-        revertBtn?.remove();
-        if (computed !== undefined) {
-            input.value = formatCurrency(computed, false, { editable: true });
-            input.classList.add('cell-computed');
-            input.title = 'Computed from your transactions — type to set your own value';
-            if (flash) {
-                // Force a reflow so re-adding the class replays the animation.
-                void input.offsetWidth;
-                input.classList.add('cell-flash');
-            }
-        } else {
+        if (computed === undefined) {
             input.value = '';
-            input.classList.remove('cell-computed');
-            input.title = '';
+            return;
+        }
+        input.value = formatCurrency(computed, false, { editable: true });
+        input.classList.add('cell-computed');
+        if (flash) {
+            void input.offsetWidth;   // reflow, so re-adding the class replays the fade
+            input.classList.add('cell-flash');
         }
     }
 
-    // ─── Table init: populate cells + wire input events ─────────────────────────
+    // Shown once, the first time a computed cell is overridden: the moment the
+    // rule matters, it says both halves of it.
+    const OVERRIDE_HINT_KEY = 'cf-override-hint-shown';
+    function maybeShowOverrideHint() {
+        try {
+            if (localStorage.getItem(OVERRIDE_HINT_KEY)) return;
+            localStorage.setItem(OVERRIDE_HINT_KEY, '1');
+        } catch {
+            return;   // no storage: skip the hint rather than repeat it forever
+        }
+        Ant.message.info('This cell now holds your value and won’t update from transactions. '
+            + 'Clear it to return to the figure from transactions.', { duration: 8000 });
+    }
 
-    /**
-     * Populate the inputs for one already-built year table and attach all event
-     * handlers:
-     *   - input:    live comma formatting + debounced save + (if includeTotals) totals refresh
-     *   - keydown:  spreadsheet-style arrow-key navigation (Enter == ArrowDown)
-     *
-     * Multi-cell selection (drag / Shift+arrow → copy / paste / delete) is added
-     * by cellselect.js once the table is built — see the enableCellSelection call
-     * below.
-     *
-     * Saves are debounced to avoid one API call per keystroke. Deletes are issued
-     * when a value is cleared, so blank cells are not stored as 0.
-     */
-    function initYearTable(outerEl, yearEntries, ctx) {
-        const table       = outerEl.querySelector('.db-table');
-        const currentYear = parseInt(outerEl.dataset.year);
+    // ─── Summaries ──────────────────────────────────────────────────────────
 
-        // Saves are debounced per input via the module-level _pendingCellSaves map
-        // (see "Cell-save scheduler" above) — one API call per SAVE_DEBOUNCE_MS of
-        // typing instead of one per keystroke. The map is also the registry that
-        // blur and pagehide flush, so moving focus or navigating away does not drop
-        // an in-progress edit.
+    const tone = (v) => (v >= 0 ? 'stmt-pos' : 'stmt-neg');
+    const signed = (v) => (v > 0 ? '+' : '') + formatCurrency(v);
 
-        // Re-apply a cell's provenance presentation (value/styling/tooltip/↺),
-        // or — on pages without the layers, i.e. the Balance Sheet — just pad
-        // the settled value back out to cents so the column stays aligned.
-        // Defined up front so fireSaveFor and the revert button share it.
-        const present = (input, month, col, opts = {}) => {
-            if (!ctx.computed) return normaliseCellValue(input);
-            applyCellPresentation(input, currentYear, month, col, ctx, { onRevert, ...opts });
-        };
+    /** Cash Flow: each month's Net (income minus expenses; transfers are
+     *  neither), the column totals and the year's Net. Read from the inputs,
+     *  so a figure being typed is counted at once. */
+    function refreshNet(card, ctx) {
+        let yearNet = 0;
+        let yearAny = false;
+        card.querySelectorAll('tbody tr').forEach((tr) => {
+            let net = 0;
+            let any = false;
+            tr.querySelectorAll('.stmt-input').forEach((input) => {
+                const v = cellNumber(input);
+                const type = ctx.typeOf.get(input.dataset.col);
+                if (v === null || (type !== 'income' && type !== 'expense')) return;
+                net += type === 'income' ? v : -v;
+                any = true;
+            });
+            const cell = tr.querySelector('.stmt-summary');
+            cell.innerHTML = any ? `<span class="${tone(net)}">${escapeHtml(signed(net))}</span>` : '';
+            if (any) { yearNet += net; yearAny = true; }
+        });
+        if (!ctx.includeTotals) return;
+        card.querySelectorAll('[data-total-col]').forEach((cell) => {
+            let sum = 0;
+            let any = false;
+            card.querySelectorAll(`.stmt-input[data-col="${CSS.escape(cell.dataset.totalCol)}"]`).forEach((input) => {
+                const v = cellNumber(input);
+                if (v !== null) { sum += v; any = true; }
+            });
+            cell.textContent = any ? formatCurrency(sum) : '';
+        });
+        card.querySelector('tfoot .stmt-summary').innerHTML = yearAny
+            ? `<span class="${tone(yearNet)}">${escapeHtml(signed(yearNet))}</span>` : '';
+    }
 
-        const fireSaveFor = (input, month, col) => {
-            _pendingCellSaves.delete(input);
-            const val = parseFloat(stripCurrencyValue(input.value));
-            // Write through to ctx.entries (and the manual layer, where the page
-            // has one) so the in-memory model always matches the cells.
-            // renderYearTables rebuilds the DOM from ctx.entries, so without
-            // this a local re-render (e.g. after a column rename) blanks every
-            // value entered since the last full reload.
-            const yearStr = String(currentYear);
-            const months = ctx.entries[yearStr] ??= {};
-            const computed = cellLayerValue(ctx.computed, currentYear, month, col);
-            if (input.value === '' || isNaN(val)) {
-                // Clearing a cell deletes the entry. On provenance pages that
-                // RELEASES the cell back to its computed value (blank when the
-                // month has no matching transactions) — a blank is never a
-                // meaningful override; to force zero, type 0.
-                if (ctx.manual?.[yearStr]?.[month]) delete ctx.manual[yearStr][month][col];
+    /** Balance Sheet: walk every year oldest first, carrying each account's
+     *  latest balance forward. An empty cell at or before this month shows the
+     *  carried figure as its placeholder, and Net Worth sums what each month
+     *  shows, debts counted against it. Every year is walked, because a
+     *  December balance carries into the next January. */
+    function refreshBalances(ctx) {
+        const now = thisMonthIndex();
+        const latest = new Map();   // column key → its most recent balance
+        const cards = [...ctx.container.querySelectorAll('.stmt-year')]
+            .sort((a, b) => a.dataset.year - b.dataset.year);
+        for (const card of cards) {
+            const year = Number(card.dataset.year);
+            card.querySelectorAll('tbody tr').forEach((tr, i) => {
+                const past = monthIndex(year, i) <= now;
+                let worth = 0;
+                let any = false;
+                tr.querySelectorAll('.stmt-input').forEach((input) => {
+                    const col = input.dataset.col;
+                    const own = cellNumber(input);
+                    if (own !== null) latest.set(col, own);
+                    const carried = own === null && past ? latest.get(col) : undefined;
+                    input.placeholder = carried === undefined
+                        ? '' : formatCurrency(carried, false, { editable: true });
+                    const shown = own ?? carried;
+                    if (!past || shown === undefined) return;
+                    worth += ctx.typeOf.get(col) === 'debt' ? -shown : shown;
+                    any = true;
+                });
+                tr.querySelector('.stmt-summary').textContent = any ? formatCurrency(worth) : '';
+            });
+        }
+    }
+
+    function refreshSummaries(card, ctx) {
+        if (ctx.summary === 'networth') refreshBalances(ctx);
+        else refreshNet(card, ctx);
+    }
+
+    // ─── Year card: fill and wire ───────────────────────────────────────────
+
+    /** Arrow keys move between cells and stop at the table's edges; Enter
+     *  moves down, so a column fills without reaching for the arrows. */
+    function moveFocus(input, key) {
+        const td = input.closest('td');
+        const tr = td.parentElement;
+        const col = [...tr.querySelectorAll('td.data-cell')].indexOf(td);
+        let row = tr;
+        let target = col;
+        if (key === 'Enter' || key === 'ArrowDown') row = tr.nextElementSibling;
+        else if (key === 'ArrowUp') row = tr.previousElementSibling;
+        else if (key === 'ArrowRight') target = col + 1;
+        else if (key === 'ArrowLeft') target = col - 1;
+        else return false;
+        const next = row?.querySelectorAll('td.data-cell')[target]?.querySelector('input');
+        if (!next) return false;
+        next.focus();   // its focus handler enters it
+        return true;
+    }
+
+    // ─── Entered and editing ────────────────────────────────────────────────
+    // A spreadsheet cell has two states once you are on it. Entered: the cell
+    // is selected, and the first keystroke replaces its value. Editing: a caret
+    // in the value, placed by double-click or F2. An entered input keeps its
+    // whole value selected so a keystroke replaces it, with the selection and
+    // the caret hidden (.is-entered, statements.css) so the cell's border is
+    // the only highlight.
+    const ENTERED = 'is-entered';
+
+    function enterCell(input) {
+        input.classList.add(ENTERED);
+        input.select();
+    }
+
+    /** Switch to editing with the caret at `at` (default: the end). */
+    function editCell(input, at = input.value.length) {
+        input.classList.remove(ENTERED);
+        input.setSelectionRange(at, at);
+    }
+
+    /** Keys that start typing into an entered cell, replacing what it held. */
+    const replacesValue = (e) => !e.ctrlKey && !e.metaKey && !e.altKey
+        && (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete');
+
+    function initYearCard(card, ctx) {
+        const year = Number(card.dataset.year);
+        const yearKey = String(year);
+        const present = (input, opts) => (ctx.computed
+            ? applyCellPresentation(input, year, ctx, opts)
+            : normaliseCellValue(input));
+
+        const fireSave = (input) => {
+            pendingCellSaves.delete(input);
+            const { month, col } = input.dataset;
+            const value = cellNumber(input);
+            // Write through to ctx so a re-render (after a column edit) shows
+            // what was typed since the last reload.
+            const months = (ctx.entries[yearKey] ??= {});
+            const computed = layerValue(ctx.computed, year, month, col);
+            if (value === null) {
+                // Clearing a cell deletes its entry. On Cash Flow that hands
+                // the cell back to its computed value; a blank is never an
+                // override (to force zero, type 0).
+                if (ctx.manual?.[yearKey]?.[month]) delete ctx.manual[yearKey][month][col];
                 if (computed !== undefined) (months[month] ??= {})[col] = computed;
                 else if (months[month]) delete months[month][col];
-                ctx.api.deleteEntry(currentYear, month, col);
+                ctx.api.deleteEntry(year, month, col);
             } else {
-                (months[month] ??= {})[col] = val;
+                (months[month] ??= {})[col] = value;
                 if (ctx.computed) {
-                    (((ctx.manual ??= {})[yearStr] ??= {})[month] ??= {})[col] = val;
-                    maybeShowOverrideHint(ctx, currentYear, month, col);
+                    (((ctx.manual ??= {})[yearKey] ??= {})[month] ??= {})[col] = value;
+                    if (computed !== undefined) maybeShowOverrideHint();
                 }
-                ctx.api.upsertEntry(currentYear, month, col, val);
+                ctx.api.upsertEntry(year, month, col, value);
             }
-            // Re-present unless the user is mid-edit in this cell (blur presents
-            // then; this covers cellselect's synthetic edits, the ↺ button, and
-            // debounced saves that land after focus moved on). Totals follow so
-            // a restored computed value is counted again.
+            // Re-present unless the cell is still being typed in (its blur
+            // presents it then): this covers pasted and cleared ranges, ↺, and
+            // saves that land after focus moved on.
             if (document.activeElement !== input) {
-                present(input, month, col, { flash: input.value === '' && computed !== undefined });
-                if (ctx.includeTotals) updateYearTotals(outerEl, ctx);
+                present(input, { flash: value === null && computed !== undefined });
+                refreshSummaries(card, ctx);
             }
         };
 
-        // ↺ on an overridden cell: clear the entry through the same save path
-        // as typing, so ctx write-through, totals, and presentation all follow.
-        const onRevert = (input, month, col) => {
-            const pending = _pendingCellSaves.get(input);
-            if (pending) { clearTimeout(pending.timer); _pendingCellSaves.delete(input); }
-            input.value = '';
-            fireSaveFor(input, month, col);
+        const scheduleSave = (input) => {
+            const pending = pendingCellSaves.get(input);
+            if (pending) clearTimeout(pending.timer);
+            const fire = () => fireSave(input);
+            pendingCellSaves.set(input, { timer: setTimeout(fire, SAVE_DEBOUNCE_MS), fire });
         };
 
-        const scheduleSave = (input, month, col) => {
-            const existing = _pendingCellSaves.get(input);
-            if (existing) clearTimeout(existing.timer);
-            const fire = () => fireSaveFor(input, month, col);
-            _pendingCellSaves.set(input, {
-                timer: setTimeout(fire, SAVE_DEBOUNCE_MS),
-                fire,
-            });
-        };
-
-        const flushSave = (input) => {
-            const pending = _pendingCellSaves.get(input);
-            if (!pending) return;
-            clearTimeout(pending.timer);
-            pending.fire();
-        };
-
-        outerEl.querySelectorAll('input[data-month][data-col]').forEach(input => {
-            const month = input.dataset.month;
-            const col   = input.dataset.col;
-            // Pre-fill with the symbol-prefixed display value so the cell matches
-            // the format produced by typing. {editable} keeps the cents even when
-            // "hide cents" is on, which would otherwise truncate them on the next
-            // save. Provenance pages route through present(), which also applies
-            // the computed styling, tooltips and ↺.
+        card.querySelectorAll('.stmt-input').forEach((input) => {
+            const { month, col } = input.dataset;
             if (ctx.computed) {
-                present(input, month, col);
+                present(input);
             } else {
-                const saved = yearEntries?.[month]?.[col];
+                // {editable} keeps the cents even with "hide cents" on, which
+                // would otherwise truncate them on the next save.
+                const saved = ctx.entries[yearKey]?.[month]?.[col];
                 if (saved !== undefined) input.value = formatCurrency(saved, false, { editable: true });
             }
 
             input.addEventListener('input', () => {
-                // On typing, the cell becomes a user value: the computed styling is
-                // removed immediately and the save (debounced below) records the
-                // override.
-                input.classList.remove('cell-computed', 'cell-flash');
-                input.title = '';
+                // Typing makes the cell the user's straight away, and puts it in
+                // editing; the save records it after the pause.
+                input.classList.remove('cell-computed', 'cell-flash', ENTERED);
                 applyCurrencyFormat(input);
-                scheduleSave(input, month, col);
-                if (ctx.includeTotals) updateYearTotals(outerEl, ctx);
+                scheduleSave(input);
+                refreshSummaries(card, ctx);
             });
 
-            // Leaving the cell commits any pending edit immediately, rather than
-            // waiting out the debounce window after tab or click-away. The flush's
-            // fireSaveFor re-renders the cell (focus has already moved); when
-            // nothing was pending (no edit, or the debounce already fired while the
-            // cell was focused) present() runs here instead, so a cleared cell
-            // fades its computed value back in on blur.
+            // Leaving the cell commits a pending edit at once rather than after
+            // the pause. With nothing pending, a cleared cell fades its
+            // computed value back in here.
+            input.addEventListener('focus', () => enterCell(input));
+            // A press places the caret on mouseup; re-select so an entered cell
+            // stays entered. A press inside a cell being edited moves its caret.
+            input.addEventListener('click', () => {
+                if (input.classList.contains(ENTERED)) input.select();
+            });
+            // Double-click edits, with the caret after the word that was hit.
+            input.addEventListener('dblclick', () => editCell(input, input.selectionEnd));
+
             input.addEventListener('blur', () => {
-                if (_pendingCellSaves.has(input)) {
-                    flushSave(input);
+                input.classList.remove(ENTERED);
+                const pending = pendingCellSaves.get(input);
+                if (pending) {
+                    clearTimeout(pending.timer);
+                    pending.fire();
                 } else {
-                    present(input, month, col, {
-                        flash: input.value === ''
-                            && cellLayerValue(ctx.computed, currentYear, month, col) !== undefined,
+                    present(input, {
+                        flash: input.value === '' && layerValue(ctx.computed, year, month, col) !== undefined,
                     });
-                    if (ctx.includeTotals) updateYearTotals(outerEl, ctx);
+                    refreshSummaries(card, ctx);
                 }
             });
 
-            // ── Spreadsheet-style arrow-key navigation ─────────────────────────
-            // Stops at the table edges (does not wrap). Enter is treated as
-            // ArrowDown so quick numeric entry moves down a column without
-            // needing the arrow keys.
-            input.addEventListener('keydown', e => {
-                const monthIdx = MONTHS.indexOf(month);
-                const colIdx   = ctx.columns.findIndex(c => c.key === col);
-                let targetMonth, targetCol;
-                if (e.key === 'Enter' || e.key === 'ArrowDown') {
-                    targetMonth = MONTHS[monthIdx + 1];
-                    targetCol   = col;
-                } else if (e.key === 'ArrowUp') {
-                    targetMonth = MONTHS[monthIdx - 1];
-                    targetCol   = col;
-                } else if (e.key === 'ArrowRight') {
-                    targetMonth = month;
-                    targetCol   = ctx.columns[colIdx + 1]?.key;
-                } else if (e.key === 'ArrowLeft') {
-                    targetMonth = month;
-                    targetCol   = ctx.columns[colIdx - 1]?.key;
-                } else {
-                    return;
+            input.addEventListener('keydown', (e) => {
+                // cellselect.js already acted on it (clearing a range).
+                if (e.defaultPrevented) return;
+                if (e.key === 'F2') {
+                    e.preventDefault();
+                    editCell(input);
+                } else if (moveFocus(input, e.key)) {
+                    e.preventDefault();
+                } else if (input.classList.contains(ENTERED) && replacesValue(e)) {
+                    // Over the whole value, so the key replaces (or clears) it.
+                    input.select();
+                    input.classList.remove(ENTERED);
                 }
-                if (!targetMonth || !targetCol) return;
-                const next = outerEl.querySelector(`input[data-month="${targetMonth}"][data-col="${targetCol}"]`);
-                if (!next) return;
-                e.preventDefault();
-                next.focus();
-                next.select();
             });
         });
 
-        // ── Spreadsheet-style multi-cell selection (drag / Shift+arrow → copy,
-        //    paste, delete). Implemented in cellselect.js, which writes cells by
-        //    dispatching synthetic `input` events that re-run the per-input save
-        //    handlers wired above, so paste and delete persist through the same
-        //    path as typing. Guarded so a page that loads tables.js but builds
-        //    no year table, and does not load cellselect.js, is unaffected.
+        // ↺: clear the override through the same save path as typing.
+        card.addEventListener('click', (e) => {
+            const btn = e.target.closest('.stmt-revert');
+            if (!btn) return;
+            const input = btn.closest('td').querySelector('.stmt-input');
+            const pending = pendingCellSaves.get(input);
+            if (pending) clearTimeout(pending.timer);
+            input.value = '';
+            fireSave(input);
+        });
+
+        // Range selection, copy, paste and delete (cellselect.js). It writes
+        // cells by dispatching `input`, so those edits save through the
+        // handlers above.
         if (window.enableCellSelection) {
-            enableCellSelection(table, { cellSelector: 'td.data-cell' });
+            enableCellSelection(card.querySelector('.stmt-grid'), { cellSelector: 'td.data-cell' });
         }
 
-        if (ctx.includeTotals) updateYearTotals(outerEl, ctx);
+        const scroller = card.querySelector('.stmt-scroll');
+        scroller.addEventListener('scroll', () => updatePing(scroller), { passive: true });
+        pingObserver.observe(scroller);
+
+        if (ctx.summary === 'net') refreshNet(card, ctx);
     }
+
+    // ─── Bootstrap ──────────────────────────────────────────────────────────
 
     /**
-     * Recompute the per-column totals shown in the table footer. Called after any
-     * cell edit, paste, or column add. Empty columns render blank rather than
-     * "$0".
-     *
-     * The cell holds one .total-value span; formatCurrency() applies the symbol
-     * prefix (with the user's chosen currency) and comma formatting.
-     */
-    function updateYearTotals(outerEl, ctx) {
-        ctx.columns.forEach(col => {
-            let sum = 0, hasValue = false;
-            outerEl.querySelectorAll(`input[data-col="${col.key}"]`).forEach(el => {
-                const val = parseFloat(stripCurrencyValue(el.value));
-                if (!isNaN(val)) { sum += val; hasValue = true; }
-            });
-
-            const cell    = outerEl.querySelector(`[data-total-col="${col.key}"]`);
-            if (!cell) return;
-            const valSpan = cell.querySelector('.total-value');
-            valSpan.textContent = hasValue ? formatCurrency(sum) : '';
-        });
-    }
-
-    // ─── Column Manager modal ───────────────────────────────────────────────────
-
-    // Icons for the manager's search / cards / rows — same glyphs as the
-    // categories editor (settingsCategories.js) so the two Statements managers
-    // read identically.
-    const _ICON_X       = '<svg viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-    const _ICON_PLUS    = '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-    const _ICON_SEARCH  = '<svg class="cat-search-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-    const _ICON_CHEVRON = '<svg class="cat-group-chevron" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg>';
-
-    /** The info-glyph text for a column editor, in that dataset's own noun. */
-    function columnEditorTip(ctx) {
-        const nounCap = ctx.itemNoun.charAt(0).toUpperCase() + ctx.itemNoun.slice(1);
-        return `${nounCap}s are the columns of this statement, grouped by `
-            + 'type. Drag one by its handle to reorder it — the order here sets '
-            + 'the column order — or drop it under another type to move it.'
-            + '\n\nDeleting one that still holds saved values asks for '
-            + 'confirmation first.';
-    }
-
-    /**
-     * Build the column editor inside `rootEl` — the Balance Sheet's half of the
-     * Statements manager modal. It is the SAME editor as the categories one
-     * (settingsCategories.js): identical .cat-* markup and styles, identical
-     * interactions, mounted the same way into a root the caller owns. Only the
-     * data layer differs — rows here are ctx.columns, driven through the
-     * /columns endpoints — which is why the two sit as two panels of one modal
-     * (openManagerModal) instead of being two modals.
-     *
-     * Layout: a search field above one collapsible card per column type
-     * ("Cash Accounts" … "Debt Accounts"). The cards are an accordion — all
-     * collapsed on open, expanding one collapses the rest; during a drag a
-     * collapsed card springs open so cross-type moves keep a drop target.
-     * Rows keep the established interactions: borderless inline rename, an
-     * always-visible quiet delete ×, and grip-handle drag-and-drop to reorder
-     * (or retype, by dropping into another card). A quiet "Add …" row closes
-     * each open card: it creates the column immediately with a placeholder
-     * name — the card fixes the type — and focuses the rename input, so there
-     * is no separate name/type form.
-     *
-     * The whole editor is rebuilt from scratch (`buildEditor()`) after every
-     * data change — adds, deletes, reorderings — so we don't have to surgically
-     * update individual rows after each backend call. This costs us very little
-     * (the modal is small and rare to interact with) and eliminates a lot of
-     * bookkeeping bugs. Renames skip the rebuild: nothing else in the editor
-     * shows the label, so the input the user just typed in is already correct.
-     *
-     * SECURITY: every user-controlled value (col.key, col.label, type labels)
-     * is escapeHtml'd before being interpolated into the innerHTML template.
-     */
-    function mountColumnEditor(rootEl, ctx) {
-        // What one column is called in the editor's copy — "column" for a
-        // generic dataset; the Balance Sheet passes "account" (opts.itemNoun) so
-        // every string here reads "account".
-        const noun    = ctx.itemNoun;
-        const nounCap = noun.charAt(0).toUpperCase() + noun.slice(1);
-
-        // View state for this mount: the search query plus which
-        // type card is expanded (accordion — at most one true at a time). Both
-        // survive the full rebuilds below.
-        const openState = {};
-        (ctx.types || []).forEach(t => { openState[t.key] = false; });
-        let query = '';
-        let root  = null;   // the .cat-editor element, recreated by buildManager
-
-        const metaText = (n) => `${n} ${n === 1 ? noun : `${noun}s`}`;
-
-        // Placeholder name for a freshly added column, uniquified so clicking
-        // "Add" twice before renaming still reads unambiguously.
-        const uniqueDefaultLabel = () => {
-            const base   = `New ${nounCap}`;
-            const labels = new Set(ctx.columns.map(c => c.label));
-            if (!labels.has(base)) return base;
-            let n = 2;
-            while (labels.has(`${base} ${n}`)) n++;
-            return `${base} ${n}`;
-        };
-
-        // Re-evaluate the search query against the rendered rows. Pure view
-        // logic — no server round-trip — so it runs on every keystroke and at
-        // the end of every rebuild. A live query hides non-matching rows, drops
-        // cards with no hits entirely, forces matching cards open, and pauses
-        // add/drag (both depend on the full, unfiltered order being visible).
-        const applyFilter = () => {
-            const q = query.trim().toLowerCase();
-            const searching = q.length > 0;
-            root.classList.toggle('cat-searching', searching);
-
-            let anyVisible = false;
-            root.querySelectorAll('.cat-group').forEach(section => {
-                let matches = 0;
-                section.querySelectorAll('.cat-row').forEach(row => {
-                    const name = (row.querySelector('.cat-name')?.value || '').toLowerCase();
-                    const hit = !searching || name.includes(q);
-                    row.hidden = !hit;
-                    if (hit) matches++;
-                });
-
-                section.hidden = searching && matches === 0;
-                if (!section.hidden) anyVisible = true;
-
-                // The type-less variant has no head — its single card is always
-                // open and the accordion state doesn't apply.
-                const head = section.querySelector('.cat-group-head');
-                if (head) {
-                    const open = searching ? true : !!openState[section.dataset.type];
-                    head.setAttribute('aria-expanded', String(open));
-                    const body = section.querySelector('.cat-group-body');
-                    if (open) body.removeAttribute('hidden');
-                    else      body.setAttribute('hidden', '');
-                }
-
-                const addBtn = section.querySelector('.cat-add-row');
-                if (addBtn) addBtn.hidden = searching;
-            });
-
-            root.querySelector('.cat-no-match').hidden = anyVisible;
-        };
-
-        const buildEditor = () => {
-            // ── One row per column: grip handle + rename input + quiet × ───────
-            // Only the grip is draggable; the row stays a normal flow element so
-            // the rename input and × button keep their pointer events.
-            const renderRow = (col) => `
-                <div class="cat-row" data-key="${escapeHtml(col.key)}">
-                    <span class="cat-grip" draggable="true" aria-label="Drag ${escapeHtml(col.label)} to reorder">${_GRIP}</span>
-                    <input type="text" class="cat-name" value="${escapeHtml(col.label)}" maxlength="50"
-                           aria-label="Rename ${escapeHtml(col.label)}">
-                    <button class="cat-icon-btn cat-delete" title="Delete ${escapeHtml(noun)}" aria-label="Delete ${escapeHtml(col.label)}">${_ICON_X}</button>
-                </div>`;
-            const renderRows = (items) => items.map(renderRow).join('')
-                || `<div class="cat-empty" data-placeholder>No ${escapeHtml(noun)}s yet</div>`;
-
-            // ── One collapsible card per type (flat, always-open card when the
-            //    dataset is type-less). Each list carries data-type so a drop
-            //    into it retypes the dragged column. ─────────────────────────────
-            let sectionsHtml;
-            if (ctx.types) {
-                sectionsHtml = ctx.types.map(t => {
-                    const cols    = ctx.columns.filter(c => c.type === t.key);
-                    const heading = t.label + (ctx.typeSectionSuffix || '');
-                    const open    = !!openState[t.key];
-                    const bodyId  = `col-group-body-${escapeHtml(t.key)}`;
-                    return `
-                    <section class="cat-group" data-type="${escapeHtml(t.key)}">
-                        <button type="button" class="cat-group-head"
-                                aria-expanded="${open}" aria-controls="${bodyId}">
-                            <span class="cat-group-dot" aria-hidden="true"></span>
-                            <span class="cat-group-title">${escapeHtml(heading)}</span>
-                            <span class="cat-group-meta">${metaText(cols.length)}</span>
-                            ${_ICON_CHEVRON}
-                        </button>
-                        <div class="cat-group-body" id="${bodyId}"${open ? '' : ' hidden'}>
-                            <div class="cat-list" data-type="${escapeHtml(t.key)}">${renderRows(cols)}</div>
-                            <button type="button" class="cat-add-row" data-type="${escapeHtml(t.key)}"
-                                    aria-label="Add ${escapeHtml(heading)} ${escapeHtml(noun)}">${_ICON_PLUS} Add ${escapeHtml(noun)}</button>
-                        </div>
-                    </section>`;
-                }).join('');
-            } else {
-                sectionsHtml = `
-                <section class="cat-group">
-                    <div class="cat-group-body">
-                        <div class="cat-list">${renderRows(ctx.columns)}</div>
-                        <button type="button" class="cat-add-row"
-                                aria-label="Add ${escapeHtml(noun)}">${_ICON_PLUS} Add ${escapeHtml(noun)}</button>
-                    </div>
-                </section>`;
-            }
-
-            rootEl.innerHTML = `
-                <div class="cat-editor">
-                    <div class="cat-search">
-                        ${_ICON_SEARCH}
-                        <input type="text" class="cat-search-input" placeholder="Search ${escapeHtml(noun)}s"
-                               aria-label="Search ${escapeHtml(noun)}s" value="${escapeHtml(query)}">
-                    </div>
-                    <div class="cat-groups">${sectionsHtml}</div>
-                    <p class="cat-no-match" hidden>No ${escapeHtml(noun)}s match your search.</p>
-                </div>`;
-
-            root = rootEl.querySelector('.cat-editor');
-
-            // ── Search — filter on every keystroke, no round-trip ──────────────
-            const searchInput = rootEl.querySelector('.cat-search-input');
-            searchInput.addEventListener('input', () => {
-                query = searchInput.value;
-                applyFilter();
-            });
-
-            // ── Card headers — accordion expand/collapse: opening a card
-            // collapses the others. A live search forces matching cards open
-            // (applyFilter takes precedence), so the stored state applies again
-            // only once the query is cleared. ─────────────────────────────────
-            rootEl.querySelectorAll('.cat-group-head').forEach(head => {
-                head.addEventListener('click', () => {
-                    const type     = head.closest('.cat-group').dataset.type;
-                    const willOpen = !openState[type];
-                    Object.keys(openState).forEach(k => { openState[k] = false; });
-                    if (willOpen) openState[type] = true;
-                    applyFilter();
-                });
-            });
-
-            // ── Inline rename — commits on blur/Enter; Escape cancels. Blank or
-            // unchanged values revert without an API call. No rebuild on
-            // success, so focus stays where the user left it. ───────────────────
-            rootEl.querySelectorAll('.cat-row .cat-name').forEach(input => {
-                const key = input.closest('.cat-row').dataset.key;
-                input.addEventListener('blur', async () => {
-                    const newLabel = input.value.trim();
-                    if (!newLabel || newLabel === input.defaultValue) {
-                        input.value = input.defaultValue;
-                        return;
-                    }
-                    const result = await ctx.api.updateColumn(key, { label: newLabel });
-                    if (!result.ok) {          // wrapWrite already announced the failure
-                        input.value = input.defaultValue;
-                        return;
-                    }
-                    input.defaultValue = newLabel;
-                    const col = ctx.columns.find(c => c.key === key);
-                    if (col) col.label = newLabel;
-                    renderYearTables(ctx);
-                });
-                input.addEventListener('keydown', e => {
-                    if (e.key === 'Enter') input.blur();     // commits via blur handler
-                    if (e.key === 'Escape') {                 // cancels — restore label
-                        input.value = input.defaultValue;
-                        input.blur();
-                    }
-                });
-            });
-
-            // ── Drag-and-drop reorder + retype ─────────────────────────────────
-            // The grip handle is the draggable element. The source row stays put
-            // (dimmed) during the drag; an accent drop-indicator line shows where
-            // the column will land instead of live-shuffling the rows. On dragend
-            // we move the row to the indicator's slot, then read the final DOM
-            // order across every card — a row's card dictates its new type — and
-            // push the whole ordering to the backend in one call.
-            let draggingRow = null;
-            let indicator   = null;   // the accent line element, reparented as it moves
-
-            const placeIndicator = (list, before) => {
-                if (!indicator) {
-                    indicator = document.createElement('div');
-                    indicator.className = 'cat-drop-indicator';
-                }
-                if (before) list.insertBefore(indicator, before);
-                else list.appendChild(indicator);
-            };
-
-            const commitOrder = async () => {
-                const order = [];
-                rootEl.querySelectorAll('.cat-list').forEach(list => {
-                    const type = list.dataset.type;   // undefined on type-less datasets
-                    list.querySelectorAll('.cat-row').forEach(row => {
-                        order.push(ctx.types ? { key: row.dataset.key, type } : { key: row.dataset.key });
-                    });
-                });
-                // No-op if the order + type assignment is unchanged from ctx.columns,
-                // so an accidental click-drag that lands back home costs no round-trip.
-                const same = order.length === ctx.columns.length && order.every((o, i) =>
-                    o.key === ctx.columns[i].key && (!ctx.types || o.type === ctx.columns[i].type));
-                if (same) return;
-                await ctx.api.reorderColumns(order);
-                await reloadYearTables(ctx);
-                buildEditor();
-            };
-
-            rootEl.querySelectorAll('.cat-grip').forEach(grip => {
-                const row = grip.closest('.cat-row');
-                grip.addEventListener('dragstart', e => {
-                    // A filtered list shows a partial order — reordering it would
-                    // write positions for rows that are not visible. Clear the
-                    // search first.
-                    if (query.trim()) { e.preventDefault(); return; }
-                    draggingRow = row;
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', row.dataset.key); // Firefox needs payload
-                    e.dataTransfer.setDragImage(row, 12, 12);
-                    // Defer the dimming and drag mode so the drag image is not the
-                    // faded row. `dragging` on the editor root hides the empty-card
-                    // placeholders (CSS) so the accent line is the only indicator.
-                    requestAnimationFrame(() => {
-                        row.classList.add('cat-dragging');
-                        root.classList.add('dragging');
-                    });
-                });
-                grip.addEventListener('dragend', () => {
-                    // Land the row where the indicator was sitting, then clean up.
-                    if (indicator?.parentElement) {
-                        indicator.parentElement.insertBefore(draggingRow, indicator);
-                    }
-                    indicator?.remove();
-                    indicator = null;
-                    row.classList.remove('cat-dragging');
-                    root.classList.remove('dragging');
-                    // Reconcile the accordion after any spring-loaded expansions:
-                    // the card the row landed in becomes the open one.
-                    const landedType = row.closest('.cat-list')?.dataset.type;
-                    if (landedType !== undefined) {
-                        Object.keys(openState).forEach(k => { openState[k] = false; });
-                        openState[landedType] = true;
-                    }
-                    applyFilter();
-                    draggingRow = null;
-                    commitOrder();
-                });
-            });
-
-            // Delegated dragover: spring a collapsed card open when the drag
-            // hovers it (the accordion never has two cards open at once, so a
-            // cross-type move would otherwise have no drop target), then place
-            // the accent line at the insertion point. Spring-opening is view-
-            // only — dragend restores the accordion state. The indicator has
-            // pointer-events:none so it does not intercept this dragover.
-            root.addEventListener('dragover', e => {
-                if (!draggingRow) return;
-                const group = e.target.closest?.('.cat-group');
-                if (group) {
-                    const body = group.querySelector('.cat-group-body');
-                    if (body?.hasAttribute('hidden')) {
-                        body.removeAttribute('hidden');
-                        group.querySelector('.cat-group-head')?.setAttribute('aria-expanded', 'true');
-                    }
-                }
-                const list = e.target.closest?.('.cat-list');
-                if (!list) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                // _dragAfterRow ignores the dimmed source row, so hovering near
-                // it resolves cleanly.
-                placeIndicator(list, _dragAfterRow(list, e.clientY));
-            });
-            root.addEventListener('drop', e => { if (draggingRow) e.preventDefault(); });
-
-            // ── Delete column. If the column has saved data the backend refuses,
-            // and confirmColumnDelete re-confirms before forcing. ─────────────
-            rootEl.querySelectorAll('.cat-delete').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const key    = btn.closest('.cat-row').dataset.key;
-                    const col    = ctx.columns.find(c => c.key === key);
-                    const result = await ctx.api.deleteColumn(key);
-                    if (!result.ok) {
-                        // 'has_data' is the expected refusal — re-confirm and
-                        // force. Anything else is a failure: report it and keep the
-                        // column, rather than removing it locally while the backend
-                        // still holds it.
-                        if (result.error === 'has_data') {
-                            confirmColumnDelete(col.label, async () => {
-                                const forced = await ctx.api.deleteColumn(key, true);
-                                if (!forced.ok) reportSaveFailure();
-                                await reloadYearTables(ctx);
-                                buildEditor();
-                            });
-                        } else {
-                            reportSaveFailure();
-                        }
-                        return;
-                    }
-                    ctx.columns = ctx.columns.filter(c => c.key !== key);
-                    renderYearTables(ctx);
-                    buildEditor();
-                });
-            });
-
-            // ── Add — the quiet row closing each open card. Creates the column
-            // immediately with a unique placeholder name (the card fixes the
-            // type), then focuses the fresh row's rename input. ────────────────
-            rootEl.querySelectorAll('.cat-add-row').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const label  = uniqueDefaultLabel();
-                    const body   = ctx.types ? { label, type: btn.dataset.type } : { label };
-                    const result = await ctx.api.addColumn(body);
-                    if (!result.ok) return;   // wrapWrite already announced the failure
-                    await reloadYearTables(ctx);
-                    buildEditor();
-                    const input = result.column && rootEl.querySelector(
-                        `.cat-row[data-key="${result.column.key}"] .cat-name`);
-                    if (input) { input.focus(); input.select(); }
-                });
-            });
-
-            applyFilter();
-        };
-
-        buildEditor();
-    }
-
-    // ─── Bootstrap ──────────────────────────────────────────────────────────────
-
-    /**
-     * Wire up a full year-table page from a single config object. Each page's JS
-     * file is a single call to this function with that page's config.
+     * Start the grid for one statement.
      *
      * opts:
-     *   apiPrefix           string  — API mount point (e.g. '/api/balance')
-     *   types               array?  — [{key, label}, ...]. Omit for type-less pages.
-     *   typeSectionSuffix   string? — appended to type labels in section headers
-     *                                 (e.g. ' Accounts' → "Cash Accounts")
-     *   includeTotals       bool    — render a totals tfoot per table
-     *   itemNoun            string? — what one column is called in the Manage
-     *                                 Columns modal's copy (default 'column';
-     *                                 the Balance Sheet passes 'account')
-     *   hideColumnManager   bool    — when true, the per-page Manage Columns
-     *                                 button + its modal are skipped entirely.
-     *                                 Used by Income & Expenses, whose columns
-     *                                 live in the unified Settings → Categories
-     *                                 editor and aren't editable per-page.
-     *   containerSelector     string? — where tables render (default
-     *                                   '.db-tables-container'). The Statements
-     *                                   page runs TWO controllers side by side, so
-     *                                   each needs a separate container and
-     *                                   buttons.
-     *   addYearBtnSelector    string? — the "Add New Year" button (default
-     *                                   '.db-actions .button-primary'); pass null
-     *                                   when the page wires add-year itself via
-     *                                   the handle's addYear
-     *   manageColsBtnSelector string? — the "Manage Columns" button (default
-     *                                   '.db-actions .button-secondary'); pass
-     *                                   null when the page mounts the editor
-     *                                   itself via the handle's columnEditor
-     *                                   (Statements makes it one panel of the
-     *                                   modal its toolbar button opens)
+     *   apiPrefix         '/api' (Cash Flow) or '/api/balance' (Balance Sheet)
+     *   title             the statement's name, for each card's label
+     *   types             [{ key, label }] — the column groups, in order
+     *   summary           'net' (income minus expenses) or 'networth' (assets
+     *                     minus debts, balances carried forward)
+     *   summaryHead       trusted markup for the summary column's header
+     *   includeTotals     render a Total row
+     *   footer            () → trusted markup for the note under the table
+     *   containerSelector where the cards go
+     *   onRender          runs after every full render and every added year,
+     *                     and once with nothing rendered if the load fails
+     *   onError           (err) → runs when the statement cannot be loaded
      *
-     * Returns a handle the page controller uses for year-level operations (the
-     * Statements toolbar acts on a year across BOTH datasets):
-     *   api           — the makeYearTableApi wrapper for this dataset
-     *   reload        — re-fetch /data and re-render every table
-     *   hasYear       — whether this dataset currently has the given year
-     *   addYear       — create a year in this dataset and render its table
-     *   columnEditor  — { tip, mount } for this dataset's column editor, ready
-     *                   to hand to openManagerModal as a panel
+     * Returns the handle the page and its managers use: api, reload(),
+     * years(), hasYear(year), addYear(year), columns(), and
+     * valueCount(columnKey), the stored values in a column across every year.
      */
     function bootstrapYearTablePage(opts) {
         const ctx = {
-            api:                 makeYearTableApi(opts.apiPrefix),
-            types:               opts.types || null,
-            typeSectionSuffix:   opts.typeSectionSuffix || '',
-            includeTotals:       !!opts.includeTotals,
-            itemNoun:            opts.itemNoun || 'column',
-            hideColumnManager:   !!opts.hideColumnManager,
-            // Mutable state — populated by reloadYearTables() in init below.
-            columns:   [],
-            years:     [],
-            entries:   {},
-            computed:  null,
-            manual:    null,
-            container: null,
+            api: makeYearTableApi(opts.apiPrefix),
+            title: opts.title,
+            types: opts.types,
+            summary: opts.summary,
+            summaryHead: opts.summaryHead,
+            includeTotals: !!opts.includeTotals,
+            footer: opts.footer,
+            onRender: opts.onRender || (() => {}),
+            container: document.querySelector(opts.containerSelector),
+            columns: [],
+            years: [],
+            entries: {},
+            computed: null,
+            manual: null,
+            typeOf: new Map(),
         };
 
-        // Create the year on the backend, append a fresh table, then re-sort so
-        // it slots into the correct visual position. Used by the button handler
-        // below and exposed on the handle for page controllers that create a
-        // year across several datasets at once (Statements).
-        const addYear = async (newYear) => {
-            await ctx.api.addYear(newYear);
-            ctx.years.push(newYear);
-            ctx.entries[String(newYear)] = {};
-            const outer = createYearTable(newYear, ctx);
-            ctx.container.appendChild(outer);
-            initYearTable(outer, {}, ctx);
-            sortTables(ctx.container);
+        // Create the year on the backend and slot its card in among the
+        // others; the page selects it from onRender.
+        const addYear = async (year) => {
+            const res = await ctx.api.addYear(year);
+            if (res.ok === false) return false;
+            ctx.years.push(year);
+            ctx.entries[String(year)] = {};
+            const card = createYearCard(year, ctx);
+            const after = [...ctx.container.querySelectorAll('.stmt-year')]
+                .find((c) => Number(c.dataset.year) < year);
+            ctx.container.insertBefore(card, after || null);
+            initYearCard(card, ctx);
+            if (ctx.summary === 'networth') refreshBalances(ctx);
+            ctx.onRender();
+            return true;
         };
 
-        const init = async () => {
-            ctx.container = document.querySelector(opts.containerSelector || '.db-tables-container');
-            await reloadYearTables(ctx);
+        const valueCount = (key) => Object.values(ctx.entries)
+            .reduce((n, months) => n + Object.values(months).filter((m) => m[key] !== undefined).length, 0);
 
-            // "Add New Year" button — opens the year-prompt modal; on confirm it
-            // creates the year in this dataset. Pages that wire the button
-            // themselves (Statements adds the year to BOTH datasets) pass
-            // addYearBtnSelector: null and call the handle's addYear instead.
-            if (opts.addYearBtnSelector !== null) {
-                const addYearBtn = document.querySelector(opts.addYearBtnSelector || '.db-actions .button-primary');
-                addYearBtn.addEventListener('click', () => {
-                    const existing = Array.from(ctx.container.querySelectorAll('.db-outer[data-year]'))
-                        .map(el => parseInt(el.dataset.year))
-                        .filter(y => !isNaN(y));
-                    promptAddYear(existing, addYear);
-                });
-            }
-
-            // "Manage Columns" button — opens the column editor alone in the
-            // shared manager modal. Skipped when the page opts out (Cash Flow
-            // manages categories in Settings) or wires the entry point itself
-            // (manageColsBtnSelector: null + the handle's columnEditor, which is
-            // how Statements makes it one panel of a two-panel modal).
-            // querySelector returns null when the button is not in the template,
-            // so the guard covers that case without an explicit flag.
-            if (opts.manageColsBtnSelector !== null) {
-                const manageBtn = document.querySelector(opts.manageColsBtnSelector || '.db-actions .button-secondary');
-                if (manageBtn && !ctx.hideColumnManager) {
-                    manageBtn.addEventListener('click', () => openManagerModal({
-                        title:     'Manage Columns',
-                        className: 'col-manager-overlay',
-                        panels:    [{
-                            id:    'columns',
-                            label: 'Columns',
-                            tip:   columnEditorTip(ctx),
-                            mount: (root) => mountColumnEditor(root, ctx),
-                        }],
-                    }));
-                }
-            }
-        };
-
-        // Script tags are at the end of <body>, so the DOM is already parsed when
-        // this runs; no DOMContentLoaded wait is needed.
-        init();
+        // Scripts sit at the end of <body>, so the container is already parsed.
+        reloadYearTables(ctx).catch((err) => {
+            console.error(`[statements] ${opts.apiPrefix} failed to load:`, err);
+            opts.onError?.(err);
+            ctx.onRender();
+        });
 
         return {
-            api:           ctx.api,
-            reload:        () => reloadYearTables(ctx),
-            hasYear:       (year) => ctx.years.includes(year),
+            api: ctx.api,
+            reload: () => reloadYearTables(ctx),
+            years: () => [...ctx.years],
+            hasYear: (year) => ctx.years.includes(year),
             addYear,
-            columnEditor:  {
-                tip:   columnEditorTip(ctx),
-                mount: (root) => mountColumnEditor(root, ctx),
-            },
+            columns: () => [...ctx.columns],
+            valueCount,
         };
     }
 
-    // ─── Cross-file surface ─────────────────────────────────────────────────────
-    // Consumed by statements.js (the year-table pages); the matching readonly
-    // entries live in eslint.config.mjs.
-    window.confirmDelete = confirmDelete;
-    window.promptAddYear = promptAddYear;
-    window.openManagerModal = openManagerModal;
+    // Consumed by statements.js; the matching readonly entry lives in
+    // eslint.config.mjs.
     window.bootstrapYearTablePage = bootstrapYearTablePage;
 }());

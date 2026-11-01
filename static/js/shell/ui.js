@@ -58,25 +58,17 @@
 //       relabel such a button. The caret is a real child element, so writing
 //       btn.textContent directly would delete it — go through setPickerLabel.
 //
-//   UI.CARD_ICONS
-//       The 20px glyph set the hover cards use (pencil / check / cross / trash
-//       / plus). Separate from UI.ICONS, which is the 24px empty-state set.
-//
 //   UI.floatingCard(id, className, ariaLabel)  → the element
 //   UI.positionFloatingCard(card, anchor, gap = 8)
-//   UI.cardActions(prefix, dataAttr)  → actionBtn(action, value, icon, label, extra)
 //   UI.markActive(selector, activeClass, isActive)
 //       The hover-card chrome. It was promoted here when the Recurring
 //       calendar's chip cards (#rec-pop) and the Balance Forecast's pin cards
 //       (#fc-pop) were the same idiom — a floating row anchored to a mark, with a
 //       display mode and an edit mode — and each held its own copy of the element
-//       factory, the flip-and-clamp positioning, the action-button markup and the
-//       active-marker toggle, plus a byte-identical icon set. Recurring's chips
-//       now open that schedule's editor instead, so floatingCard,
-//       positionFloatingCard and markActive have one caller left (#fc-pop) while
-//       CARD_ICONS and cardActions still serve both pages. The CONTENT of
-//       each card stays in its own file: one describes a merchant and a
-//       cadence, the other a label and a date, and they have no rows in common.
+//       factory, the flip-and-clamp positioning and the active-marker toggle.
+//       Recurring's chips now open that schedule's editor instead, so these
+//       serve the Balance Forecast's pin cards (#fc-pop) alone. The cards'
+//       buttons and icons are Ant Design's now (widgets/ant.js).
 //
 //   UI.observeChart(el, draw(w, h, animate), { height, target })  /  UI.unobserveChart(el)
 //       Draw a chart now and again on every real resize of its container.
@@ -172,8 +164,8 @@
         // ── Dropdown menu ──────────────────────────────────────────────────────
         // Anchored to `anchorBtn`: absolute-positioned into its parent, which is
         // forced to position: relative only when otherwise unpositioned (an
-        // inline `relative` on a sticky/absolute parent would override it — see
-        // .p-forehead-btns in tables.css). Closes on outside click. `selected`
+        // inline `relative` on a sticky/absolute parent would override it).
+        // Closes on outside click. `selected`
         // marks the current choice in picker-style menus (stepper month/year).
         function openMenu(anchorBtn, items) {
             document.querySelector('.p-table-dropdown')?.remove();
@@ -297,13 +289,26 @@
             if (!btn || !menu) return null;
 
             const close = () => { menu.hidden = true; };
+            // The choice the button shows is marked in the list it opens
+            // (aria-current), matched by caption: every caller already keeps
+            // the button's label in step with its state through setPickerLabel,
+            // so the label is the one value every picker has in common.
+            const markCurrent = () => {
+                const label = btn.textContent.trim();
+                for (const item of menu.querySelectorAll('button')) {
+                    if (item.textContent.trim() === label) item.setAttribute('aria-current', 'true');
+                    else item.removeAttribute('aria-current');
+                }
+            };
             btn.addEventListener('click', (e) => {
                 // Stop the document listener below from seeing this same click
                 // and closing the menu we are opening.
                 e.stopPropagation();
                 // A picker with nothing to pick (no years in the ledger) is
                 // disabled rather than empty, so it must not open.
-                if (!btn.disabled) menu.hidden = !menu.hidden;
+                if (btn.disabled) return;
+                menu.hidden = !menu.hidden;
+                if (!menu.hidden) markCurrent();
             });
             document.addEventListener('click', close);
 
@@ -318,18 +323,7 @@
             return { close };
         }
 
-        // ── Hover cards (Recurring chips, Forecast pins) ───────────────────────
-
-        // 20px stroke glyphs for the card's action buttons. A separate, smaller
-        // set from ICONS above: these sit in a 22px button inside a floating
-        // row, not in an empty state's glyph tile.
-        const CARD_ICONS = {
-            pencil: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M14.5 3.5l2 2-9.5 9.5-3 1 1-3 9.5-9.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
-            check:  '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 10.5l3.5 3.5L15 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-            cross:  '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
-            trash:  '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-            plus:   '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 5v10M5 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
-        };
+        // ── Hover cards (Forecast pins) ────────────────────────────────────────
 
         /** The card element, created on first use and reused after. Parked on
          *  <body> and fixed-positioned by the caller, so the scroll container
@@ -361,15 +355,6 @@
             left = Math.min(Math.max(8, left), Math.max(8, window.innerWidth - c.width - 8));
             card.style.top = `${Math.round(top)}px`;
             card.style.left = `${Math.round(left)}px`;
-        }
-
-        /** Build the card's action-button maker for one page's class prefix and
-         *  identifying data attribute — `cardActions('rec', 'key')` returns the
-         *  `actionBtn(action, value, icon, label, extra)` both cards call. */
-        function cardActions(prefix, dataAttr) {
-            return (action, value, icon, label, extraCls = '') =>
-                `<button type="button" class="button-icon ${prefix}-action-btn ${extraCls}" data-action="${escapeHtml(action)}"
-      data-${dataAttr}="${escapeHtml(String(value))}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${CARD_ICONS[icon]}</button>`;
         }
 
         /** Light up the marks the open card belongs to — a monthly bill's whole
@@ -493,7 +478,11 @@
         //
         // `dismissOnBackdrop` also closes on a click outside the dialog. Off by
         // default: a form dialog would lose what was typed into it.
-        function dialog(bodyHtml, { className = '', zIndex = null, dismissOnBackdrop = false, onClose = null } = {}) {
+        //
+        // `canClose`, when given, is asked before every close, the caller's
+        // own included; returning false keeps the dialog open (a write still
+        // in flight). The caller clears its own reason before closing it.
+        function dialog(bodyHtml, { className = '', zIndex = null, dismissOnBackdrop = false, onClose = null, canClose = null } = {}) {
             const overlay = document.createElement('div');
             overlay.className = 'confirm-overlay';
             if (zIndex) overlay.style.zIndex = String(zIndex);
@@ -512,7 +501,7 @@
             };
             let closed = false;
             function close() {
-                if (closed) return;
+                if (closed || (canClose && !canClose())) return;
                 closed = true;
                 overlay.remove();
                 document.removeEventListener('keydown', onKey);
@@ -596,7 +585,7 @@
         return {
             emptyState, ICONS, skChart, skRows, skeletonGuard, openMenu, wirePicker,
             lockPickerWidth, PICKER_CARET, setPickerLabel, toast,
-            CARD_ICONS, floatingCard, positionFloatingCard, cardActions, markActive,
+            floatingCard, positionFloatingCard, markActive,
             dialog, confirm, observeChart, unobserveChart,
         };
     })();

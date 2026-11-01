@@ -2,7 +2,8 @@
 
 // UI probe for the first-run onboarding flow. Boots the real app entry against
 // an isolated (fresh) userData dir, then drives Dashboard → hero → account picker →
-// import → "Here Is Your Import", capturing a screenshot at each step.
+// the import wizard (file, columns, review, done), capturing a screenshot at
+// each step, then an ordinary import from the ledger.
 //
 //   electron scratchpad/probe-onboarding.js
 //
@@ -146,81 +147,67 @@ app.whenReady().then(async () => {
       };
     })()`);
 
+    // The import wizard (an Ant Design Modal stepping through File, Columns and
+    // Review here, since first-run has asked the account already). Its drop
+    // zone clicks the file input, which the patch above answers with the CSV.
     await js('document.querySelector(".onb-next").click()');
     await sleep(1200);
-    check('column-mapping step reached',
-      await js('!!document.querySelector(".tx-import-map-form")'));
-    const detected = await js(`(() => {
-      const g = (f) => { const s = document.querySelector('.tx-import-map-select[data-field="'+f+'"]'); return s ? s.selectedOptions[0].textContent : null; };
-      return { date: g('date'), description: g('description'), amount: g('amount'), balance: g('balance') };
-    })()`);
+    check('the wizard opens at the file, the account already settled',
+      await js(`[...document.querySelectorAll('.tx-import-modal .ant-steps-item-title')].map(e => e.textContent).join('|')`) === 'File|Columns|Review');
+    check('account is not re-asked', await js(`!document.querySelector('.tx-import-modal input[type="radio"]')`));
+    await js('document.querySelector(".tx-import-modal .ant-upload-drag").click()');
+    await sleep(1200);
+    const mapped = (f) => `document.querySelector('.tx-import-modal [data-map="${f}"]')?.selectedOptions[0]?.textContent`;
+    check('column-mapping step reached', await js(`!!document.querySelector('.tx-import-map')`));
+    const detected = await js(`({ date: ${mapped('date')}, description: ${mapped('description')}, amount: ${mapped('amount')}, balance: ${mapped('balance')} })`);
     check('columns auto-detected, including the balance column',
       detected.date === 'Posting Date' && detected.description === 'Description'
         && detected.amount === 'Amount' && detected.balance === 'Balance',
       JSON.stringify(detected));
 
     // ── The live preview reflects the MAPPING, not a raw file dump ──
-    const firstCell = await js(`document.querySelector('.tx-import-preview-wrap table tbody tr td')?.textContent.trim()`);
+    const cell = (n) => `document.querySelector('.tx-import-preview tbody tr td:nth-child(${n})')?.textContent.trim()`;
+    const firstCell = await js(cell(1));
     check('live preview shows the parsed date (mapped), not the raw file string',
-      firstCell === '2026-03-02', firstCell);
+      firstCell === await js(`formatDate('2026-03-02')`), firstCell);
     await shot('03-mapping');
 
     // Re-map Notes to the Balance column and confirm the preview updates
     // immediately, with no Continue click involved.
-    await js(`(() => {
-      const sel = document.querySelector('.tx-import-map-select[data-field="notes"]');
-      const opt = [...sel.options].find(o => o.textContent === 'Balance');
+    const setMap = (field, text) => js(`(() => {
+      const sel = document.querySelector('.tx-import-modal [data-map="${field}"]');
+      const opt = [...sel.options].find(o => o.textContent === ${JSON.stringify(text)});
       sel.value = opt.value;
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     })()`);
+    await setMap('notes', 'Balance');
     await sleep(200);
-    const notesCell = await js(`document.querySelector('.tx-import-preview-wrap table tbody tr td:nth-child(4)')?.textContent.trim()`);
+    const notesCell = await js(cell(3));
     check('changing a column selection live-updates the preview', notesCell === '2413.19', notesCell);
     await shot('03b-mapping-live-update');
-
-    // Put it back to skip before continuing, so the rest of the run matches
-    // the file's real shape (no Notes column).
-    await js(`(() => {
-      const sel = document.querySelector('.tx-import-map-select[data-field="notes"]');
-      sel.value = '';
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`);
+    // Back to skip, so the rest of the run matches the file's real shape.
+    await setMap('notes', '— skip —');
     await sleep(200);
 
-    await js('document.querySelector(".tx-import-continue-btn").click()');
-    await sleep(1200);
-    check('combined import screen reached', await js('!!document.querySelector(".tx-import-preview-full")'));
-    check('titled "Here Is Your Import" — the merged preview + results screen',
-      await js(`document.querySelector('.tx-import-dialog-title')?.textContent`) === 'Here Is Your Import');
-    check('account is not re-asked here',
-      await js(`!document.querySelector('.tx-import-dialog .acct-tiles')`));
-    check('no balance opt-in question anywhere in the flow',
-      await js(`!document.querySelector('.tx-import-balance-prompt, .tx-import-balance-choice')`));
-    // ── Step 3's uncategorized digest — computed by a dry run BEFORE anything
-    // commits — now lives in the STATIC bar (replacing the old "Importing
-    // into: <account>" line), and exactly two footer actions ──
-    const digest = await js(`(() => ({
-      headline: document.querySelector('.tx-found-headline')?.textContent.trim() || '',
-      note: document.querySelector('.tx-import-balance-bar .tx-found-note')?.textContent.replace(/\\s+/g,' ').trim() || '',
-      noteIsStatic: !!document.querySelector('.tx-import-balance-bar .tx-found-note'),
-      hasBars: !!document.querySelector('.tx-found-cat'),
-      hasTotals: !!document.querySelector('.tx-found-totals'),
-      buttons: [...document.querySelectorAll('.tx-import-footer--preview button')].map(b => b.textContent.trim()),
+    await js('document.querySelector(".tx-import-modal [data-act=continue]").click()');
+    await sleep(1400);
+    const review = await js(`(() => ({
+      title: document.querySelector('.tx-import-title')?.textContent,
+      stats: [...document.querySelectorAll('.tx-import-stats .ant-statistic-title')].map(e => e.textContent).join('|'),
+      need: document.querySelectorAll('.tx-import-stats .ant-statistic-content')[3]?.textContent,
+      rows: document.querySelectorAll('.tx-import-table tbody tr').length,
+      buttons: [...document.querySelectorAll('.tx-import-modal .ant-modal-footer button')].map(b => b.textContent.trim()),
     }))()`);
-    check('headline states how many rows will be added', /will be added/.test(digest.headline), digest.headline);
-    check('the callout lives in the static bar (outside the scrolling table)', digest.noteIsStatic);
-    check('uncategorized callout present, phrased as a future ("will be")',
-      /uncategorized/i.test(digest.note) && /will be/i.test(digest.note), digest.note);
-    check('no bar chart in the merged screen (removed per spec)', !digest.hasBars);
-    check('no income/expense totals in the merged screen (removed per spec)', !digest.hasTotals);
-    check('exactly two footer actions: Go Back, Looks Right',
-      digest.buttons.length === 2 && digest.buttons[0] === 'Go Back' && digest.buttons[1] === 'Looks Right',
-      digest.buttons.join(' | '));
-    console.log('\n      ' + digest.headline);
-    console.log('      ' + digest.note);
-    await shot('04-here-is-your-import');
+    check('review reached: "Here’s what we found"', review.title === 'Here’s what we found', review.title);
+    check('the four figures: new, already in the ledger, categorized, need a category',
+      review.stats === 'New transactions|Already in the ledger|Categorized for you|Need a category', review.stats);
+    check('the categorizer leaves the ones it is unsure of blank', Number(review.need) > 0, review.need);
+    check('three footer actions: Back, Cancel, Import N',
+      review.buttons.length === 3 && review.buttons[0] === 'Back' && /^Import \d+ transactions$/.test(review.buttons[2]),
+      review.buttons.join(' | '));
+    await shot('04-review');
 
-    await js('document.querySelector(".tx-import-do-btn").click()');
+    await js('document.querySelector(".tx-import-modal [data-act=import]").click()');
     await sleep(2000);
 
     const after = await js('apiFetch("/api/balance/columns").then(r => r.json())');
@@ -233,21 +220,19 @@ app.whenReady().then(async () => {
     const onb = await js('apiFetch("/api/onboarding").then(r => r.json())');
     check('no longer fresh', onb.fresh === false);
 
-    // ── Step 4: "Success!" — minimal, exactly two actions ──
-    check('Success modal reached', await js(`document.querySelector('.tx-import-dialog--success .tx-import-dialog-title')?.textContent`) === 'Success!');
-    check('no header/footer rules on this screen (per spec)',
-      await js(`getComputedStyle(document.querySelector('.tx-import-dialog--success .tx-import-dialog-header')).borderBottomWidth`) === '0px'
-      && await js(`getComputedStyle(document.querySelector('.tx-import-dialog--success .tx-import-footer')).borderTopWidth`) === '0px');
-    check('exactly two actions: Start Another, Finish',
-      await js(`[...document.querySelectorAll('.tx-import-dialog--success .tx-import-footer button')].map(b => b.textContent.trim()).join('|')`)
-        === 'Start Another|Finish');
-    await shot('05-success');
+    // ── The Done step: what was done, and exactly two ways on ──
+    check('Done step reached',
+      await js(`document.querySelector('.tx-import-done-title')?.textContent`) === 'Everyday Checking is set up');
+    check('exactly two actions: Import another account, Finish',
+      await js(`[...document.querySelectorAll('.tx-import-modal .ant-modal-footer button')].map(b => b.textContent.trim()).join('|')`)
+        === 'Import another account|Finish');
+    await shot('05-done');
 
-    // "Start Another" is onboarding's path back to the picker
+    // "Import another account" is onboarding's path back to the picker
     // (the account just imported shows up as a chip there).
-    await js('document.querySelector(".tx-import-more-btn").click()');
+    await js('document.querySelector(".tx-import-modal [data-act=more]").click()');
     await sleep(600);
-    check('back at the picker — no separate "here\'s what we found" screen anymore',
+    check('back at the picker',
       await js('!!document.querySelector(".onb-dialog .acct-tiles")'));
     check('the adopted account appears under "your accounts", by its name',
       (await js(`[...document.querySelectorAll('.acct-tile-name')].map(e => e.textContent)`))[0] === 'Everyday Checking');
@@ -269,9 +254,9 @@ app.whenReady().then(async () => {
     check('hero gone', await js('document.getElementById("dashboard-firstrun") === null || document.getElementById("dashboard-firstrun").hidden'));
     await shot('07-dashboard');
 
-    // ── Step 7: the ORDINARY import asks the same question, up front ──
-    // Same code path, no onboarding involved: the account step must come before
-    // the file dialog, pre-filled from the account used last.
+    // ── The ORDINARY import asks the same question, up front ──
+    // Same wizard, no onboarding involved: the account step comes before the
+    // file, pre-picked from the account used last.
     await js('window.location.href = "app://aventurine/transactions"');
     await sleep(2500);
     await js(`(() => {
@@ -290,47 +275,40 @@ app.whenReady().then(async () => {
     // past the step being observed.
     await js('window.__runP = TxFileImport.run(); "started"');
     await sleep(900);
-    check('normal import asks the account FIRST, before any file dialog',
-      await js(`!!document.querySelector('.tx-import-dialog .acct-tiles')`));
+    check('normal import asks the account FIRST, before the file',
+      await js(`document.querySelector('.tx-import-modal .ant-steps-item-process .ant-steps-item-title')?.textContent`) === 'Account');
     check('pre-filled from the account used last (an EXISTING account)',
-      await js(`document.querySelector('.tx-import-dialog input[type="radio"]:checked')?.value`) === 'checking',
-      'checked=' + await js(`document.querySelector('.tx-import-dialog input[type="radio"]:checked')?.value`));
+      await js(`document.querySelector('.tx-import-modal input[name="tx-import-acct"]:checked')?.value`) === 'checking',
+      'checked=' + await js(`document.querySelector('.tx-import-modal input[name="tx-import-acct"]:checked')?.value`));
     check('primary action is ready (routine path is one click)',
-      await js(`document.querySelector('.tx-import-acct-next').disabled === false`));
+      await js(`document.querySelector('.tx-import-modal [data-act=next]').disabled === false`));
     await shot('08-normal-import-account');
 
-    await js('document.querySelector(".tx-import-acct-next").click()');
+    await js('document.querySelector(".tx-import-modal [data-act=next]").click()');
+    await sleep(600);
+    await js('document.querySelector(".tx-import-modal .ant-upload-drag").click()');
     await sleep(1400);
     check('proceeds to mapping after the account step',
-      await js('!!document.querySelector(".tx-import-map-form")'));
-    check('no row counter in Map Columns (removed per spec)',
-      await js('!document.querySelector(".tx-import-dialog-body .tx-import-row-count")'));
+      await js(`!!document.querySelector('.tx-import-map')`));
     check('no manual split toggle — this file has one Amount column, so only that field shows',
-      await js(`!document.querySelector('.tx-import-switch-row, .tx-import-map-mode')
-                 && !!document.querySelector('.tx-import-map-select[data-field="amount"]')
-                 && !document.querySelector('.tx-import-map-select[data-field="debit"]')`));
-    await js('document.querySelector(".tx-import-continue-btn").click()');
+      await js(`!!document.querySelector('.tx-import-modal [data-map="amount"]')
+                 && !document.querySelector('.tx-import-modal [data-map="debit"]')`));
+    await js('document.querySelector(".tx-import-modal [data-act=continue]").click()');
     await sleep(1400);
-    check('combined screen reached again on the normal path',
-      await js('!!document.querySelector(".tx-import-preview-full")'));
-    check('still no balance question on the normal path',
-      await js(`!document.querySelector('.tx-import-balance-choice')`));
-    await shot('09-normal-import-preview');
+    check('review reached again on the normal path', await js(`!!document.querySelector('.tx-import-stats')`));
+    await shot('09-normal-import-review');
 
-    // "Go Back" returns to Map Columns with the previous selections intact,
-    // and commits nothing — verified by re-continuing and landing back on the
-    // combined screen with the same row count as before.
-    await js('document.querySelector(".tx-import-back-btn").click()');
+    // Back returns to the columns with the previous selections intact, and
+    // commits nothing — verified by continuing again and landing back on the
+    // review.
+    await js('document.querySelector(".tx-import-modal [data-act=back]").click()');
     await sleep(800);
-    check('Go Back returns to Map Columns',
-      await js('!!document.querySelector(".tx-import-map-form")'));
-    check('previous column selections are retained',
-      await js(`document.querySelector('.tx-import-map-select[data-field="date"]')?.selectedOptions[0]?.textContent`) === 'Posting Date');
-    await js('document.querySelector(".tx-import-continue-btn").click()');
+    check('Back returns to the columns', await js(`!!document.querySelector('.tx-import-map')`));
+    check('previous column selections are retained', await js(mapped('date')) === 'Posting Date');
+    await js('document.querySelector(".tx-import-modal [data-act=continue]").click()');
     await sleep(1400);
-    check('re-continuing after Go Back lands back on the combined screen',
-      await js('!!document.querySelector(".tx-import-preview-full")'));
-    await shot('10-normal-import-goback');
+    check('continuing again lands back on the review', await js(`!!document.querySelector('.tx-import-stats')`));
+    await shot('10-normal-import-back');
 
     const failed = results.filter((r) => !r.ok);
     console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

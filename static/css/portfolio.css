@@ -1,273 +1,344 @@
 /* ============================================================================
-   portfolio.css — Portfolio-only styles.
+   portfolio.css — the Portfolio page (pages/portfolio.html), in Ant Design.
    ============================================================================
-   tables.css owns everything that's shared with the year-table pages
-   (the .db-* base table classes, frosted-glass surface treatment, modal
-   shells, ⋮ menu, the .button-primary / .button-secondary button styles,
-   and the column-manager rules). This file holds only what's specific to
-   the Portfolio page's 7-column asset table.
+   The components (cards, buttons, table, Segmented, fields, modal…) are
+   ant.css; the ring is donut.css (widgets/donut.js). This file is the page:
+   its layout, the allocation legend, the account cards and their editable
+   holdings table, and the Add asset dialog's rows.
+   ============================================================================ */
 
-   Design tokens used (defined in style.css :root):
-     --col-first-pad / --cell-pad-y    — column + cell rhythm
-     --font-h2 / h3 / numeric          — role-specific font families
-     --size-body / small / micro       — body 15px · small 13px · micro 11px
-     --weight-medium / semibold        — font weights
-     --track-wide / wider              — letter-spacing tracking scale
-*/
+/* Anchor to the top so the cards never scroll out of reach when zoomed in
+   (same pattern as the other pages). */
+.page:has(.pf-page) {
+    align-items: flex-start;
+}
 
-/* == Collapsible accounts ==
-   The forehead row toggles its table (tables.css already gives it the pointer
-   cursor and hover fill). Collapsing keeps the forehead and hides the column
-   headers, the asset rows and the totals row. */
-.p-title-left {
+/* The full width the page is given, with the app's page padding, like every
+   other page. Grown as a flex item rather than width:100%: .page is a scroll
+   container whose content box still counts the scrollbar's track, so a
+   percentage width would overshoot by it. Also the container the layout
+   below queries. */
+.pf-page {
+    flex: 1;
+    min-width: 0;
+    padding: var(--page-pad);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    container: pf-page / inline-size;
+}
+
+/* Add account, hard left. No page heading: the sidebar's active link already
+   names the page. */
+.pf-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+
+/* ─── Totals ────────────────────────────────────────────────────────────────
+   Market value and cost basis in the text colour; the gain in the colour of
+   which way it went, its rate beside it. */
+.pf-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+.pf-stat-up .ant-statistic-content { color: var(--ant-color-success); }
+.pf-stat-down .ant-statistic-content { color: var(--ant-color-error); }
+/* The rate goes under the figure when the card is too narrow for both, rather
+   than being cut off. */
+.pf-stat-gain .ant-statistic-content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 8px;
+}
+.pf-stat-suffix {
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size);
+}
+
+
+/* ─── Allocation beside the accounts, or above them ─────────────────────────
+   Ant's 8/16 split of a 24-column row once the page is wide enough for a ring
+   and a full-width table side by side; below that the allocation sits above
+   the accounts at full width. Beside them it stays in view while a long list
+   of accounts scrolls past. */
+.pf-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+@container pf-page (min-width: 1320px) {
+    .pf-main { grid-template-columns: minmax(0, 8fr) minmax(0, 16fr); }
+    .pf-alloc {
+        position: sticky;
+        top: var(--page-pad);
+    }
+}
+
+.pf-alloc-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 24px 32px;
+}
+.pf-alloc-chart {
+    flex: none;
+    width: 240px;
+    max-width: 100%;
+    aspect-ratio: 1;
+}
+
+/* The ring's centre readout, in Ant's type: a small caps label over the
+   total. donut.css draws it in the app's own faces for the Dashboard. */
+.pf-alloc .donut-center-label {
+    fill: var(--ant-color-text-tertiary);
+    font-family: var(--ant-font-family);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+}
+.pf-alloc .donut-center-value {
+    fill: var(--ant-color-text);
+    font-family: var(--ant-font-family);
+    font-size: 24px;
+    font-weight: var(--ant-font-weight-strong);
+    letter-spacing: 0;
+}
+
+/* One row per slice: its colour, its name, its value and its share. */
+.pf-legend {
+    flex: 1 1 260px;
+    max-width: 480px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.pf-legend-row {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) auto 40px;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: var(--ant-radius);
+}
+.pf-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.pf-legend-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pf-legend-value {
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.pf-legend-share {
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+
+
+/* ─── Account cards ─────────────────────────────────────────────────────────
+   The header: fold, the name with Ant's edit pencil, then Add asset and
+   Delete account. A press on the header folds the card to it. */
+.pf-accounts {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.pf-account > .ant-card-head { cursor: pointer; }
+.pf-account > .ant-card-head .ant-card-head-title {
+    display: flex;
+    align-items: center;
+    cursor: auto;
+}
+.pf-account-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pf-account-actions {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-width: 0;
 }
 
-.p-collapse-btn {
-    display: inline-flex;
+/* The pencil shows while the header is pointed at or the pencil has keyboard
+   focus, as the Ant artifact's do; always on a touch screen. */
+.pf-account .ant-typography-edit { opacity: 0; }
+.pf-account > .ant-card-head:hover .ant-typography-edit,
+.pf-account .ant-typography-edit:focus-visible { opacity: 1; }
+@media (hover: none) {
+    .pf-account .ant-typography-edit { opacity: 1; }
+}
+
+.pf-rename-input {
+    max-width: 360px;
+    font-size: var(--ant-font-size-lg);
+    font-weight: var(--ant-font-weight-strong);
+}
+
+/* Folding: the chevron turns to point along the closed card, and the header
+   becomes the whole card. */
+.pf-fold .anticon { transition: transform var(--ant-motion-mid) var(--ant-ease-in-out); }
+.pf-account.is-folded .pf-fold .anticon { transform: rotate(-90deg); }
+.pf-account.is-folded > .ant-card-body { display: none; }
+.pf-account.is-folded > .ant-card-head {
+    margin-bottom: 0;
+    border-bottom: 0;
+    border-radius: var(--ant-radius-lg);
+}
+
+.pf-account > .ant-card-body { padding: 0; }
+
+/* An account with nothing in it yet: Ant's empty state and the way to fill it. */
+.pf-account-empty,
+.pf-accounts-empty {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: none;
-    border-radius: 4px;
-    background: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    transition: color 0.15s ease;
+    padding: 16px 16px 24px;
+}
+.pf-accounts-empty .ant-empty { margin-block: 8px 16px; }
+
+
+/* ─── Holdings table ────────────────────────────────────────────────────────
+   Ant's small table, flush in its card (so the header row has no corners of
+   its own), with the five editable columns as inputs: borderless at rest, a
+   hairline box under the pointer, Ant's focused field while typing in one.
+   Each input's border and padding add up to the header's 8px, so the text in
+   a cell starts exactly under its column's heading. */
+/* Fixed layout: every column but Asset has its width, and Asset takes what is
+   left (an auto layout would hand the spare width to every column instead).
+   The set columns come to 784px, so the table scrolls inside its card before
+   the asset name drops under about 200px. */
+.pf-table {
+    table-layout: fixed;
+    min-width: 984px;
+    --cell-select-border: var(--ant-color-primary);
+}
+.pf-table thead th:first-child,
+.pf-table thead th:last-child { border-radius: 0; }
+/* The widths below include the cells' padding. */
+.pf-table th { box-sizing: border-box; }
+
+.pf-col-ticker { width: 96px; }
+.pf-col-num    { width: 120px; }
+.pf-col-gain   { width: 168px; }
+.pf-col-act    { width: 40px; }
+
+.pf-table td.pf-edit { padding: 4px 0; }
+.pf-table td.pf-col-act {
+    padding: 4px;
+    text-align: center;
 }
 
-.p-collapse-btn:hover { color: var(--text-primary); }
-.p-collapse-btn:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 1px;
-}
-
-.p-collapse-btn svg {
-    width: 14px;
-    height: 14px;
-    transition: transform 0.15s ease;
-}
-
-.db-outer.is-collapsed .p-collapse-btn svg { transform: rotate(-90deg); }
-
-.db-outer.is-collapsed .db-header-row,
-.db-outer.is-collapsed tbody,
-.db-outer.is-collapsed tfoot {
-    display: none;
-}
-
-/* Add Row, Remove Row and the ⋮ menu all go with the rows. */
-.db-outer.is-collapsed .p-forehead-btns { display: none; }
-
-/* The forehead's bottom border is the table's only edge once the rest is hidden. */
-.db-outer.is-collapsed .db-title-row th { border-bottom: none; }
-
-@media (prefers-reduced-motion: reduce) {
-    .p-collapse-btn svg { transition: none; }
-}
-
-/* == Page split: allocation donut | account tables ==
-   One quarter of the row for the donut, three quarters for the tables. The
-   tables column is min-width:0 so a wide table scrolls inside its own wrapper
-   instead of stretching the grid track. The summary card sticks to the top of
-   the scrolling page, so the donut stays in view while a long list of accounts
-   scrolls past. Below 1100px the two stack, since a quarter of a narrow window
-   is too small to hold a legible ring. */
-.portfolio-layout {
-    display: grid;
-    grid-template-columns: 1fr 3fr;
-    align-items: start;
-    gap: 16px;
-}
-
-/* The tables, then the Add Account button beneath the last one. */
-.portfolio-main {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    min-width: 0;
-}
-
-.portfolio-main .db-actions .button-primary { flex: 1; }
-
-@media (max-width: 1100px) {
-    .portfolio-layout { grid-template-columns: 1fr; }
-}
-
-.portfolio-summary {
-    position: sticky;
-    top: 0;
-    min-width: 0;
-    box-sizing: border-box;
-    border: var(--border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
-    padding: 24px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-/* The same all-caps eyebrow the Dashboard's card titles use. */
-.portfolio-summary-title {
-    margin: 0;
-    color: var(--color-base-500);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-    line-height: var(--lh-tight);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
-}
-
-.portfolio-summary .accounts-pie {
-    width: 100%;
-    max-width: 220px;
-    aspect-ratio: 1;
-    align-self: center;
-}
-
-/* == Table sizing == */
-/* The 7-column asset table needs a wider minimum than the 12-month year
-   tables. Below 720px the page-level scroll kicks in (overflow-x on .page). */
-.portfolio-table {
-    min-width: 720px;
-}
-
-/* The ticker column reads left-to-right (e.g. "AAPL"). tables.css
-   right-aligns every non-first-child cell; this row of selectors restores
-   left alignment for the ticker column only. */
-.portfolio-table .db-header-row .col-ticker,
-.portfolio-table td.col-ticker {
-    text-align: left;
-}
-
-/* The portfolio's cells contain inputs that set their own internal padding
-   (.p-input, .p-text-input, .p-ticker-input below), so the default
-   --col-first-pad reset from tables.css is removed, leaving horizontal spacing
-   to the inputs. */
-.portfolio-table td {
-    padding: 0;
-}
-
-/* == Column widths == */
-/* Fixed widths keep all account tables visually aligned even when their
-   asset names vary in length. */
-.col-asset-name { width: 175px; min-width: 145px; }
-.col-ticker     { width: 75px;  min-width: 65px; max-width: 95px; }
-.col-number     { width: 125px; min-width: 105px; }
-.col-roi        { width: 85px;  min-width: 75px; }
-
-/* == Forehead height override ==
-   Portfolio foreheads are slightly more compact than year-table foreheads
-   because the asset-name title doesn't need as much breathing room above
-   the dense 7-column header. Left side still uses --col-first-pad to keep
-   the title vertically aligned with the column below. */
-.db-outer[data-account-id] .db-title-inner {
-    padding: 3px 12px 3px var(--col-first-pad);
-}
-
-/* == Rename-account dialog input ==
-   The textbox shown by renameAccountDialog() in portfolio.js. Wider and
-   chunkier than the borderless inline-rename inputs (.cat-name) because
-   this is a primary dialog input, not an inline edit. */
-.p-rename-input {
-    width: 100%;
-    height: var(--control-height);
-    background: var(--frost-2);
-    border: var(--border-width) solid var(--stroke-medium);
-    border-radius: 5px;
-    outline: none;
-    color: var(--text-primary);
-    font-family: var(--font-h2);
-    font-size: var(--size-small);
-    padding: 4px 10px;
-    caret-color: var(--frost-caret);
-    box-sizing: border-box;
-    margin-bottom: 2px;
-}
-
-/* == Cell input overrides ==
-   The base .p-input rules (width / box-sizing / padding / focus highlight)
-   live in tables.css under the shared `.db-input, .p-input` selector group
-   so the two stay pixel-identical. Below are only the portfolio-specific
-   alignment overrides.
-
-   .p-text-input / .p-ticker-input  — left-aligned text cells (Asset Name,
-       Ticker). They keep the shared 16px padding-left (so the text starts
-       under the column header), but tighten padding-right to 8px so longer
-       names have more room before getting truncated.
-   .p-number-wrap .p-input          — right-aligned currency / count cells
-       (Amount, Avg Price, Mkt Price). Wrapper has no styles of its own —
-       it's a width container left over from the old separate-symbol span
-       layout.
-*/
-.p-text-input {
-    text-align: left;
-    padding-right: 8px;
-}
-
-.p-ticker-input {
-    text-align: left;
-    padding-right: 8px;
-    text-transform: uppercase;
-    letter-spacing: var(--track-wide);
-    font-weight: var(--weight-semibold);
-}
-
-.p-number-wrap {
-    width: 100%;
-}
-
-.p-number-wrap .p-input {
-    text-align: right;
-}
-
-/* == Computed read-only cells (Total, ROI) ==
-   These cells display values calculated from the editable cells in the
-   same row — they aren't <input>s, just <span>s. Padding mirrors the
-   shared cell-input rule so a computed value sits at exactly the same
-   horizontal offset as an input value above or below it. */
-.p-computed {
+.pf-input {
     display: block;
     box-sizing: border-box;
-    text-align: right;
-    font-family: var(--font-numeric);
-    font-size: var(--size-body);
-    color: var(--text-secondary);
-    padding: var(--cell-pad-y) var(--col-first-pad);
-    white-space: nowrap;
+    width: 100%;
+    height: var(--ant-control-height);
+    margin: 0;
+    padding: 4px 7px;
+    border: var(--ant-line-width) solid transparent;
+    border-radius: var(--ant-radius);
+    background: transparent;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size);
+    line-height: var(--ant-line-height);
+    outline: none;
+    transition: border-color var(--ant-motion-mid), box-shadow var(--ant-motion-mid),
+        background-color var(--ant-motion-mid);
+}
+.pf-input::placeholder { color: var(--ant-color-text-placeholder); }
+.pf-input:hover { border-color: var(--ant-color-border); }
+.pf-input:focus {
+    border-color: var(--ant-color-primary);
+    background: var(--ant-color-bg-container);
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
+}
+.pf-input-num {
     font-variant-numeric: tabular-nums;
+    text-align: end;
 }
-
-/* .roi-positive / .roi-negative now live in style.css under "Shared
-   percentage / delta colors" — every ROI display retones with the rest
-   of the app when the theme palette changes. */
-
-/* == Footer (per-account totals) row ==
-   The portfolio tfoot mirrors a normal entry row's column structure but
-   with computed totals instead of editable inputs. */
-.portfolio-total-row {
-    border-top: var(--border-width) solid var(--border);
-    background-color: var(--frost-2);
+/* A ticker is a code: Ant's code face, upper case, quieter than the name. */
+.pf-input-ticker {
+    color: var(--ant-color-text-secondary);
+    font-family: var(--ant-font-family-code);
+    font-size: var(--ant-font-size-sm);
+    text-transform: uppercase;
 }
+.pf-input-ticker::placeholder { text-transform: none; }
 
-/* Left padding uses --col-first-pad to align the "Total" label with asset
-   names above. Scoped inside .portfolio-table to outweigh the
-   `.portfolio-table td { padding: 0 }` reset above (which has the same
-   class-count specificity but with an extra element selector). */
-.portfolio-table .portfolio-footer-label {
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-    color: var(--text-primary);
-    padding: 10px 16px 10px var(--col-first-pad);
+.pf-table .pf-value {
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+/* Spreadsheet selection (cellselect.js): the range in the primary tint, the
+   active cell a step deeper, and no caret blinking in a selected range. The
+   outline round the range is the --cell-select-border cellselect draws. */
+.pf-table td.cell-selected { background: var(--ant-color-primary-bg); }
+.pf-table td.cell-selected.cell-active { background: var(--ant-color-primary-bg-hover); }
+.pf-table td.cell-selected .pf-input { caret-color: transparent; }
+
+/* A gain: the caret and the amount and rate, in the colour of which way it
+   went. */
+.pf-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+    white-space: nowrap;
+}
+.pf-change .anticon { font-size: var(--ant-font-size-sm); }
+.pf-change-up { color: var(--ant-color-success); }
+.pf-change-down { color: var(--ant-color-error); }
+.pf-change-flat { color: var(--ant-color-text-tertiary); }
+
+
+/* ─── Add asset ─────────────────────────────────────────────────────────────
+   The name and the ticker on one row, the three figures on the next. */
+.pf-add-dialog .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.pf-form-row {
+    display: flex;
+    gap: 12px;
+}
+.pf-form-row > .ant-form-item { flex: 1; }
+.pf-form-row > .pf-form-wide { flex: 2; }
+.pf-ticker-field { text-transform: uppercase; }
+.pf-ticker-field::placeholder { text-transform: none; }
+.pf-num-field { font-variant-numeric: tabular-nums; }
+
+
+@media (prefers-reduced-motion: reduce) {
+    .pf-fold .anticon,
+    .pf-input { transition: none; }
 }

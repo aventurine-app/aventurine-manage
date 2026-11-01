@@ -2,24 +2,28 @@
    transfers.css — the Saved & Invested report, a tab of the Reports page.
 
    Loads alongside forecast.css and trends.css (pages/reports.html). forecast.css
-   owns the .rep-* tab shell, the page padding and the .dashboard-card-header /
-   .chart-area chrome; trends.css owns the .dashboard-chart .chart-* hooks the
-   SVG from chart.js needs. What is left for this file is the report's own
-   layout: the shared toolbar row, the two-up grid the cards sit in, the
-   stacked-column marks, and the legend that doubles as the stack's table
-   view.
+   owns the .rep-* tab shell, the page padding, the pickers and the charts' Ant
+   palette; trends.css owns the .dashboard-chart .chart-* hooks the SVG from
+   chart.js needs; the cards are ant.css. What is left for this file is the
+   report's own layout: the shared toolbar row, the two-up grid the cards sit
+   in, the stacked-column marks, and the legend that doubles as the stack's
+   table view.
+
+   The Dashboard loads this file too, for the stacked-column rules alone
+   (.chart-col, .chart-seg): its Spending card draws with them. Everything
+   .tfr-* is this report's.
    ============================================================================ */
 
 .tfr-page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-24);
+    gap: 16px;
 }
 
 /* ─── The one control, above both cards ───────────────────────────────────────
    Both charts are the same rows over the same months, so they answer to one
    picker (see pages/reports.html). It sits at the right edge, where a card
-   header's own controls sit, so the column of controls down the page still
+   head's own controls sit, so the column of controls down the page still
    lines up. */
 .tfr-toolbar {
     display: flex;
@@ -31,48 +35,32 @@
    The stack is the line's own itemisation, so the pair reads as one row: both
    charts get the same width, chart.js derives height from width, and their
    month axes therefore line up across the gap. Fixed columns per breakpoint
-   rather than auto-fit, the Metrics grid's rule — auto-fit sizes by available
-   width and can leave a card looking like one that failed to load — and the
-   same 1100px fold, below which two charts of twelve months each are narrower
-   than their own axis labels. Cards STRETCH to the row's height rather than
-   sitting at their natural one: the legend makes the second card taller, and
-   an even bottom edge reads as one row where a ragged one reads as breakage. */
+   rather than auto-fit — auto-fit sizes by available width and can leave a card
+   looking like one that failed to load — and the same 1100px fold, below which
+   two charts of twelve months each are narrower than their own axis labels.
+   Cards STRETCH to the row's height rather than sitting at their natural one:
+   the legend makes the second card taller, and an even bottom edge reads as one
+   row where a ragged one reads as breakage. Ant's 16px gutter. */
 .tfr-charts {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-24) 28px;
+    gap: 16px;
 }
 
 @media (max-width: 1100px) {
     .tfr-charts { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Mirrors .trends-card / .forecast-card — the same card the whole Reports page
-   is built from. */
-.tfr-card {
-    min-width: 0;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
-    padding: var(--space-24) 28px;
-    display: flex;
-    flex-direction: column;
-}
-
 #transfers-chart,
 #transfers-accounts-chart { width: 100%; }
 
-/* The window's total, opposite the first card's title. Proportional figures,
-   not tabular: tabular-nums gives every digit the width of a zero, which reads
-   as loose on a standalone number. It is a column of numbers that needs the
-   alignment, and this is one number. */
+/* The window's total, in the first card's head where Ant puts a card's extra.
+   Strong, at the head's own size: it is the figure the line adds up to.
+   Proportional figures, not tabular: it is one number, not a column. */
 .tfr-total {
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-body);
-    font-weight: var(--weight-semibold);
-    line-height: var(--lh-tight);
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-lg);
+    font-weight: var(--ant-font-weight-strong);
     white-space: nowrap;
 }
 
@@ -103,64 +91,47 @@
    Always present, because eight bands cannot be told apart by hue alone and
    colour is never the only channel allowed to carry identity. It is also the
    stack's table view: every band's window total is stated here, so no value in
-   the chart is reachable only by hovering it. Each row links into the ledger on
-   the Top Merchants rule; "Other" is not one group of transactions, so it stays
-   plain text. */
+   the chart is reachable only by hovering it. An entry that opens the ledger is
+   a small default Button (transfers.js); "Other" is not one group of
+   transactions, so it stays plain text on the same footprint. */
 .tfr-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-8) var(--space-16);
-    margin-top: var(--space-16);
+    gap: 8px;
+    margin-top: 16px;
 }
 
 .tfr-legend-item {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: 6px;
     min-width: 0;
-    padding: var(--space-4) var(--space-8);
-    border-radius: 6px;
-    color: var(--text-secondary);
-    text-decoration: none;
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    letter-spacing: var(--track-wider);
+    height: var(--ant-control-height-sm);
+    padding: 0 7px;
+    color: var(--ant-color-text);
 }
 
 .tfr-swatch {
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
-    flex-shrink: 0;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
 }
 
 .tfr-legend-name {
+    max-width: 180px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 180px;
 }
 
-/* Text wears text tokens, never the band's colour: a light categorical step is
-   illegible as type on the surface. The swatch beside it carries the identity.
-   Tabular here, unlike .tfr-total — these DO sit in a row of numbers the eye
-   compares. */
+/* The total in the secondary text colour after the name, tabular so a row of
+   them compares digit by digit. Text wears text tokens, never the band's
+   colour: the swatch beside it carries the identity. */
 .tfr-legend-amount {
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
+    color: var(--ant-color-text-tertiary);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-}
-
-.tfr-legend-link { cursor: pointer; }
-.tfr-legend-link:hover {
-    background: var(--frost-2);
-    color: var(--text-primary);
-}
-.tfr-legend-link:hover .tfr-legend-name { text-decoration: underline; }
-.tfr-legend-link:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 2px;
 }
 
 @media (max-width: 900px) {

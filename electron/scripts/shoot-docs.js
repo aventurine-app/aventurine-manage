@@ -352,9 +352,8 @@ app.whenReady().then(async () => {
       await click(`.dash-card[data-type="${type}"] [data-act="period"]`);
       await sleep(400);
     };
-    // A press outside the picker closes it (the page listens for pointerdown on
-    // the document), which is what a click on empty page does. Escape does not
-    // reliably reach it from inside the month stepper.
+    // A press outside the picker closes it (ant.js listens for pointerdown on
+    // the document), which is what a click on empty page does.
     const closeDashboardPicker = async () => {
       await js(`document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
       await sleep(250);
@@ -367,17 +366,12 @@ app.whenReady().then(async () => {
      *  Only the two month cards (Monthly Cash Flow, Breakdown) have a month
      *  field; Spending is a year-to-date trend and keeps its range.
      *
-     *  The picker follows the calendar until "Current month" is unticked, which
-     *  pins today's month and unlocks the stepper; one step back is then the
-     *  month before. Each picker is closed after, or it stays open in the shot. */
+     *  A month card's period control is a month between previous and next
+     *  arrows; one press of the previous arrow pins the month before. */
     const dashboardPreviousMonth = async () => {
       for (const type of ['cashflow', 'balances']) {
-        await openDashboardPicker(type);
-        if (!(await click('.dash-period-pop [data-pp="latest"]'))) missing.push(`${type} current-month box`);
-        await sleep(200);
-        if (!(await click('.dash-period-pop [data-step="-1"]'))) missing.push(`${type} previous-month step`);
-        await sleep(300);
-        await closeDashboardPicker();
+        if (!(await click(`.dash-card[data-type="${type}"] [data-act="month-prev"]`))) missing.push(`${type} previous-month arrow`);
+        await sleep(400);
       }
     };
 
@@ -424,21 +418,21 @@ app.whenReady().then(async () => {
     /** Switch the chart palette for a capture. A SECOND axis from the surface
      *  theme above, read pre-paint by the same theme-init.js, so it has the same
      *  rule: write it before the navigation that should show it. '' is the
-     *  accent-derived default ramp; 'gemstone' is the jewel-toned one the
-     *  website's shots are taken in. */
+     *  default (Ant Design's chart palette, which the website's shots are taken
+     *  in); 'opal' is the desaturated one. */
     const setGraphTheme = (value) =>
       js(`localStorage.setItem('graph-theme', ${JSON.stringify(value)})`);
 
     const esc = () => js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
 
-    /** Answer the import's account question. With several accounts adopted the app
-     *  pre-selects nothing on a first import, so the primary button stays disabled
-     *  until something is chosen; this selects one rather than clicking the
-     *  disabled button. */
+    /** Answer the import wizard's account question. With several accounts adopted
+     *  the app pre-selects nothing on a first import, so Next stays disabled until
+     *  something is chosen; this selects one rather than clicking the disabled
+     *  button. */
     const pickImportAccount = async (key) => {
       const ok = await js(`(() => {
-        const r = document.querySelector('.tx-import-dialog input[type="radio"][value="' + ${JSON.stringify(key)} + '"]')
-          || document.querySelector('.tx-import-dialog input[type="radio"]');
+        const r = document.querySelector('.tx-import-modal input[type="radio"][value="' + ${JSON.stringify(key)} + '"]')
+          || document.querySelector('.tx-import-modal input[type="radio"]');
         if (!r) return false;
         r.checked = true;
         r.dispatchEvent(new Event('change', { bubbles: true }));
@@ -520,8 +514,8 @@ app.whenReady().then(async () => {
       console.log('\n— dashboard —');
       await nav('/', 3200);
       const filled = await js(`(() => ({
-        cashflow: !!document.querySelector('.dash-card[data-type="cashflow"] svg'),
-        spending: !!document.querySelector('.dash-card[data-type="spending"] svg'),
+        cashflow: !!document.querySelector('.dash-card[data-type="cashflow"] .dash-cf-row'),
+        spending: !!document.querySelector('.dash-card[data-type="spending"] .dash-card-body svg'),
         snapshot: !!document.querySelector('.dash-card[data-type="balances"] .accounts-pie-svg'),
       }))()`);
       if (!filled.cashflow || !filled.spending || !filled.snapshot) {
@@ -606,20 +600,27 @@ app.whenReady().then(async () => {
         };
       })()`);
 
+      // The import is one Ant Design Modal stepping through Account, File,
+      // Columns and Review; the file input's click (patched above) is what the
+      // drop zone triggers.
       await js('window.__p = TxFileImport.run(); "started"');
       await sleep(900);
       await pickImportAccount(keys.checking);
-      await shotEl('import-account-question', '.tx-import-dialog');
-      await click('.tx-import-acct-next');
+      await shotEl('import-account-question', '.tx-import-modal');
+      await click('.tx-import-modal [data-act="next"]');
+      await sleep(600);
+      await shotEl('import-choose-file', '.tx-import-modal');
+      await click('.tx-import-modal .ant-upload-drag');
       await sleep(1500);
-      await shotEl('import-map-columns', '.tx-import-dialog');
-      await shotEl('import-map-preview', '.tx-import-preview-wrap', 6);
-      await click('.tx-import-continue-btn');
+      await shotEl('import-map-columns', '.tx-import-modal');
+      await shotEl('import-map-preview', '.tx-import-preview', 6);
+      await click('.tx-import-modal [data-act="continue"]');
       await sleep(1800);
-      await shotEl('import-here-is-your-import', '.tx-import-dialog');
-      await shotEl('import-error-banner', '.tx-import-errors-banner', 6);
-      await shotEl('import-uncategorized-note', '.tx-import-balance-bar', 6);
-      const dupRect = await rectOf('.tx-import-row-dup');
+      await shotEl('import-here-is-your-import', '.tx-import-modal');
+      await shotEl('import-error-banner', '.tx-import-modal .ant-alert-error', 6);
+      // What the categorizer filled in and what still needs a category.
+      await shotEl('import-uncategorized-note', '.tx-import-stats', 6);
+      const dupRect = await rectOf('.tx-import-muted');
       if (dupRect) {
         await shot('import-duplicate-rows', {
           x: Math.round(dupRect.x - 8), y: Math.round(dupRect.y - 34),
@@ -627,10 +628,10 @@ app.whenReady().then(async () => {
           height: 120,
         });
       } else missing.push('import-duplicate-rows');
-      await click('.tx-import-do-btn');
-      await sleep(2500);
-      await shotEl('import-success', '.tx-import-dialog--success');
-      await click('.tx-import-finish-btn');
+      await click('.tx-import-modal [data-act="import"]');
+      await sleep(1200);
+      // An import from the ledger ends with a message, not a dialog.
+      await shotEl('import-success', '.ant-message-notice', 6);
       await sleep(2000);
     }
 
@@ -658,10 +659,12 @@ app.whenReady().then(async () => {
       await js('window.__p2 = TxFileImport.run(); "started"');
       await sleep(900);
       await pickImportAccount(keys.checking);
-      await click('.tx-import-acct-next');
+      await click('.tx-import-modal [data-act="next"]');
+      await sleep(600);
+      await click('.tx-import-modal .ant-upload-drag');
       await sleep(1500);
-      await shotEl('import-map-columns-split', '.tx-import-dialog');
-      await click('.tx-import-close');
+      await shotEl('import-map-columns-split', '.tx-import-modal');
+      await click('.tx-import-modal .ant-modal-close');
       await sleep(400);
     }
 
@@ -671,14 +674,29 @@ app.whenReady().then(async () => {
       await nav('/transactions', 2500);
       await unhover();
       await shotWin('transactions-page');
-      await shotEl('transactions-chips', '.tx-chips', 8);
+      await shotEl('transactions-chips', '.tx-filters', 0);
       await shotEl('sidebar', '.menu', 0);
 
-      // A few rows, close up: category pills, account tags, signed amounts.
+      /** One crop around several elements: a control and the pop-up it opened
+       *  (appended to <body>, so no single element holds both). */
+      const shotAround = async (name, selectors, pad = 8) => {
+        const r = await js(`(() => {
+          const rs = ${JSON.stringify(selectors)}.map(s => document.querySelector(s)).filter(Boolean).map(e => e.getBoundingClientRect());
+          if (!rs.length) return null;
+          const x = Math.min(...rs.map(b => b.left)), y = Math.min(...rs.map(b => b.top));
+          return { x, y, width: Math.max(...rs.map(b => b.right)) - x, height: Math.max(...rs.map(b => b.bottom)) - y };
+        })()`);
+        if (!r) { missing.push(name); return; }
+        const x = Math.max(0, Math.round(r.x - pad));
+        const y = Math.max(0, Math.round(r.y - pad));
+        await shot(name, { x, y, width: Math.min(W - x, Math.round(r.width + pad * 2)), height: Math.min(H - y, Math.round(r.height + pad * 2)) });
+      };
+
+      // A few rows, close up: category tags, account tags, signed amounts.
       const rows = await js(`(() => {
         const tb = document.getElementById('tx-tbody');
         const b = tb.getBoundingClientRect();
-        const head = document.querySelector('.tx-header-row').getBoundingClientRect();
+        const head = document.getElementById('tx-thead').getBoundingClientRect();
         return { x: b.x, y: head.y, width: b.width, height: 250 };
       })()`);
       await shot('transactions-rows', {
@@ -686,143 +704,115 @@ app.whenReady().then(async () => {
         width: Math.round(rows.width), height: Math.round(rows.height),
       });
 
-      // The clean merchant name, expanded to reveal the bank's own text. The
-      // named row sits well down the list, so scroll it into view before
-      // framing it — with the row above for contrast (that one has no name, so
-      // it shows the bank's text directly and gets no chevron).
-      const revealed = await js(`(() => {
-        const btn = document.querySelector('.tx-desc-toggle');
-        if (!btn) return false;
-        btn.click();
-        return true;
-      })()`);
-      if (revealed) {
-        await sleep(500);
-        await scrollTo('.tx-desc-original');
+      // A clean merchant name over the bank's own text. The named row sits
+      // well down the list, so it is scrolled into view first, framed with the
+      // row above for contrast (that one has no name, so it shows the bank's
+      // text alone).
+      if (await js('!!document.querySelector(".tx-desc-raw")')) {
+        await scrollTo('.tx-desc-raw');
         const row = await js(`(() => {
-          const o = document.querySelector('.tx-desc-original');
-          if (!o) return null;
-          const b = o.closest('tr').getBoundingClientRect();
+          const b = document.querySelector('.tx-desc-raw').closest('tr').getBoundingClientRect();
           return { x: b.x, y: b.y, width: b.width, height: b.height };
         })()`);
-        if (row) {
-          await shot('transactions-clean-name', {
-            x: Math.max(0, Math.round(row.x)),
-            y: Math.max(0, Math.round(row.y - 58)),
-            width: Math.min(W - Math.max(0, Math.round(row.x)), 900),
-            height: Math.min(H - Math.max(0, Math.round(row.y - 58)), Math.round(row.height) + 118),
-          });
-        } else missing.push('transactions-clean-name');
+        await shot('transactions-clean-name', {
+          x: Math.max(0, Math.round(row.x)),
+          y: Math.max(0, Math.round(row.y - 58)),
+          width: Math.min(W - Math.max(0, Math.round(row.x)), 900),
+          height: Math.min(H - Math.max(0, Math.round(row.y - 58)), Math.round(row.height) + 70),
+        });
+        await js('document.querySelector(".page").scrollTo(0, 0)');
+        await sleep(300);
       } else missing.push('transactions-clean-name');
 
-      // Filter popovers.
-      await click('.tx-filter-chip[data-filter="category"] .tx-filter-main');
+      // The filters' pop-ups: the Category Select's list (it opens on a
+      // press, not a click) and the date range's presets and month.
+      await js(`document.querySelector('#tx-filter-category .ant-select-selector').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))`);
       await sleep(400);
-      await shotEl('transactions-filter-category', '.tx-filter-chip[data-filter="category"]', 8);
+      await shotAround('transactions-filter-category', ['#tx-filter-category', '.ant-select-dropdown']);
       await esc();
-      await click('.tx-filter-chip[data-filter="date"] .tx-filter-main');
+      await click('#tx-dates input');
       await sleep(400);
-      await shotEl('transactions-filter-date', '.tx-filter-chip[data-filter="date"]', 8);
+      await shotAround('transactions-filter-date', ['#tx-dates', '.ant-picker-dropdown']);
       await esc();
       await sleep(200);
 
-      // Filtered to the uncategorized backlog — the working view.
-      await js(`(() => {
-        const chip = document.querySelector('.tx-filter-chip[data-filter="category"] .tx-filter-main');
-        chip.click();
-      })()`);
+      // Filtered to the uncategorized backlog — the working view — by picking
+      // Uncategorized in the Category filter.
+      await js(`document.querySelector('#tx-filter-category .ant-select-selector').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))`);
       await sleep(400);
-      await js(`(() => {
-        const opt = [...document.querySelectorAll('.tx-pop-option')].find(o => o.textContent.trim() === 'Uncategorized');
-        if (opt) opt.click();
-      })()`);
+      await js(`[...document.querySelectorAll('.ant-select-dropdown .ant-select-item-option')].find(o => o.textContent.trim() === 'Uncategorized')?.click()`);
+      await esc();
       await sleep(600);
       await unhover();
       await shotWin('transactions-uncategorized');
 
-      // Selection + the bulk-edit wizard. Narrow to the one shop that appears
-      // four times under four terminal numbers, then edit two of them — so the
+      // Selection + the edit wizard. Narrow to the one shop that appears four
+      // times under four terminal numbers, then edit two of them — so the
       // "find similar" step has the other two to offer, which is the whole
       // point of that step.
-      await click('#tx-clear-all');
+      await click('#tx-clear-filters');
       await sleep(500);
-      await click('.tx-filter-chip[data-filter="name"] .tx-filter-main');
-      await sleep(400);
       await js(`(() => {
-        const input = document.querySelector('.tx-filter-popover input[data-k="name"]');
-        if (!input) return false;
+        const input = document.getElementById('tx-search');
         input.value = 'QX MKT';
         input.dispatchEvent(new Event('input', { bubbles: true }));
-        return true;
       })()`);
       await sleep(500);
-      await esc();
-      await sleep(400);
       await js(`(() => {
         [...document.querySelectorAll('.tx-row-cb')].slice(0, 2).forEach(cb => {
           cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true }));
         });
       })()`);
       await sleep(300);
-      await shotEl('transactions-selection', '.tx-chips-right', 10);
-      await click('.tx-edit-btn');
+      await shotEl('transactions-selection', '#tx-batch', 10);
+      await click('#tx-batch-edit');
       await sleep(700);
-      if (await js('!!document.querySelector(".tx-edit-dialog")')) {
-        await shotEl('bulk-edit-step-edit', '.tx-edit-dialog');
-        // The edit step is one control row over the rows it rewrites, whatever
-        // the selection size, so the category goes in that row and not in the
-        // read-only rows below it. This runs after the step-1 shot: it exists to
-        // give steps 2 and 3 something to be about, since the cascade searches
-        // on the category the control row hands the batch — without it the
-        // similar step shoots its own "nothing has a category" empty state.
+      if (await js('!!document.querySelector(".tx-wizard")')) {
+        await shotEl('bulk-edit-step-edit', '.tx-wizard');
+        // "Apply to similar" needs a category to hand on, so one is set after
+        // the step-1 shot; without it the similar step has nothing to find.
         await js(`(() => {
-          const sel = document.querySelector('#tx-bulk-apply .tx-input-category');
-          if (sel) {
-            const opt = [...sel.options].find(o => o.textContent.trim() === 'Food');
-            if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }
-          }
-          const cb = document.getElementById('tx-cascade-cb');
-          if (cb) cb.checked = true;
+          const sel = document.querySelector('.tx-wizard [data-e="category"]');
+          const opt = [...sel.options].find(o => o.textContent.trim() === 'Food');
+          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+          const cb = document.querySelector('.tx-cascade input');
+          cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true }));
         })()`);
         await sleep(300);
-        await click('#tx-edit-next');
+        await click('.tx-wizard [data-act="next"]');
         await sleep(2400);
-        await shotEl('bulk-edit-step-similar', '.tx-edit-dialog');
-        await click('#tx-edit-next');
+        await shotEl('bulk-edit-step-similar', '.tx-wizard');
+        await click('.tx-wizard [data-act="next"]');
         await sleep(900);
-        await shotEl('bulk-edit-step-review', '.tx-edit-dialog');
-        await click('#tx-edit-cancel');
+        await shotEl('bulk-edit-step-review', '.tx-wizard');
+        await click('.tx-wizard .ant-modal-close');
         await sleep(400);
       } else {
         missing.push('bulk-edit-* (no rows were selectable)');
       }
 
       // Delete confirmation.
-      await js(`(() => {
-        [...document.querySelectorAll('.tx-row-cb')].slice(0, 2).forEach(cb => {
-          cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-      })()`);
-      await sleep(300);
-      await click('.tx-delete-btn');
+      await click('#tx-batch-delete');
       await sleep(500);
-      await shotEl('transactions-delete-confirm', '.confirm-dialog');
-      await click('.confirm-cancel');
+      await shotEl('transactions-delete-confirm', '.ant-modal-confirm');
+      await click('.ant-modal-confirm [data-choice="cancel"]');
       await sleep(300);
 
-      // Clear filters, then the inline add row and the export modal.
-      await click('#tx-clear-all');
+      // Clear the filters, then Add transaction (a dialog now, under the
+      // name the inline add row's shot had) and the export dialog.
+      await click('#tx-batch-clear');
+      await click('#tx-clear-filters');
       await sleep(600);
-      await click('.tx-add-btn');
+      await click('#tx-add-btn');
       await sleep(500);
-      await shotEl('transactions-add-row', 'tr.tx-new', 12);
+      await shotEl('transactions-add-row', '.tx-form-modal');
       await esc();
       await sleep(300);
-      await shotEl('transactions-pagination', '.tx-pagination', 10);
-      await click('.tx-export-btn');
+      await shotEl('transactions-pagination', '#tx-pagination', 10);
+      await click('#tx-export-btn');
       await sleep(600);
-      await shotEl('transactions-export', '.tx-export-dialog');
-      await click('.tx-import-close');
+      await shotEl('transactions-export', '.tx-export-modal');
+      await click('.tx-export-modal .ant-modal-close');
       await sleep(300);
     }
 
@@ -832,11 +822,11 @@ app.whenReady().then(async () => {
       await nav('/statements', 3000);
       await unhover();
       await shotWin('statements-cash-flow');
-      await shotEl('statements-toolbar', '.stmt-toolbar', 6);
+      await shotEl('statements-toolbar', '.stmt-bar', 6);
 
-      // Computed (accent italics) beside a hand-typed value, close up.
+      // Computed (primary colour) beside a hand-typed value, close up.
       const cell = await rectOf(`#stmt-panel-cashflow input[data-col="general"]`);
-      const table = await rectOf('#stmt-panel-cashflow .db-wrapper');
+      const table = await rectOf('#stmt-panel-cashflow .stmt-year:not([hidden])');
       if (cell && table) {
         await shot('statements-computed-cells', {
           x: Math.round(table.x), y: Math.round(table.y),
@@ -846,7 +836,7 @@ app.whenReady().then(async () => {
       }
       // The ↺ that appears on a cell you have typed over — with the month name
       // and its computed neighbours in frame, so it reads as a table cell.
-      const overridden = '#stmt-panel-cashflow .db-outer:not([hidden]) input[data-month="April"][data-col="income"]';
+      const overridden = '#stmt-panel-cashflow .stmt-year:not([hidden]) input[data-month="April"][data-col="income"]';
       await hover(overridden);
       const oc = await rectOf(overridden);
       if (oc) {
@@ -858,10 +848,10 @@ app.whenReady().then(async () => {
       } else missing.push('statements-revert-cell');
       await unhover();
 
-      // The page's two actions, which used to live behind a ⋮ menu here. Framed
+      // The year control and the page's two actions, on the tabs' row. Framed
       // from the group's own rect plus padding, so the shot follows the buttons
       // if their labels or count change.
-      const actions = await rectOf('.stmt-toolbar-right');
+      const actions = await rectOf('.stmt-extra');
       if (actions) {
         const pad = 12;
         await shot('statements-menu', {
@@ -872,33 +862,19 @@ app.whenReady().then(async () => {
         });
       } else missing.push('statements-menu');
 
-      // One "Manage Columns" modal holds both editors as two panels, one per
-      // statement sheet, opening on the one matching the current tab. From the
-      // Cash Flow tab that is its categories; the switch then shows the Balance
+      // One "Manage Columns" modal holds both editors as two tabs, one per
+      // statement, opening on the one matching the current tab. From the Cash
+      // Flow tab that is its categories; the other tab shows the Balance
       // Sheet's accounts in the same frame.
       // Two shots, one modal — the docs still show each editor on its own.
-      const openColumnsManager = async () => {
-        await click('#stmt-columns-btn');
-        await sleep(900);
-      };
-      const openSecondCard = async (panel) => {
-        await js(`(() => {
-          const heads = [...document.querySelectorAll('.mgr-panel[data-panel="${panel}"] .cat-group-head')];
-          const head = heads[${panel === 'cashflow' ? 1 : 0}];
-          if (head) head.click();
-        })()`);
-        await sleep(400);
-      };
-
-      await openColumnsManager();
-      await openSecondCard('cashflow');
-      await shotEl('statements-manage-categories', '.cat-manager');
-
-      await js(`document.querySelector('.mgr-tab[data-panel="balance"]')?.click()`);
+      await click('#stmt-columns-btn');
       await sleep(900);
-      await openSecondCard('balance');
-      await shotEl('statements-manage-columns', '.cat-manager');
-      await click('.cat-manager-close');
+      await shotEl('statements-manage-categories', '.stmt-columns-modal');
+
+      await js(`document.querySelector('.stmt-columns-modal [role="tab"][data-tab="balance"]')?.click()`);
+      await sleep(900);
+      await shotEl('statements-manage-columns', '.stmt-columns-modal');
+      await click('.stmt-columns-modal .ant-modal-close');
       await sleep(400);
 
       await click('#stmt-tab-balance');
@@ -910,14 +886,14 @@ app.whenReady().then(async () => {
       await click('#stmt-tab-cashflow');
       await sleep(1000);
       const cols = await js(`(() => {
-        const ins = [...document.querySelectorAll('#stmt-panel-cashflow .db-outer:not([hidden]) input[data-month="January"]')];
+        const ins = [...document.querySelectorAll('#stmt-panel-cashflow .stmt-year:not([hidden]) input[data-month="January"]')];
         return ins.slice(0, 3).map(i => i.dataset.col);
       })()`);
       if (cols && cols.length >= 3) {
         await dragCells(
-          `#stmt-panel-cashflow .db-outer:not([hidden]) input[data-month="February"][data-col="${cols[0]}"]`,
-          `#stmt-panel-cashflow .db-outer:not([hidden]) input[data-month="May"][data-col="${cols[2]}"]`);
-        const t2 = await rectOf('#stmt-panel-cashflow .db-outer:not([hidden]) .db-wrapper');
+          `#stmt-panel-cashflow .stmt-year:not([hidden]) input[data-month="February"][data-col="${cols[0]}"]`,
+          `#stmt-panel-cashflow .stmt-year:not([hidden]) input[data-month="May"][data-col="${cols[2]}"]`);
+        const t2 = await rectOf('#stmt-panel-cashflow .stmt-year:not([hidden])');
         await shot('tables-cell-selection', {
           x: Math.round(t2.x), y: Math.round(t2.y),
           width: Math.min(W - Math.round(t2.x), 740),
@@ -994,13 +970,13 @@ app.whenReady().then(async () => {
     if (ONLY && ONLY.has('site')) {
       console.log('\n— site —');
 
-      // Every site crop is shot in the LIGHT theme and the GEMSTONE chart
+      // Every site crop is shot in the LIGHT theme and the DEFAULT chart
       // palette, so the Features section reads as one set. Set once here rather
       // than per shot: both live in localStorage on a fixed origin, so they
       // survive every nav below. The docs phases run under the defaults, which
       // is why the pair is put back at the end of the block.
       await setTheme('');
-      await setGraphTheme('gemstone');
+      await setGraphTheme('');
 
       // The default dashboard — two rows, six cards, under its toolbar.
       // Unlike the crops below this one is padded: those are cards, whose own
@@ -1014,8 +990,8 @@ app.whenReady().then(async () => {
       // paycheque against a half month of spending. The month before it is the
       // whole picture the cards are meant to show.
       await nav('/', 3200);
-      if (await js(`document.documentElement.dataset.graphTheme !== 'gemstone'`)) {
-        throw new Error('dashboard did not load in the gemstone palette');
+      if (await js(`document.documentElement.dataset.graphTheme !== undefined`)) {
+        throw new Error('dashboard did not load in the default graph palette');
       }
       await dashboardPreviousMonth();
       await sleep(900);
@@ -1061,7 +1037,7 @@ app.whenReady().then(async () => {
     // Whole-window captures — title bar, sidebar and page in one picture — for
     // the website, where the site crops above deliberately drop all of that.
     // Shot in the COLORFUL surface theme (the site crops use the light one) on
-    // the gemstone palette. Opt in by naming it, like `site`:
+    // the default graph palette. Opt in by naming it, like `site`:
     //
     //   SHOT_ONLY=frames SHOT_W=1728 SHOT_H=972 SHOT_SCALE=2 SHOT_OUT=… \
     //     electron --no-sandbox --force-device-scale-factor=2 scripts/shoot-docs.js
@@ -1094,20 +1070,20 @@ app.whenReady().then(async () => {
       // does most of its work, so a light frame would show the chrome the crops
       // deliberately drop and then paint it in the one theme that makes it
       // plainest. SHOT_SURFACE=dark re-shoots the same set for the website's
-      // click-to-flip pair. The gemstone palette is fixed either way: it is the
-      // one chart ramp both surfaces are tuned against. Set once here; both axes
+      // click-to-flip pair. The default palette is fixed either way: Ant draws
+      // it unchanged on both surfaces. Set once here; both axes
       // live in localStorage on a fixed origin, so they survive every nav below.
       console.log(`  surface: ${FRAME_SURFACE}`);
       await setTheme(FRAME_SURFACES[FRAME_SURFACE]);
-      await setGraphTheme('gemstone');
+      await setGraphTheme('');
 
       // Stepped back one month for the reason the site dashboard is: the seeded
       // ledger stops at today, so the current month is a part-month and the
       // month cards would open on a half paycheque against a half month of
       // spending.
       await nav('/', 3200);
-      if (await js(`document.documentElement.dataset.graphTheme !== 'gemstone'`)) {
-        throw new Error('dashboard did not load in the gemstone palette');
+      if (await js(`document.documentElement.dataset.graphTheme !== undefined`)) {
+        throw new Error('dashboard did not load in the default graph palette');
       }
       await dashboardPreviousMonth();
       await sleep(900);
@@ -1159,7 +1135,7 @@ app.whenReady().then(async () => {
       // catches a capture taken mid-flight or with no data behind it.
       console.log(`  ${await seedBudgets()} budgets seeded`);
       await nav('/budgets', 3200);
-      await click('#bud-month [data-step="-1"]');
+      await click('#bud-month-prev');
       await sleep(2000);
       const bubbles = await js(`(() => ({
         drawn: document.querySelectorAll('.bud-bubble').length,
@@ -1230,7 +1206,7 @@ app.whenReady().then(async () => {
         body: JSON.stringify({ name: 'Brokerage' }) }).then(r => r.json())`);
       await nav('/portfolio', 2500);
       await unhover();
-      await shotPage('portfolio-page', '.db-outer');
+      await shotPage('portfolio-page', '.pf-account');
     }
 
     // ═══ Phase 11: settings + database management ════════════════════════════

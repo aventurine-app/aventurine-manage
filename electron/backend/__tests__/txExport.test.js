@@ -348,6 +348,37 @@ test('export validates filters', (t) => {
   assert.deepEqual({ exported: body.exported, total: body.total }, { exported: 1, total: 1 });
 });
 
+test('export filters.description also matches the notes, like the ledger search', (t) => {
+  const c = makeClient(t);
+  createTx(c, 'HARDWARE STORE', { notes: 'Fence posts for the garden' });
+  createTx(c, 'GARDEN CENTER');
+  createTx(c, 'BOOKSHOP');
+  const dest = path.join(c.dir, 'garden.csv');
+  const body = exportAll(c, dest, 'csv', { filters: { description: 'garden' } });
+  assert.equal(body.exported, 2);
+  assert.doesNotMatch(fs.readFileSync(dest, 'utf8'), /BOOKSHOP/);
+});
+
+test('export filters.ids saves exactly the ticked rows', (t) => {
+  const c = makeClient(t);
+  const a = createTx(c, 'Ticked One');
+  createTx(c, 'Left Out');
+  const b = createTx(c, 'Ticked Two');
+  const dest = path.join(c.dir, 'ticked.csv');
+  const body = exportAll(c, dest, 'csv', { filters: { ids: [a.id, b.id] } });
+  assert.deepEqual({ exported: body.exported, total: body.total }, { exported: 2, total: 2 });
+  const text = fs.readFileSync(dest, 'utf8');
+  assert.match(text, /Ticked One/);
+  assert.match(text, /Ticked Two/);
+  assert.doesNotMatch(text, /Left Out/);
+
+  const r = c.post('/api/transactions/export', {
+    path: path.join(c.dir, 'bad.csv'), format: 'csv', offset: 0, filters: { ids: ['1'] },
+  });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /ids must all be integers/);
+});
+
 test('export validates format, offset, and path', (t) => {
   const c = makeClient(t);
   const dest = path.join(c.dir, 'x.csv');

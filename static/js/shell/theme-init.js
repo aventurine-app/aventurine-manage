@@ -22,10 +22,9 @@
 // needs resolving at paint time; the live picker (settings.js) repaints it when
 // the OS preference changes while the app is open.
 //
-// Stored 'graph-theme' values: '' (the accent-derived Aventurine ramp, the
-// default), 'gemstone', 'opal', 'lapis' or 'labradorite'. The graph palette is
-// a SECOND, independent axis from the surface (see the block at the foot of
-// themes.css).
+// Stored 'graph-theme' values: '' (Ant Design's chart palette, the default) or
+// 'opal' (the same palette, desaturated). The graph palette is a SECOND,
+// independent axis from the surface (see the block at the foot of themes.css).
 //
 // Both axes land on <html> as data-* before first paint, to avoid a flash of the
 // wrong theme on nav. window.appTheme exposes the same reads and the painter to
@@ -47,13 +46,16 @@
         'tint-pink':   { theme: '',     tint: 'pink' },
     };
 
-    // 'colorful' was the graph palette's name before it was retoned to jewel
-    // colours. The stored value is rewritten rather than merely mapped, because
-    // an unknown value is not an error anywhere — it just falls through to the
-    // accent ramp with no picker button lit — so a stale one would silently look
-    // like the user had never chosen a palette at all.
-    if (localStorage.getItem('graph-theme') === 'colorful') {
-        localStorage.setItem('graph-theme', 'gemstone');
+    // Palettes this app used to offer (the accent-derived Aventurine ramp,
+    // 'gemstone', 'lapis', 'labradorite', and 'colorful' before them) are gone.
+    // An unknown value is not an error anywhere, it just falls through to the
+    // default with no picker button lit, so a stale one is rewritten to the
+    // default rather than left to look as though no palette had been chosen.
+    {
+        const stored = localStorage.getItem('graph-theme');
+        if (stored !== null && stored !== '' && stored !== 'opal') {
+            localStorage.setItem('graph-theme', '');
+        }
     }
 
     /** The stored surface choice, with Colorful standing in for an absent key.
@@ -62,7 +64,7 @@
         return localStorage.getItem('color-theme') ?? 'colorful';
     }
 
-    /** The stored graph palette; '' (the Aventurine ramp) when none is stored. */
+    /** The stored graph palette; '' (the default) when none is stored. */
     function graph() {
         return localStorage.getItem('graph-theme') ?? '';
     }
@@ -96,6 +98,12 @@
 
     if (localStorage.getItem('ui-density') === 'compact') {
         document.documentElement.dataset.density = 'compact';
+    }
+
+    // A collapsed sidebar (nav.js) is restored pre-paint too, so it never
+    // flashes open and then snaps shut.
+    if (localStorage.getItem('nav-rail') === '1') {
+        document.documentElement.classList.add('has-rail');
     }
 
     // Tag the host OS so the custom title bar (titlebar.css) can match the

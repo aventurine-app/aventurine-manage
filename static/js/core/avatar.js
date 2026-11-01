@@ -77,15 +77,14 @@
         return s.replace(/\s+/g, ' ').trim();
     }
 
-    // 8 fixed slots (.avatar-circle-0..7 in ui.css) — light/desaturated steps
-    // of the same 8 hues as the dataviz skill's categorical palette, evenly
-    // spaced by hue angle for pastel distinguishability (see ui.css for why).
+    // 10 fixed slots (.avatar-circle-0..9 in ui.css) — the Ant Design preset
+    // hues, each a light tint under a darker shade of itself (see ui.css).
     // The colour hash runs on the noise-stripped key (above) so unmatched
     // merchants with a varying trailing reference number still land on one
     // colour; initials use the original label, since the first-two-words rule
     // rarely reaches that trailing noise and the label is what is printed
     // beside the circle.
-    const AVATAR_SLOTS = 8;
+    const AVATAR_SLOTS = 10;
 
     // ── Brand icons ─────────────────────────────────────────────────────────
     // The join between a label on screen and a file on disk. NOT the

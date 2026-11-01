@@ -33,10 +33,27 @@
         return document.documentElement.dataset.dbLocked === '1';
     }
 
+    /** True from the moment a move is requested until the document is replaced.
+     *
+     *  history.back()/forward() only ask for a move; the page stays up, buttons
+     *  enabled, until the next one has loaded. Chromium counts a second request
+     *  from the entry the first is heading to, not the one on screen, so a
+     *  double click, a held Alt+Arrow or a doubled side-button press walks two
+     *  or more entries and appears to skip pages. The move is single-shot: the
+     *  load that completes it discards this document, and with it the latch. */
+    let moving = false;
+
+    /** How long to wait before concluding no move is coming — at either end of
+     *  the trail, or in a plain browser, history.back() is a silent no-op and
+     *  nothing would ever clear the latch. Far longer than a local page load. */
+    const MOVE_TIMEOUT_MS = 1500;
+
     /** The one way anything here moves. Every input path funnels through it so
      *  the lock gate cannot be reached around. */
     function go(direction) {
-        if (isLocked()) return;
+        if (isLocked() || moving) return;
+        moving = true;
+        setTimeout(() => { moving = false; }, MOVE_TIMEOUT_MS);
         if (direction === 'back')         history.back();
         else if (direction === 'forward') history.forward();
     }
@@ -90,6 +107,8 @@
         }
         if (!direction) return;
         e.preventDefault();
+        // A held key auto-repeats; one press is one step.
+        if (e.repeat) return;
         go(direction);
     });
 

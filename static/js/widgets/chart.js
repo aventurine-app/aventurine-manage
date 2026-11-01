@@ -41,13 +41,11 @@
   // retone on a theme swap; the arrays are only first-paint fallbacks for the
   // rare frame before styles resolve.
   //
-  //   'accent' (default) — the accent-derived --chart-* ramp (style.css). One
-  //       measure over time; the series are variations of the same thing, so
-  //       following the UI accent is exactly right.
-  //   'categorical'      — the --cat-* ramp (style.css). For a chart whose
-  //       series are CATEGORIES rather than one measure over time. What that
-  //       ramp IS depends on the graph palette: eight steps of the accent under
-  //       Aventurine, eight distinct hues under Gemstone (themes.css).
+  //   'accent' (default) — the --chart-* tokens (ant.css, the Graphs palette).
+  //       One measure over time; the series are variations of the same thing.
+  //   'categorical'      — the --cat-* tokens (ant.css). For a chart whose
+  //       series are CATEGORIES rather than one measure over time. Both are the
+  //       first eight hues of the Graphs palette picked in Preferences.
   const PALETTE = [
     '#8fb088', '#5c7152', '#a9c1a4', '#33402d',
     '#7c9670', '#b6c8b2', '#647a59', '#5a6f50',

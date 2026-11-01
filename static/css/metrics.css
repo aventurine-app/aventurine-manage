@@ -2,10 +2,10 @@
    metrics.css — the Metrics report, a tab of the Reports page.
 
    Loads only alongside forecast.css (pages/reports.html), which owns the .rep-*
-   tab shell, the card header chrome (.dashboard-card-header / -title), the
-   "i" info badge and the page padding. What lives here is the report's own
-   column: one shell holding two sub-cards — the headline figure tiles and their
-   sparklines, and the Vitals grid of range-coloured gauges.
+   tab shell, the pickers and the page padding; the cards, Statistics and the
+   info icon are ant.css. What lives here is the report's own column: one Card
+   holding two inner Cards — the headline figures and their sparklines, and
+   the Vitals grid of range-coloured gauges.
 
    Every mark on this card is drawn from a number that is also printed beside
    it — the gauges have their percentages, the sparklines have the year
@@ -15,140 +15,110 @@
 .metrics-page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-24);
+    gap: 16px;
 }
 
-/* ─── One container for the whole report ──────────────────────────────────────
-   The shell is the page's ordinary card (border, surface, shadow), holding the
-   year heading and its picker in a header row and the three sections below as
-   flat sub-cards. The year picker scopes every section, not just the first,
-   which is why it sits in the shell's header and not in a section's. */
-.met-shell {
-    min-width: 0;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
-    padding: var(--space-24) 28px;
+/* ─── One card for the whole report ───────────────────────────────────────────
+   The chosen year is the card's title and the year picker its extra, because
+   the picker scopes every section, not just the first. The two sections are
+   inner Cards in its body. */
+.met-shell-body {
     display: flex;
     flex-direction: column;
-    gap: var(--space-24);
+    gap: 16px;
 }
 
-.met-shell-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-16);
-    min-height: var(--control-height);
-}
-
-/* The chosen year, as the title of everything under it. */
-.met-year {
-    margin: 0;
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-h1);
-    font-weight: var(--weight-bold);
-    line-height: var(--lh-tight);
+/* The chosen year, as the title of everything under it: Ant's h4. */
+.ant-card-head-title.met-year {
+    font-size: 20px;
+    line-height: 1.4;
     font-variant-numeric: tabular-nums;
-}
-
-/* The sections are sub-cards INSIDE the shell: bordered so each question reads
-   as its own answer, but with no shadow — a shadow inside a shadowed card
-   reads as a card floating on a card. */
-.met-card {
-    min-width: 0;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 8px;
-    background: var(--surface1);
-    padding: var(--space-24) 28px;
-    display: flex;
-    flex-direction: column;
 }
 
 /* ─── Headline figures ────────────────────────────────────────────────────── */
 /* Five money totals in the first card (income, expenses, net, savings,
-   invested), four ratios in the second. Each tile stacks label, value, YoY
-   pill and then its sparkline, so the tile only has to be as wide as the
-   number and five fit where four used to.
+   invested), four ratios in the second. Each figure is a Statistic — title,
+   value — with its YoY change and then its sparkline under it, so the tile only
+   has to be as wide as the number and five fit in a row.
    Both grids are FIXED at each breakpoint rather than auto-fit, because
    auto-fit sizes by available width and would leave a ragged last row that
-   moves as the window does. Breakpoints match dashboard.css: the sidebar and page padding
-   take ~280px off the viewport. */
+   moves as the window does. */
 .met-figures {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: var(--space-20) 28px;
+    gap: 24px;
 }
-.met-figure { min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
-.met-figure-label {
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-    text-transform: uppercase;
-}
-.met-figure-value {
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-h3);
-    font-weight: var(--weight-semibold);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+/* Positioned: the change line's words for a screen reader are absolutely
+   placed (.ant-visually-hidden), and must not escape to the page. */
+.met-figure {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 /* Net is the one figure that can be negative, and a minus sign in a column of
-   money is easy to miss — so it carries the loss colour too. */
-.met-figure-negative .met-figure-value { color: var(--accent-negative); }
+   money is easy to miss — so it carries the error colour too. */
+.met-figure-negative .ant-statistic-content { color: var(--ant-color-error); }
+
+/* Each figure's colour, for its sparkline: money in green, money out red, the
+   rest in the chart palette — the pairing the Cash Flow card uses. */
+.met-figure { --met-spark: var(--ant-color-primary); }
+.met-figure-income   { --met-spark: var(--ant-color-success); }
+.met-figure-expenses { --met-spark: var(--ant-color-error); }
+.met-figure-saved    { --met-spark: var(--ant-chart-1); }
+.met-figure-invested { --met-spark: var(--ant-chart-3); }
+
+/* ─── The change line ─────────────────────────────────────────────────────────
+   Ant's caret and the percentage in the colour of whether the move is good,
+   then "YoY" in the secondary text colour. */
+.met-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+}
+.met-change .anticon { font-size: var(--ant-font-size-sm); }
+.met-change-suffix { color: var(--ant-color-text-tertiary); }
+.met-change-good { color: var(--ant-color-success); }
+/* A move the wrong way, but a small one — the warning colour a gauge's caution
+   range uses. Same three-level scale, said on the change line because the two
+   trend goals have no tile of their own. */
+.met-change-near { color: var(--ant-color-warning); }
+.met-change-bad  { color: var(--ant-color-error); }
+.met-change-flat { color: var(--ant-color-text-tertiary); }
+.met-change-none { color: var(--ant-color-text-tertiary); }
 
 /* ─── Sparklines ──────────────────────────────────────────────────────────────
    Every tracked year of one figure, with the selected year marked, drawn under
    the number at the tile's full width and a fixed height. The line is in a
    stretched inner box with a non-scaling stroke and the marker dot is placed
    in the outer svg by percentage, so widening the tile widens the chart and
-   nothing else. Deliberately quiet: it is context for the number above it, not
-   a second reading of the card. margin-top:auto drops it to the tile's bottom
-   edge, so every chart in a row shares one baseline whatever the pills above
-   them wrap to. */
+   nothing else. margin-top:auto drops it to the tile's bottom edge, so every
+   chart in a row shares one baseline whatever the lines above them wrap to. */
 .met-spark {
     display: block;
     width: 100%;
-    height: 56px;
+    height: 48px;
     margin-top: auto;
-    padding-top: var(--space-8);
+    padding-top: 12px;
     overflow: visible;
 }
-.met-spark-area { fill: color-mix(in srgb, var(--accent-primary) 13%, transparent); }
+.met-spark-area { fill: color-mix(in srgb, var(--met-spark) 14%, transparent); }
 .met-spark-line {
     fill: none;
-    stroke: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+    stroke: var(--met-spark);
     stroke-width: 1.5;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
-.met-spark-dot { fill: var(--accent-primary); }
-
-.met-change {
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-}
-.met-change-good { color: var(--accent-positive); }
-/* A move the wrong way, but a small one — the amber the goal tiles use for
-   "slightly off". Same three-level scale, said on the pill instead of a badge
-   because the two trend goals have no tile of their own. */
-.met-change-near { color: var(--warning); }
-.met-change-bad  { color: var(--accent-negative); }
-.met-change-flat { color: var(--text-tertiary); }
-.met-change-none { color: var(--text-tertiary); font-style: italic; font-weight: var(--weight-regular); }
+.met-spark-dot { fill: var(--met-spark); }
 
 /* ─── Ratio grid ──────────────────────────────────────────────────────────── */
 .met-metrics {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--space-24) 28px;
+    gap: 24px 32px;
 }
 
 @media (max-width: 1100px) {
@@ -160,38 +130,34 @@
     .met-figures,
     .met-metrics { grid-template-columns: minmax(0, 1fr); }
 }
-.met-metric { min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.met-metric { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .met-metric-label {
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-    text-transform: uppercase;
     display: flex;
     align-items: center;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
+.met-metric-label .ant-info-tip { letter-spacing: 0; }
 
 /* ─── Gauges ──────────────────────────────────────────────────────────────────
    Every ratio tile's meter is a GAUGE: the full 0–100% track it is a share of,
    pre-coloured into the three ranges the value can land in, with a tick and a
    percentage at each boundary between two of them, and the year's own value
-   riding above the track in a waypoint pin.
+   riding above the track in a pin.
 
-   This replaced a bar that filled from the left with a target notched on it.
-   That drawing put the whole verdict at ONE point — the tip of the fill — so it
-   only meant something to a reader who already knew what a good number was.
-   Colouring the track instead puts the scale on screen before the value is, and
-   makes the pin's colour a consequence of where it landed rather than a second,
-   separately computed opinion (which is why the ✓/!/✕ badge is gone: with the
-   ranges drawn, it said the same thing twice).
+   Colouring the track puts the scale on screen before the value is, and makes
+   the pin's colour a consequence of where it landed rather than a second,
+   separately computed opinion.
 
-   The ranges are drawn at part strength. They are the ground the reading is
-   taken against, and at full saturation three of them under a small number
-   would out-shout it. The pin is the mark that gets full colour. */
+   The ranges are drawn at part strength, in Ant's success, warning and error
+   colours. They are the ground the reading is taken against, and at full
+   saturation three of them under a small number would out-shout it. The pin is
+   the mark that gets full colour. */
 .met-gauge {
     position: relative;
-    margin-top: var(--space-8);
+    margin-top: 8px;
 }
 
 /* Reserved on every tile whether or not there is a value to pin, so a row of
@@ -199,29 +165,27 @@
    enough for a headline-sized pin plus its point and the gap under it. */
 .met-gauge-pins {
     position: relative;
-    height: 40px;
+    height: 44px;
 }
 
 /* A ratio with no value for this year. It has no point on the track to stand on,
-   so it is not drawn as a pin — but the tile still has to SAY so, which is the
-   job the headline percentage used to do before the pin took it over. */
+   so it is not drawn as a pin — but the tile still has to SAY so. */
 .met-gauge-none {
     position: absolute;
     left: 0;
-    bottom: var(--space-8);
-    color: var(--text-tertiary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-h3);
-    font-weight: var(--weight-semibold);
-    font-variant-numeric: tabular-nums;
+    bottom: 8px;
+    color: var(--ant-color-text-tertiary);
+    font-size: 20px;
+    font-weight: var(--ant-font-weight-strong);
 }
 
+/* Progress's track: 8px, fully rounded. */
 .met-gauge-track {
     position: relative;
     height: 8px;
-    border-radius: 4px;
+    border-radius: 100px;
     overflow: hidden;
-    background: var(--frost-2);
+    background: var(--ant-color-fill-secondary);
     /* Grows as ONE piece, the way it is read. */
     transform: scaleX(0);
     transform-origin: left center;
@@ -232,9 +196,9 @@
 .met-metric-na .met-gauge-track { opacity: 0.45; }
 
 .met-gauge-band { position: absolute; top: 0; bottom: 0; }
-.met-gauge-good    { background: color-mix(in srgb, var(--accent-positive) 55%, transparent); }
-.met-gauge-caution { background: color-mix(in srgb, var(--warning) 55%, transparent); }
-.met-gauge-bad     { background: color-mix(in srgb, var(--accent-negative) 55%, transparent); }
+.met-gauge-good    { background: color-mix(in srgb, var(--ant-color-success) 50%, transparent); }
+.met-gauge-caution { background: color-mix(in srgb, var(--ant-color-warning) 50%, transparent); }
+.met-gauge-bad     { background: color-mix(in srgb, var(--ant-color-error) 50%, transparent); }
 
 /* The boundary between two ranges. Inside the track rather than overhanging it,
    because the number underneath is what names the boundary — the tick only has
@@ -245,56 +209,49 @@
     bottom: 0;
     width: 2px;
     margin-left: -1px;
-    background: var(--text-primary);
+    background: var(--ant-color-bg-container);
 }
 
 .met-gauge-scale {
     position: relative;
-    height: var(--space-16);
+    height: 20px;
 }
 .met-gauge-mark {
     position: absolute;
-    top: var(--space-4);
+    top: 4px;
     transform: translateX(-50%);
-    color: var(--text-tertiary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-micro);
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-/* ─── The waypoint pin ────────────────────────────────────────────────────────
+/* ─── The pin ─────────────────────────────────────────────────────────────────
    The year's value, sitting above the track at the point it names, pointing
-   down at it.
+   down at it: a Tag in the colour of the range it landed in, at the size of a
+   headline figure, because it IS the tile's number.
 
-   It is a TINTED box with a coloured edge, not a solid block of the range
-   colour: white on the positive green is about 3:1, under what a small bold
-   number needs, and a pin whose own value is hard to read would be a strange
-   thing for the pin to be. The edge and the tint carry the colour; the number
-   keeps the body text colour and stays legible in both themes.
+   A tinted box with a coloured edge, not a solid block of the range colour, so
+   the number keeps the body text colour and stays legible in both themes.
 
    Centred on the true value even at 0% and 100%, where it overhangs the track by
    about half its width — that overhang lands in the grid gutter or the card
-   padding, both 28px, and nudging it inward would point it at a percentage the
-   year did not have. */
+   padding, and nudging it inward would point it at a percentage the year did
+   not have. */
 .met-pin {
     position: absolute;
-    bottom: var(--space-8);
-    transform: translateX(-50%);
-    padding: var(--space-4) var(--space-8);
-    border: 1.5px solid;
-    border-radius: 6px;
-    background: var(--surface1);
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
-    /* The tile's headline size: this pin IS the tile's number, not an annotation
-       on one — the percentage under the label that used to be it is gone. */
-    font-size: var(--size-h3);
-    font-weight: var(--weight-semibold);
+    bottom: 8px;
+    padding: 0 8px;
+    border: var(--ant-line-width) solid;
+    border-radius: var(--ant-radius);
+    color: var(--ant-color-text);
+    font-size: 20px;
+    font-weight: var(--ant-font-weight-strong);
     font-variant-numeric: tabular-nums;
-    line-height: 1.4;
+    line-height: 1.5;
     white-space: nowrap;
     opacity: 0;
+    transform: translateX(-50%);
     animation: met-pin-drop 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.15s forwards;
 }
 /* The point. A square turned 45° with two of its edges kept, so the pin's
@@ -305,26 +262,26 @@
     position: absolute;
     left: 50%;
     bottom: -5px;
-    width: 10px;
-    height: 10px;
-    margin-left: -5px;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
     background: inherit;
-    border-right: 1.5px solid;
-    border-bottom: 1.5px solid;
+    border-right: var(--ant-line-width) solid;
+    border-bottom: var(--ant-line-width) solid;
     border-color: inherit;
     transform: rotate(45deg);
 }
 .met-pin-good {
-    border-color: var(--accent-positive);
-    background: color-mix(in srgb, var(--accent-positive) 16%, var(--surface1));
+    border-color: color-mix(in srgb, var(--ant-color-success) 45%, var(--ant-color-bg-container));
+    background: color-mix(in srgb, var(--ant-color-success) 10%, var(--ant-color-bg-container));
 }
 .met-pin-caution {
-    border-color: var(--warning);
-    background: color-mix(in srgb, var(--warning) 18%, var(--surface1));
+    border-color: color-mix(in srgb, var(--ant-color-warning) 50%, var(--ant-color-bg-container));
+    background: color-mix(in srgb, var(--ant-color-warning) 12%, var(--ant-color-bg-container));
 }
 .met-pin-bad {
-    border-color: var(--accent-negative);
-    background: color-mix(in srgb, var(--accent-negative) 16%, var(--surface1));
+    border-color: color-mix(in srgb, var(--ant-color-error) 45%, var(--ant-color-bg-container));
+    background: color-mix(in srgb, var(--ant-color-error) 10%, var(--ant-color-bg-container));
 }
 
 @keyframes met-fill-grow { to { transform: scaleX(1); } }

@@ -1,0 +1,3008 @@
+/* ============================================================================
+   ant.css — Ant Design (v5), rebuilt for the workspaces drawn in it.
+   ============================================================================
+   The frontend has no framework and no network, so Ant Design's components are
+   rebuilt here from its specs (sizes, radii, spacing, states, motion) rather
+   than imported. ant.js holds the interactive halves: Modal, Tooltip,
+   Popconfirm, the month picker and message toasts.
+
+   COLOUR COMES FROM THE APP THEME. Every token below is a mapping onto the app's
+   own (style.css, themes.css): Ant's container is --surface1, its primary is
+   --accent-primary, its fills are the text colour at Ant's alphas. So a page
+   drawn in Ant Design still follows the theme picker — light, dark, warm, the
+   tints and the accent — instead of carrying Ant's white-and-blue into a pink
+   or a warm-dark window. Shape, type and motion are Ant's own.
+
+   Loaded per page, like any page-only stylesheet, by the pages drawn in it
+   (Recurring, Portfolio, Reports, Budgets, Statements, Transactions and the
+   Dashboard); every class is ant-* so nothing here can reach the chrome.
+
+     1. Tokens
+     2. Scope: type
+     3. Icons
+     4. Button
+     5. Data entry: compact group, input, select, picker trigger, checkbox,
+        segmented, form item
+     6. Card, Statistic, Tabs
+     7. Tag, Alert, Progress, Empty, List, text and its edit pencil
+     8. Table, and its large size
+     9. Modal, Modal.confirm
+    10. Tooltip, Popover, Popconfirm, the info icon
+    11. Picker dropdown (the month panel)
+    12. Message
+    13. Motion
+    14. More buttons: link, ghost
+    15. Affixed input, text area
+    16. Select with tags, and the options dropdown
+    17. Range picker and the date panel
+    18. Radio, radio buttons, slider
+    19. Steps
+    20. Pagination
+    21. Table: middle size, sorters, ellipsis
+    22. More tags, code
+    23. Upload dragger, Spin
+    24. Notification
+    25. Popover title, editable text
+    26. Dropdown menu
+    27. Drawer
+    28. Tabs, editable card type
+    29. CheckableTag
+    30. Picker presets chosen, picker footer
+   ============================================================================ */
+
+
+/* ─── 1. Tokens ─────────────────────────────────────────────────────────────
+ * Ant's map tokens, kebab-cased (colorBgContainer → --ant-color-bg-container).
+ * Declared on <html>, the element the theme tokens live on, so each var()
+ * resolves against the theme that is painted. */
+:root {
+    --ant-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+        'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --ant-font-family-code: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    --ant-font-size: 14px;
+    --ant-font-size-sm: 12px;
+    --ant-font-size-lg: 16px;
+    --ant-font-size-heading-3: 24px;
+    --ant-line-height: 1.5714285714;      /* 22px at 14 */
+    --ant-line-height-sm: 1.6666666667;   /* 20px at 12 */
+    --ant-line-height-lg: 1.5;            /* 24px at 16 */
+    --ant-font-weight-strong: 600;
+
+    --ant-control-height: 32px;
+    --ant-control-height-sm: 24px;
+    --ant-radius: 6px;
+    --ant-radius-lg: 8px;
+    --ant-radius-sm: 4px;
+    --ant-line-width: 1px;
+
+    --ant-motion-fast: 0.1s;
+    --ant-motion-mid: 0.2s;
+    --ant-motion-slow: 0.3s;
+    --ant-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
+    --ant-ease-out-circ: cubic-bezier(0.08, 0.82, 0.17, 1);
+
+    /* Text. Ant's tertiary is 45% black (3.4:1); the app's tertiary clears AA,
+       so it is what Ant's descriptions and statistic titles read here. */
+    --ant-color-text: var(--text-primary);
+    --ant-color-text-secondary: var(--text-secondary);
+    --ant-color-text-tertiary: var(--text-tertiary);
+    --ant-color-text-placeholder: color-mix(in srgb, var(--text-primary) 35%, transparent);
+    --ant-color-text-disabled: color-mix(in srgb, var(--text-primary) 30%, transparent);
+    /* Text on a primary fill: the app's own button ink, which flips per theme
+       to stay legible on the accent. */
+    --ant-color-text-on-primary: var(--button-text);
+    --ant-color-icon: var(--text-tertiary);
+    --ant-color-icon-hover: var(--text-primary);
+
+    /* Surfaces: the page, cards, and what floats over them. */
+    --ant-color-bg-layout: var(--background);
+    --ant-color-bg-container: var(--surface1);
+    --ant-color-bg-elevated: var(--surface1);
+    --ant-color-bg-mask: rgba(0, 0, 0, 0.45);
+    --ant-color-bg-spotlight: rgba(0, 0, 0, 0.85);
+
+    /* Lines and fills. Controls take the app's border, which is darker than
+       Ant's #d9d9d9 and so actually reads as a field edge; dividers take a
+       half step of it. Fills are the text colour at Ant's alphas, so they tint
+       toward black on light and toward white on dark, as Ant's do. */
+    --ant-color-border: var(--border);
+    --ant-color-border-secondary: color-mix(in srgb, var(--border) 50%, var(--surface1));
+    --ant-color-split: var(--ant-color-border-secondary);
+    --ant-color-fill: color-mix(in srgb, var(--text-primary) 15%, transparent);
+    --ant-color-fill-secondary: color-mix(in srgb, var(--text-primary) 6%, transparent);
+    --ant-color-fill-tertiary: color-mix(in srgb, var(--text-primary) 4%, transparent);
+    --ant-color-fill-quaternary: color-mix(in srgb, var(--text-primary) 2%, transparent);
+    --ant-table-header-bg: color-mix(in srgb, var(--text-primary) 3%, var(--surface1));
+
+    /* Primary: the app accent and its hover step, with Ant's tints mixed from
+       it so a user-picked accent carries through every selected state. */
+    --ant-color-primary: var(--accent-primary);
+    --ant-color-primary-hover: var(--accent-primary-hover);
+    --ant-color-primary-active: color-mix(in srgb, var(--accent-primary) 80%, #000);
+    --ant-color-primary-bg: color-mix(in srgb, var(--accent-primary) 12%, var(--surface1));
+    --ant-color-primary-bg-hover: color-mix(in srgb, var(--accent-primary) 20%, var(--surface1));
+    --ant-color-primary-border: color-mix(in srgb, var(--accent-primary) 40%, var(--surface1));
+    --ant-control-outline: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+
+    /* Status: the app's gain green, loss red and info blue. */
+    --ant-color-success: var(--accent-positive);
+    --ant-color-success-bg: color-mix(in srgb, var(--accent-positive) 8%, var(--surface1));
+    --ant-color-success-border: color-mix(in srgb, var(--accent-positive) 35%, var(--surface1));
+    --ant-color-warning: var(--warning);
+    --ant-color-warning-bg: color-mix(in srgb, var(--warning) 10%, var(--surface1));
+    --ant-color-warning-border: color-mix(in srgb, var(--warning) 40%, var(--surface1));
+    --ant-color-error: var(--accent-negative);
+    --ant-color-error-hover: color-mix(in srgb, var(--accent-negative) 80%, #fff);
+    --ant-color-error-active: color-mix(in srgb, var(--accent-negative) 80%, #000);
+    --ant-color-error-bg: color-mix(in srgb, var(--accent-negative) 8%, var(--surface1));
+    --ant-color-error-outline: color-mix(in srgb, var(--accent-negative) 15%, transparent);
+    --ant-color-info: var(--accent-info-light);
+    --ant-color-info-text: var(--accent-info);
+    --ant-color-info-bg: color-mix(in srgb, var(--accent-info-light) 9%, var(--surface1));
+    --ant-color-info-border: color-mix(in srgb, var(--accent-info-light) 35%, var(--surface1));
+
+    /* Elevation: Ant's boxShadow (pop-ups) and its buttons' 2px drop. */
+    --ant-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12),
+        0 9px 28px 8px rgba(0, 0, 0, 0.05);
+    --ant-shadow-button: 0 2px 0 rgba(0, 0, 0, 0.02);
+    --ant-shadow-button-primary: 0 2px 0 color-mix(in srgb, var(--accent-primary) 10%, transparent);
+    --ant-shadow-button-danger: 0 2px 0 color-mix(in srgb, var(--accent-negative) 6%, transparent);
+
+    /* Stacking: above the app's dialogs (1000), below its toast (1400). */
+    --ant-z-popup: 1200;
+    --ant-z-tooltip: 1250;
+    --ant-z-message: 1350;
+}
+
+/* ─── 1b. Chart palette ─────────────────────────────────────────────────────
+ * The one place a chart colour is written down. Everything that draws a chart
+ * reads these tokens (ant.js categoryHue, the Dashboard and Portfolio cards,
+ * the Reports engines through the --chart-* mapping below), so the Graphs
+ * choice in Preferences is a swap of this block and nothing else. Default is
+ * Ant's own palette; themes.css re-points the same names for Opal.
+ *
+ * The selector list also names the Default swatch in Preferences, so that
+ * swatch keeps showing these values while Opal is the live palette. */
+:root,
+.settings-graph-swatch[data-graph-theme=""] {
+    /* AntV's categorical palette, for series that are identities rather than
+       meanings, such as a portfolio's holdings and accounts. Ant draws it
+       unchanged on light and dark. */
+    --ant-chart-1: #1783ff;
+    --ant-chart-2: #00c9c9;
+    --ant-chart-3: #7863ff;
+    --ant-chart-4: #f0884d;
+    --ant-chart-5: #60c42d;
+    --ant-chart-6: #d580ff;
+    --ant-chart-7: #2491b3;
+    --ant-chart-8: #bd8f24;
+    --ant-chart-9: #ff80ca;
+    --ant-chart-10: #17c76f;
+
+    /* The hues a category takes once the ten above are spoken for (ant.js
+       categoryHue picks one by a hash of its key). */
+    --ant-chart-extra-1: #aaba01;
+    --ant-chart-extra-2: #bc7cfc;
+    --ant-chart-extra-3: #237cbc;
+    --ant-chart-extra-4: #2de379;
+    --ant-chart-extra-5: #ce8032;
+    --ant-chart-extra-6: #ff7af4;
+    --ant-chart-extra-7: #545fd3;
+    --ant-chart-extra-8: #afe410;
+
+    /* Meanings: money arriving, money leaving, money that only moved, and the
+       primary a single measure over time is drawn in. */
+    --ant-chart-primary: var(--ant-color-primary);
+    --ant-chart-income: var(--ant-color-success);
+    --ant-chart-expense: var(--ant-color-error);
+    --ant-chart-transfer: var(--ant-color-info);
+
+    /* The category colours that are not AntV's: a second income (Ant's green-4)
+       and Uncategorized, a quiet grey. Both a step darker on dark, below. */
+    --ant-chart-income-2: #95de64;
+    --ant-chart-neutral: #b8bcbb;
+
+    /* Ant's purple-6 and volcano-6 and green-6: Investing, and the two outflow
+       bands and the hub that the Sankey cannot take from the ten above. */
+    --ant-chart-purple: #722ed1;
+    --ant-chart-volcano: #fa541c;
+    --ant-chart-green: #52c41a;
+
+    /* Money arriving, the Sankey's left side: Ant's blue, deepest first
+       (blue-7 down to blue-2). */
+    --ant-chart-inflow-1: #0958d9;
+    --ant-chart-inflow-2: #1677ff;
+    --ant-chart-inflow-3: #4096ff;
+    --ant-chart-inflow-4: #69b1ff;
+    --ant-chart-inflow-5: #91caff;
+    --ant-chart-inflow-6: #bae0ff;
+}
+
+/* The same names under the legacy --chart-* / --cat-* tokens the chart engines
+ * read (chart.js, forecast.js, cashflow-sankey.js, chartramp.js, trends.css).
+ * The engines paint SVG attributes, which cannot hold a var(), so they read
+ * these off <html> and repaint on 'themechange'.
+ *
+ * Money leaving is one hue per category as G2 draws a Sankey. No blue and no
+ * green: blue is money arriving and green is the hub, so AntV's two blues
+ * (-1, -7) and two greens (-5, -10) are left out and volcano and purple stand
+ * in. Ordered so neighbouring bands (the ramp is laid out biggest first) never
+ * share a hue family. --chart-expense points at the ramp's FIRST step:
+ * core/chartramp.js trims the ramp to start at it, and here the ramp is a set
+ * of hues rather than a walk of one, so nothing should be trimmed. */
+:root {
+    --chart-1: var(--ant-chart-1);
+    --chart-2: var(--ant-chart-2);
+    --chart-3: var(--ant-chart-3);
+    --chart-4: var(--ant-chart-4);
+    --chart-5: var(--ant-chart-5);
+    --chart-6: var(--ant-chart-6);
+    --chart-7: var(--ant-chart-7);
+    --chart-8: var(--ant-chart-8);
+    --chart-1-ink: #fff;
+
+    --cat-1: var(--ant-chart-1);
+    --cat-2: var(--ant-chart-2);
+    --cat-3: var(--ant-chart-3);
+    --cat-4: var(--ant-chart-4);
+    --cat-5: var(--ant-chart-5);
+    --cat-6: var(--ant-chart-6);
+    --cat-7: var(--ant-chart-7);
+    --cat-8: var(--ant-chart-8);
+
+    --chart-inflow-1: var(--ant-chart-inflow-1);
+    --chart-inflow-2: var(--ant-chart-inflow-2);
+    --chart-inflow-3: var(--ant-chart-inflow-3);
+    --chart-inflow-4: var(--ant-chart-inflow-4);
+    --chart-inflow-5: var(--ant-chart-inflow-5);
+    --chart-inflow-6: var(--ant-chart-inflow-6);
+
+    --chart-outflow-1: var(--ant-chart-2);   /* cyan */
+    --chart-outflow-2: var(--ant-chart-4);   /* orange */
+    --chart-outflow-3: var(--ant-chart-3);   /* violet */
+    --chart-outflow-4: var(--ant-chart-8);   /* gold */
+    --chart-outflow-5: var(--ant-chart-6);   /* lilac */
+    --chart-outflow-6: var(--ant-chart-9);   /* pink */
+    --chart-outflow-7: var(--ant-chart-volcano);
+    --chart-outflow-8: var(--ant-chart-purple);
+    --chart-expense: var(--chart-outflow-1);
+
+    /* The Sankey's hub, where every flow is totalled. Its two bars and the
+       channel between them all take it. */
+    --chart-net: var(--ant-chart-green);
+
+    /* Money that only moved. */
+    --chart-transfer: var(--ant-chart-1);
+}
+
+
+/* Ant's dark algorithm: fills at its dark alphas, pop-ups a step lighter than
+   the cards they float over, and stronger shadows, which barely show on a dark
+   page at the light values. */
+html[data-theme="dark"] {
+    --ant-color-bg-elevated: color-mix(in srgb, var(--surface1) 92%, var(--text-primary));
+    --ant-color-bg-spotlight: #424242;
+    --ant-color-border-secondary: color-mix(in srgb, var(--border) 70%, var(--surface1));
+    --ant-color-fill: color-mix(in srgb, var(--text-primary) 18%, transparent);
+    --ant-color-fill-secondary: color-mix(in srgb, var(--text-primary) 12%, transparent);
+    --ant-color-fill-tertiary: color-mix(in srgb, var(--text-primary) 8%, transparent);
+    --ant-color-fill-quaternary: color-mix(in srgb, var(--text-primary) 4%, transparent);
+    --ant-table-header-bg: color-mix(in srgb, var(--text-primary) 5%, var(--surface1));
+    --ant-color-primary-active: color-mix(in srgb, var(--accent-primary) 85%, #000);
+    --ant-color-primary-bg: color-mix(in srgb, var(--accent-primary) 20%, var(--surface1));
+    --ant-color-primary-bg-hover: color-mix(in srgb, var(--accent-primary) 28%, var(--surface1));
+    --ant-color-primary-border: color-mix(in srgb, var(--accent-primary) 50%, var(--surface1));
+    --ant-control-outline: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+    --ant-color-info-bg: color-mix(in srgb, var(--accent-info-light) 16%, var(--surface1));
+    --ant-color-info-border: color-mix(in srgb, var(--accent-info-light) 45%, var(--surface1));
+    --ant-color-error-bg: color-mix(in srgb, var(--accent-negative) 16%, var(--surface1));
+    --ant-color-success-bg: color-mix(in srgb, var(--accent-positive) 14%, var(--surface1));
+    --ant-color-success-border: color-mix(in srgb, var(--accent-positive) 45%, var(--surface1));
+    --ant-color-warning-bg: color-mix(in srgb, var(--warning) 14%, var(--surface1));
+    --ant-color-warning-border: color-mix(in srgb, var(--warning) 45%, var(--surface1));
+    --ant-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.32), 0 3px 6px -4px rgba(0, 0, 0, 0.48),
+        0 9px 28px 8px rgba(0, 0, 0, 0.2);
+    --ant-chart-income-2: #7bc96f;
+    --ant-chart-neutral: #6b6f6e;
+}
+
+
+/* ─── 2. Scope: type ────────────────────────────────────────────────────────
+ * Ant's type, on everything drawn in it: the page root and each pop-up root
+ * (they are appended to <body>, outside the page). The app chrome around them
+ * keeps the app's own faces. */
+.ant-scope {
+    color: var(--ant-color-text);
+    font-family: var(--ant-font-family);
+    font-size: var(--ant-font-size);
+    line-height: var(--ant-line-height);
+    -webkit-font-smoothing: antialiased;
+}
+
+.ant-scope :where(button, input, select, textarea) {
+    font-family: inherit;
+}
+
+/* nav.css styles bare ul and li for the sidebar (white text, a gap under each
+   item); a list drawn in Ant Design takes neither. */
+.ant-scope :where(ul, ol) { color: inherit; }
+.ant-scope :where(li) { margin: 0; }
+
+/* Read aloud, not shown: the word a colour or an icon stands for where that is
+   the only visible cue (a gain's caret, an amount's direction). */
+.ant-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+
+/* ─── 3. Icons ──────────────────────────────────────────────────────────────
+ * Ant Design Icons, inlined by ant.js. 1em square in the current colour. */
+.anticon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    color: inherit;
+    font-style: normal;
+    line-height: 0;
+    vertical-align: -0.125em;
+}
+
+.anticon svg {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+}
+
+
+/* ─── 4. Button ─────────────────────────────────────────────────────────────
+ * Default, primary and text; danger on default and primary; icon-only, small,
+ * large and block. Disabled greys out; loading keeps the colour, dims it and spins
+ * in place of the icon. */
+.ant-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: var(--ant-control-height);
+    padding: 4px 15px;
+    border: var(--ant-line-width) solid transparent;
+    border-radius: var(--ant-radius);
+    background: transparent;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size);
+    font-weight: 400;
+    line-height: var(--ant-line-height);
+    white-space: nowrap;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+    outline: none;
+    transition: color var(--ant-motion-mid) var(--ant-ease-in-out),
+        background-color var(--ant-motion-mid) var(--ant-ease-in-out),
+        border-color var(--ant-motion-mid) var(--ant-ease-in-out),
+        box-shadow var(--ant-motion-mid) var(--ant-ease-in-out);
+}
+
+.ant-btn .anticon { font-size: var(--ant-font-size); }
+/* A button that navigates is a link (href), drawn the same. */
+a.ant-btn { text-decoration: none; }
+
+.ant-btn:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+
+.ant-btn-default {
+    background: var(--ant-color-bg-container);
+    border-color: var(--ant-color-border);
+    box-shadow: var(--ant-shadow-button);
+}
+.ant-btn-default:not(:disabled):hover {
+    border-color: var(--ant-color-primary-hover);
+    color: var(--ant-color-primary-hover);
+}
+.ant-btn-default:not(:disabled):active {
+    border-color: var(--ant-color-primary-active);
+    color: var(--ant-color-primary-active);
+}
+
+.ant-btn-primary {
+    background: var(--ant-color-primary);
+    color: var(--ant-color-text-on-primary);
+    box-shadow: var(--ant-shadow-button-primary);
+}
+.ant-btn-primary:not(:disabled):hover { background: var(--ant-color-primary-hover); }
+.ant-btn-primary:not(:disabled):active { background: var(--ant-color-primary-active); }
+
+.ant-btn-default.ant-btn-dangerous {
+    border-color: var(--ant-color-error);
+    color: var(--ant-color-error);
+    box-shadow: var(--ant-shadow-button-danger);
+}
+.ant-btn-default.ant-btn-dangerous:not(:disabled):hover {
+    border-color: var(--ant-color-error-hover);
+    color: var(--ant-color-error-hover);
+}
+.ant-btn-default.ant-btn-dangerous:not(:disabled):active {
+    border-color: var(--ant-color-error-active);
+    color: var(--ant-color-error-active);
+}
+
+.ant-btn-primary.ant-btn-dangerous {
+    background: var(--ant-color-error);
+    color: var(--danger-text);
+    box-shadow: var(--ant-shadow-button-danger);
+}
+.ant-btn-primary.ant-btn-dangerous:not(:disabled):hover { background: var(--ant-color-error-hover); }
+.ant-btn-primary.ant-btn-dangerous:not(:disabled):active { background: var(--ant-color-error-active); }
+
+.ant-btn-text:not(:disabled):hover { background: var(--ant-color-fill-secondary); }
+.ant-btn-text:not(:disabled):active { background: var(--ant-color-fill); }
+
+.ant-btn-text.ant-btn-dangerous { color: var(--ant-color-error); }
+.ant-btn-text.ant-btn-dangerous:not(:disabled):hover {
+    background: var(--ant-color-error-bg);
+    color: var(--ant-color-error-hover);
+}
+.ant-btn-text.ant-btn-dangerous:not(:disabled):active {
+    background: var(--ant-color-error-bg);
+    color: var(--ant-color-error-active);
+}
+
+.ant-btn-icon-only {
+    width: var(--ant-control-height);
+    padding-inline: 0;
+}
+.ant-btn-icon-only .anticon { font-size: var(--ant-font-size-lg); }
+
+.ant-btn-sm {
+    height: var(--ant-control-height-sm);
+    padding: 0 7px;
+    border-radius: var(--ant-radius-sm);
+}
+.ant-btn-sm.ant-btn-icon-only { width: var(--ant-control-height-sm); padding-inline: 0; }
+.ant-btn-sm.ant-btn-icon-only .anticon { font-size: var(--ant-font-size); }
+
+.ant-btn-lg {
+    height: 40px;
+    padding: 6px 15px;
+    border-radius: var(--ant-radius-lg);
+    font-size: var(--ant-font-size-lg);
+}
+
+.ant-btn-block { width: 100%; }
+
+.ant-btn:disabled {
+    border-color: var(--ant-color-border);
+    background: var(--ant-color-fill-tertiary);
+    color: var(--ant-color-text-disabled);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+.ant-btn-text:disabled {
+    border-color: transparent;
+    background: transparent;
+}
+
+/* Busy: the button keeps its colour at Ant's 65% and stops taking clicks, so
+   a slow save cannot be sent twice. The spinner stands in for the icon. */
+.ant-btn-loading {
+    opacity: 0.65;
+    pointer-events: none;
+    cursor: default;
+}
+.ant-btn-loading .anticon { display: none; }
+.ant-btn-loading::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    flex: none;
+    box-sizing: border-box;
+    border: 2px solid currentColor;
+    border-inline-end-color: transparent;
+    border-radius: 50%;
+    animation: ant-spin 1s linear infinite;
+}
+
+
+/* ─── 5. Data entry ─────────────────────────────────────────────────────────
+ * Ant's Input, Select, DatePicker trigger and Checkbox over native controls:
+ * 32px, a 6px radius, the primary hover colour under the pointer and the
+ * primary colour with a soft ring while focused. */
+
+/* Space.Compact: controls joined into one, sharing their inner borders. */
+.ant-space-compact {
+    display: inline-flex;
+    min-width: 0;
+}
+.ant-space-compact > :not(:first-child) { margin-inline-start: calc(var(--ant-line-width) * -1); }
+.ant-space-compact > :not(:first-child):not(:last-child) { border-radius: 0; }
+.ant-space-compact > :first-child:not(:last-child) {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+}
+.ant-space-compact > :last-child:not(:first-child) {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+}
+/* The hovered or focused member's border has to win the shared edge. */
+.ant-space-compact > :hover,
+.ant-space-compact > :focus,
+.ant-space-compact > :focus-within,
+.ant-space-compact > .ant-picker-focused {
+    position: relative;
+    z-index: 2;
+}
+.ant-space-compact-block {
+    display: flex;
+    width: 100%;
+}
+/* A select inside a compact group: its box is the native control. */
+.ant-space-compact > .ant-select > .ant-select-selector { border-radius: inherit; }
+.ant-space-compact > .ant-select:not(:first-child):not(:last-child) > .ant-select-selector { border-radius: 0; }
+.ant-space-compact > .ant-select:first-child:not(:last-child) > .ant-select-selector {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+}
+.ant-space-compact > .ant-select:last-child:not(:first-child) > .ant-select-selector {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+}
+
+.ant-input,
+.ant-select-selector {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: var(--ant-control-height);
+    margin: 0;
+    padding: 4px 11px;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size);
+    line-height: var(--ant-line-height);
+    outline: none;
+    transition: border-color var(--ant-motion-mid), box-shadow var(--ant-motion-mid),
+        background-color var(--ant-motion-mid);
+}
+.ant-input::placeholder { color: var(--ant-color-text-placeholder); }
+.ant-input:hover,
+.ant-select-selector:hover { border-color: var(--ant-color-primary-hover); }
+.ant-input:focus,
+.ant-select-selector:focus {
+    border-color: var(--ant-color-primary);
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
+}
+.ant-input[aria-invalid="true"],
+.ant-select-selector[aria-invalid="true"] { border-color: var(--ant-color-error); }
+.ant-input[aria-invalid="true"]:focus,
+.ant-select-selector[aria-invalid="true"]:focus { box-shadow: 0 0 0 2px var(--ant-color-error-outline); }
+.ant-input:disabled,
+.ant-select-selector:disabled {
+    border-color: var(--ant-color-border);
+    background: var(--ant-color-fill-tertiary);
+    color: var(--ant-color-text-disabled);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+.ant-input[hidden] { display: none; }
+
+/* InputNumber at rest: Ant shows its step handles only on hover, and the native
+   spinners are a different drawing, so they are off. Arrow keys still step. */
+.ant-input[type="number"] { appearance: textfield; }
+.ant-input[type="number"]::-webkit-inner-spin-button,
+.ant-input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* A date field's calendar glyph, at Ant's quiet suffix-icon weight. */
+.ant-input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.45; }
+.ant-input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: 0.85; }
+
+/* The text stuck to a field ("[ 2 ] weeks"): Ant's addon. */
+.ant-input-addon {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    padding: 0 11px;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-fill-quaternary);
+    color: var(--ant-color-text);
+    white-space: nowrap;
+}
+
+/* Select: the native <select> is the box; the arrow is Ant's DownOutlined over
+   it (a <select> cannot hold a child, so the arrow is a sibling). */
+.ant-select {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-width: 0;
+}
+.ant-select-selector {
+    padding-inline-end: 28px;
+    appearance: none;
+    cursor: pointer;
+}
+.ant-select-selector option {
+    background: var(--ant-color-bg-elevated);
+    color: var(--ant-color-text);
+}
+.ant-select-arrow {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 11px;
+    z-index: 1;
+    display: inline-flex;
+    color: var(--ant-color-text-placeholder);
+    font-size: var(--ant-font-size-sm);
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+/* size="small": 24px, the arrow tucked in to match. */
+.ant-select-sm .ant-select-selector {
+    height: var(--ant-control-height-sm);
+    padding: 0 24px 0 7px;
+    border-radius: var(--ant-radius-sm);
+    line-height: calc(var(--ant-control-height-sm) - 2px);
+}
+.ant-select-sm .ant-select-arrow { inset-inline-end: 7px; }
+
+/* DatePicker's trigger, as a button that opens a picker panel (ant.js). */
+.ant-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-sizing: border-box;
+    min-width: 0;
+    height: var(--ant-control-height);
+    margin: 0;
+    padding: 4px 11px;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size);
+    line-height: var(--ant-line-height);
+    text-align: start;
+    cursor: pointer;
+    outline: none;
+    transition: border-color var(--ant-motion-mid), box-shadow var(--ant-motion-mid);
+}
+.ant-picker:hover { border-color: var(--ant-color-primary-hover); }
+.ant-picker:focus-visible,
+.ant-picker-focused {
+    border-color: var(--ant-color-primary);
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
+}
+.ant-picker-input {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ant-picker-suffix {
+    display: inline-flex;
+    color: var(--ant-color-text-placeholder);
+}
+
+/* Checkbox: a native box, drawn as Ant's. The tick and the indeterminate square
+   are the box's own ::after, so there is no extra element to keep in sync. */
+.ant-checkbox-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ant-color-text);
+    cursor: pointer;
+}
+
+.ant-checkbox {
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius-sm);
+    background: var(--ant-color-bg-container);
+    appearance: none;
+    cursor: pointer;
+    transition: background-color var(--ant-motion-mid), border-color var(--ant-motion-mid);
+}
+.ant-checkbox::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    inset-inline-start: 25%;
+    box-sizing: border-box;
+    width: 5.7px;
+    height: 9.1px;
+    border: 2px solid var(--ant-color-text-on-primary);
+    border-top: 0;
+    border-inline-start: 0;
+    opacity: 0;
+    transform: rotate(45deg) scale(0) translate(-50%, -50%);
+    transition: transform var(--ant-motion-fast) var(--ant-ease-in-out), opacity var(--ant-motion-fast);
+}
+.ant-checkbox:checked {
+    border-color: var(--ant-color-primary);
+    background: var(--ant-color-primary);
+}
+.ant-checkbox:checked::after {
+    opacity: 1;
+    transform: rotate(45deg) scale(1) translate(-50%, -50%);
+    transition: transform var(--ant-motion-mid) cubic-bezier(0.12, 0.4, 0.29, 1.46) var(--ant-motion-fast);
+}
+.ant-checkbox:indeterminate {
+    border-color: var(--ant-color-border);
+    background: var(--ant-color-bg-container);
+}
+.ant-checkbox:indeterminate::after {
+    inset-inline-start: 50%;
+    width: 8px;
+    height: 8px;
+    border: 0;
+    background: var(--ant-color-primary);
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+.ant-checkbox-wrapper:hover .ant-checkbox:not(:checked),
+.ant-checkbox:not(:checked):hover { border-color: var(--ant-color-primary); }
+.ant-checkbox-wrapper:hover .ant-checkbox:checked,
+.ant-checkbox:checked:hover {
+    border-color: var(--ant-color-primary-hover);
+    background: var(--ant-color-primary-hover);
+}
+.ant-checkbox:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+
+/* Segmented: a track of options, the chosen one lifted onto the surface.
+   Its items are toggle buttons (aria-pressed). */
+.ant-segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-fill-tertiary);
+    color: var(--ant-color-text-secondary);
+}
+.ant-segmented-item {
+    min-height: 28px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: inherit;
+    font-size: var(--ant-font-size);
+    line-height: 28px;
+    cursor: pointer;
+    transition: color var(--ant-motion-mid), background-color var(--ant-motion-mid);
+}
+.ant-segmented-item:not([aria-pressed="true"]):hover {
+    background: var(--ant-color-fill-secondary);
+    color: var(--ant-color-text);
+}
+.ant-segmented-item[aria-pressed="true"] {
+    background: var(--ant-color-bg-elevated);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02),
+        0 2px 4px 0 rgba(0, 0, 0, 0.02);
+    color: var(--ant-color-text);
+}
+.ant-segmented-item:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 0;
+}
+/* An option with an icon before its label. */
+.ant-segmented-item > .anticon { margin-inline-end: 6px; }
+.ant-segmented-sm { border-radius: var(--ant-radius-sm); }
+.ant-segmented-sm .ant-segmented-item {
+    min-height: 20px;
+    padding: 0 7px;
+    border-radius: 2px;
+    line-height: 20px;
+}
+
+/* Form.Item, vertical: the label over the control, and the reason it failed
+   under it in words, so the red border is never the only signal. */
+.ant-form-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.ant-form-item-label { color: var(--ant-color-text-secondary); }
+.ant-form-item-explain { color: var(--ant-color-error); }
+.ant-form-item-explain:empty { display: none; }
+
+
+/* ─── 6. Card, Statistic, Tabs ──────────────────────────────────────────────
+ * The bordered card: a 56px head over a 24px body, or a 12px body when small.
+ * An inner card (type="inner", a card inside a card) has a shorter, tinted
+ * head and a 16px 24px body. */
+.ant-card {
+    position: relative;
+    box-sizing: border-box;
+    min-width: 0;
+    border: var(--ant-line-width) solid var(--ant-color-border-secondary);
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text);
+}
+
+.ant-card-head {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 56px;
+    margin-bottom: calc(var(--ant-line-width) * -1);
+    padding: 0 24px;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-border-secondary);
+    border-radius: var(--ant-radius-lg) var(--ant-radius-lg) 0 0;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-lg);
+    font-weight: var(--ant-font-weight-strong);
+}
+.ant-card-head-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.ant-card-head-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font: inherit;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ant-card-extra {
+    margin-inline-start: auto;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size);
+    font-weight: 400;
+}
+.ant-card-body { padding: 24px; }
+.ant-card-small > .ant-card-head {
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: var(--ant-font-size);
+}
+.ant-card-small > .ant-card-body { padding: 12px; }
+
+.ant-card-type-inner > .ant-card-head {
+    min-height: 0;
+    padding: 0 16px;
+    background: var(--ant-color-fill-quaternary);
+    font-size: var(--ant-font-size);
+}
+.ant-card-type-inner > .ant-card-head .ant-card-head-title { padding: 12px 0; }
+.ant-card-type-inner > .ant-card-body { padding: 16px 24px; }
+
+.ant-statistic-title {
+    margin-bottom: 4px;
+    color: var(--ant-color-text-tertiary);
+}
+.ant-statistic-content {
+    overflow: hidden;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-heading-3);
+    line-height: 1.3333333333;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Tabs, line type: the labels on a hairline, the active one in the primary
+   colour over a 2px ink bar. The tabs are role="tab" buttons and the page
+   script moves aria-selected. */
+.ant-tabs-nav {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 32px;
+    margin: 0;
+}
+.ant-tabs-nav::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-border-secondary);
+}
+.ant-tabs-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 12px 0;
+    border: 0;
+    background: transparent;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size);
+    line-height: var(--ant-line-height);
+    white-space: nowrap;
+    cursor: pointer;
+    outline: none;
+    transition: color var(--ant-motion-slow);
+}
+.ant-tabs-tab:hover { color: var(--ant-color-primary-hover); }
+.ant-tabs-tab:active { color: var(--ant-color-primary-active); }
+.ant-tabs-tab[aria-selected="true"] {
+    color: var(--ant-color-primary);
+    text-shadow: 0 0 0.25px currentColor;
+}
+.ant-tabs-tab::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    height: 2px;
+    background: var(--ant-color-primary);
+    opacity: 0;
+    transform: scaleX(0.6);
+    transition: opacity var(--ant-motion-slow), transform var(--ant-motion-slow) var(--ant-ease-in-out);
+}
+.ant-tabs-tab[aria-selected="true"]::after {
+    opacity: 1;
+    transform: scaleX(1);
+}
+.ant-tabs-tab:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+    border-radius: var(--ant-radius-sm);
+}
+
+
+/* ─── 7. Tag, Alert, Progress, Empty, text ──────────────────────────────── */
+.ant-tag {
+    display: inline-block;
+    margin: 0;
+    padding-inline: 7px;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius-sm);
+    background: var(--ant-color-fill-quaternary);
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-sm);
+    line-height: 20px;
+    white-space: nowrap;
+}
+
+/* color="processing": the info blue, for a tag that names what is in effect. */
+.ant-tag-processing {
+    border-color: var(--ant-color-info-border);
+    background: var(--ant-color-info-bg);
+    color: var(--ant-color-info-text);
+}
+
+/* closable: the × after the text. */
+.ant-tag-close-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline-start: 3px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--ant-color-text-tertiary);
+    font-size: 10px;
+    vertical-align: -1px;
+    cursor: pointer;
+    transition: color var(--ant-motion-mid);
+}
+.ant-tag-close-icon:hover { color: var(--ant-color-text); }
+.ant-tag-close-icon:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 1px;
+}
+
+/* Alert: one line beside its icon. With a description (.ant-alert-with-
+   description) it grows to Ant's 20px 24px and the message to 16px. */
+.ant-alert {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: var(--ant-line-width) solid transparent;
+    border-radius: var(--ant-radius-lg);
+    color: var(--ant-color-text);
+    overflow-wrap: break-word;
+}
+.ant-alert-with-description {
+    align-items: flex-start;
+    padding: 20px 24px;
+}
+.ant-alert-info {
+    border-color: var(--ant-color-info-border);
+    background: var(--ant-color-info-bg);
+}
+.ant-alert-error {
+    border-color: color-mix(in srgb, var(--accent-negative) 35%, var(--surface1));
+    background: var(--ant-color-error-bg);
+}
+.ant-alert-success {
+    border-color: var(--ant-color-success-border);
+    background: var(--ant-color-success-bg);
+}
+.ant-alert-warning {
+    border-color: var(--ant-color-warning-border);
+    background: var(--ant-color-warning-bg);
+}
+.ant-alert-icon { flex: none; font-size: var(--ant-font-size); }
+.ant-alert-info .ant-alert-icon { color: var(--ant-color-info); }
+.ant-alert-error .ant-alert-icon { color: var(--ant-color-error); }
+.ant-alert-success .ant-alert-icon { color: var(--ant-color-success); }
+.ant-alert-warning .ant-alert-icon { color: var(--ant-color-warning); }
+/* With a description, the icon grows to 24px and sits by the message. */
+.ant-alert-with-description { gap: 12px; }
+.ant-alert-with-description .ant-alert-icon { font-size: 24px; }
+.ant-alert-content {
+    flex: 1;
+    min-width: 0;
+}
+.ant-alert-message { color: var(--ant-color-text); }
+.ant-alert-with-description .ant-alert-message {
+    font-size: var(--ant-font-size-lg);
+    line-height: var(--ant-line-height-lg);
+}
+.ant-alert-description { margin-top: 4px; }
+.ant-alert-description:empty { display: none; }
+
+/* Progress, line, small: a 6px track, the figure beside it. */
+.ant-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    font-size: var(--ant-font-size-sm);
+    line-height: var(--ant-line-height-sm);
+}
+.ant-progress-outer {
+    flex: 1;
+    min-width: 0;
+}
+.ant-progress-inner {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 100px;
+    background: var(--ant-color-fill-secondary);
+}
+.ant-progress-bg {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ant-color-info);
+}
+.ant-progress-text {
+    flex: none;
+    min-width: 3em;
+    color: var(--ant-color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+/* status="exception": the bar and its figure in the error red. */
+.ant-progress-status-exception .ant-progress-bg { background: var(--ant-color-error); }
+/* status="success": the bar in the success green, the figure a tick. */
+.ant-progress-status-success .ant-progress-bg { background: var(--ant-color-success); }
+.ant-progress-status-success .ant-progress-text { color: var(--ant-color-success); }
+.ant-progress-status-exception .ant-progress-text { color: var(--ant-color-error); }
+
+/* Empty, with Ant's simple image. Its three tones are Ant's fills made opaque
+   against the card, which is how Ant draws the image too. */
+.ant-empty {
+    margin: 32px 8px;
+    color: var(--ant-color-text-tertiary);
+    text-align: center;
+}
+.ant-empty-compact { margin-block: 8px; }
+.ant-empty-image {
+    height: 40px;
+    margin-bottom: 8px;
+}
+.ant-empty-image svg {
+    width: auto;
+    height: 100%;
+}
+.ant-empty-img-shadow { fill: color-mix(in srgb, var(--text-primary) 4%, var(--surface1)); }
+.ant-empty-img-stroke { stroke: color-mix(in srgb, var(--text-primary) 15%, var(--surface1)); }
+.ant-empty-img-content { fill: color-mix(in srgb, var(--text-primary) 2%, var(--surface1)); }
+.ant-empty-title { color: var(--ant-color-text); }
+.ant-empty-desc {
+    max-width: 52ch;
+    margin: 4px auto 0;
+}
+.ant-empty-footer { margin-top: 16px; }
+
+/* List: rows on hairlines, each a content side and its actions, the actions
+   split by short hairlines. Bordered puts the list in a box; small tightens
+   the rows. */
+.ant-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ant-color-text);
+}
+.ant-list-bordered {
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius-lg);
+}
+.ant-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+    padding: 12px 0;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-split);
+}
+.ant-list-item:last-child { border-bottom: 0; }
+.ant-list-bordered .ant-list-item { padding-inline: 24px; }
+.ant-list-sm .ant-list-item { padding: 8px 16px; }
+.ant-list-item-action {
+    display: flex;
+    flex: none;
+    align-items: center;
+    margin: 0 0 0 auto;
+    padding: 0;
+    list-style: none;
+}
+.ant-list-item-action > li {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--ant-color-text-secondary);
+}
+.ant-list-item-action > li:last-child { padding-inline-end: 0; }
+.ant-list-item-action-split {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 0;
+    width: 1px;
+    height: 14px;
+    margin-top: -7px;
+    background: var(--ant-color-split);
+}
+
+/* Typography.Text type="secondary". */
+.ant-typography-secondary { color: var(--ant-color-text-tertiary); }
+
+/* Typography's editable: the pencil after the text that turns it into a field. */
+.ant-typography-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-inline-start: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-primary);
+    font-size: var(--ant-font-size);
+    vertical-align: middle;
+    cursor: pointer;
+    transition: color var(--ant-motion-mid), opacity var(--ant-motion-mid);
+}
+.ant-typography-edit:hover { color: var(--ant-color-primary-hover); }
+.ant-typography-edit:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+
+
+/* ─── 8. Table ──────────────────────────────────────────────────────────────
+ * Small: 8px cells, a tinted header with hairline column splits, row hover,
+ * and the selected-row tint row selection gives. */
+/* Positioned so it is the containing block of anything absolute inside it
+   (the visually hidden words in a cell): otherwise those escape its scroll box
+   and widen the whole page by however far the table runs off to the side. */
+.ant-table-wrapper {
+    position: relative;
+    min-width: 0;
+    overflow-x: auto;
+}
+.ant-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text);
+    text-align: start;
+}
+.ant-table th,
+.ant-table td {
+    padding: 8px;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-border-secondary);
+    overflow-wrap: break-word;
+    text-align: start;
+    transition: background-color var(--ant-motion-mid);
+}
+.ant-table thead th {
+    position: relative;
+    background: var(--ant-table-header-bg);
+    font-weight: var(--ant-font-weight-strong);
+}
+.ant-table thead th:first-child { border-start-start-radius: var(--ant-radius-lg); }
+.ant-table thead th:last-child { border-start-end-radius: var(--ant-radius-lg); }
+.ant-table thead th:not(:last-child):not(.ant-table-selection-column)::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 0;
+    width: 1px;
+    height: 1.6em;
+    background: var(--ant-color-split);
+    transform: translateY(-50%);
+}
+.ant-table tbody tr:hover > td { background: var(--ant-color-fill-quaternary); }
+.ant-table tbody tr.ant-table-row-selected > td { background: var(--ant-color-primary-bg); }
+.ant-table tbody tr.ant-table-row-selected:hover > td { background: var(--ant-color-primary-bg-hover); }
+.ant-table .ant-table-selection-column {
+    width: 32px;
+    text-align: center;
+}
+.ant-table .ant-table-selection-column .ant-checkbox { vertical-align: middle; }
+.ant-table .ant-table-cell-end { text-align: end; }
+/* size="large", Ant's default: 16px cells, for a table that is a page's main
+   content rather than a dense grid inside a card. */
+.ant-table-large th,
+.ant-table-large td { padding: 16px; }
+
+/* Table.Summary: the totals row under the rows it totals, on the header's tint. */
+.ant-table tfoot td {
+    background: var(--ant-table-header-bg);
+    font-weight: var(--ant-font-weight-strong);
+}
+.ant-table tfoot tr:last-child > td { border-bottom: 0; }
+
+
+/* ─── 9. Modal ──────────────────────────────────────────────────────────────
+ * Ant's Modal over the app's one dialog shell (UI.dialog): .ant-modal-wrap is
+ * added to its .confirm-overlay and .ant-modal to its .confirm-dialog, and both
+ * pairs outrank the shell's single-class rules in style.css. Ant places a modal
+ * 100px from the top rather than centring it. */
+.confirm-overlay.ant-modal-wrap {
+    align-items: flex-start;
+    padding: 100px 16px 24px;
+    overflow-y: auto;
+    background: var(--ant-color-bg-mask);
+    animation: ant-fade-in var(--ant-motion-mid) ease-out;
+}
+
+.confirm-dialog.ant-modal {
+    position: relative;
+    box-sizing: border-box;
+    width: 520px;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 20px 24px;
+    border: 0;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+    color: var(--ant-color-text);
+    animation: ant-zoom-in var(--ant-motion-slow) var(--ant-ease-out-circ);
+}
+
+.ant-modal-header {
+    margin-bottom: 8px;
+    padding-inline-end: 32px;   /* clear of the close button */
+}
+.ant-modal-title {
+    margin: 0;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-lg);
+    font-weight: var(--ant-font-weight-strong);
+    line-height: var(--ant-line-height-lg);
+    overflow-wrap: break-word;
+}
+
+.confirm-dialog.ant-modal .ant-modal-close {
+    position: absolute;
+    top: 17px;
+    right: 17px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-icon);
+    font-size: var(--ant-font-size-lg);
+    line-height: 1;
+    cursor: pointer;
+    transition: color var(--ant-motion-mid), background-color var(--ant-motion-mid);
+}
+.confirm-dialog.ant-modal .ant-modal-close:hover {
+    background: var(--ant-color-fill-secondary);
+    color: var(--ant-color-icon-hover);
+}
+.confirm-dialog.ant-modal .ant-modal-close:active { background: var(--ant-color-fill); }
+.confirm-dialog.ant-modal .ant-modal-close:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+
+.ant-modal-body { overflow-wrap: break-word; }
+
+.ant-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+/* Modal.confirm (Ant.confirm): the warning icon at 22px beside the title, the
+   content indented under the title, no close button (Escape and Cancel). */
+.ant-modal-confirm .ant-modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding-inline-end: 0;
+}
+.ant-modal-confirm .ant-modal-header > .anticon {
+    margin-top: 1px;
+    color: var(--ant-color-warning);
+    font-size: 22px;
+}
+.ant-modal-confirm .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-inline-start: 34px;
+}
+/* The content's paragraphs in Ant's type, not the app dialog's (style.css
+   styles .confirm-dialog p). */
+.ant-modal-confirm .ant-modal-body p {
+    margin: 0;
+    color: var(--ant-color-text);
+    font: inherit;
+}
+.ant-modal-confirm .ant-modal-footer { margin-top: 24px; }
+.confirm-dialog.ant-modal-confirm .ant-modal-close { display: none; }
+
+
+/* ─── 10. Tooltip, Popover, Popconfirm, the info icon ───────────────────────
+ * Fixed to the viewport and placed by ant.js, so no scroll container clips
+ * them. The arrow is a triangle on the edge facing the anchor. */
+
+/* InfoCircleOutlined after a title, carrying the title's explanation as a
+   Tooltip (data-tip). Focusable, so the tooltip opens from the keyboard too. */
+.ant-info-tip {
+    display: inline-flex;
+    align-items: center;
+    margin-inline-start: 6px;
+    border-radius: 50%;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size);
+    font-weight: 400;
+    vertical-align: -0.125em;
+    cursor: help;
+    transition: color var(--ant-motion-mid);
+}
+.ant-info-tip:hover,
+.ant-info-tip:focus-visible { color: var(--ant-color-text); }
+.ant-info-tip:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+.ant-tooltip,
+.ant-popover {
+    position: fixed;
+    top: 0;
+    left: 0;
+    color: var(--ant-color-text);
+}
+.ant-tooltip[hidden],
+.ant-popover[hidden] { display: none; }
+
+.ant-tooltip {
+    z-index: var(--ant-z-tooltip);
+    max-width: 250px;
+    pointer-events: none;
+}
+.ant-tooltip-inner {
+    box-sizing: border-box;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 6px 8px;
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-bg-spotlight);
+    box-shadow: var(--ant-shadow);
+    color: #fff;
+    overflow-wrap: break-word;
+}
+
+.ant-popover {
+    z-index: var(--ant-z-popup);
+    max-width: min(320px, calc(100vw - 16px));
+}
+.ant-popover-inner {
+    padding: 12px;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+}
+
+/* The arrow, for both: --ant-arrow-x is set by ant.js so it points at the
+   anchor's centre even when the pop-up was pushed back inside the window. */
+.ant-tooltip-arrow,
+.ant-popover-arrow {
+    position: absolute;
+    left: var(--ant-arrow-x, 50%);
+    width: 16px;
+    height: 8px;
+    transform: translateX(-50%);
+}
+.ant-tooltip-arrow { background: var(--ant-color-bg-spotlight); }
+.ant-popover-arrow { background: var(--ant-color-bg-elevated); }
+.ant-placement-top .ant-tooltip-arrow,
+.ant-placement-top .ant-popover-arrow {
+    top: 100%;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.ant-placement-bottom .ant-tooltip-arrow,
+.ant-placement-bottom .ant-popover-arrow {
+    bottom: 100%;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.ant-placement-left .ant-tooltip-arrow {
+    top: var(--ant-arrow-y, 50%);
+    left: 100%;
+    width: 8px;
+    height: 16px;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+    transform: translateY(-50%);
+}
+
+.ant-popconfirm-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.ant-popconfirm-message > .anticon {
+    margin-top: 4px;
+    color: var(--ant-color-warning);
+    font-size: var(--ant-font-size);
+}
+.ant-popconfirm-title {
+    color: var(--ant-color-text);
+    font-weight: var(--ant-font-weight-strong);
+}
+.ant-popconfirm-description { margin-top: 4px; }
+.ant-popconfirm-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+
+/* ─── 11. Picker dropdown: the month panel ──────────────────────────────────
+ * DatePicker's month panel: the year between its « » buttons, then the twelve
+ * months three to a row. This month wears the primary hairline; the chosen one
+ * is filled. */
+.ant-picker-dropdown {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: var(--ant-z-popup);
+}
+.ant-picker-dropdown[hidden] { display: none; }
+
+.ant-picker-panel {
+    width: 288px;
+    overflow: hidden;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+}
+.ant-picker-header {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-split);
+    color: var(--ant-color-text);
+}
+.ant-picker-header-view {
+    flex: 1;
+    font-weight: var(--ant-font-weight-strong);
+    line-height: 40px;
+    text-align: center;
+}
+.ant-picker-header-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-icon);
+    font-size: var(--ant-font-size-sm);
+    cursor: pointer;
+    transition: color var(--ant-motion-mid);
+}
+.ant-picker-header-btn:not(:disabled):hover { color: var(--ant-color-icon-hover); }
+.ant-picker-header-btn:disabled {
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+}
+.ant-picker-header-btn:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+
+.ant-picker-body { padding: 0 8px; }
+.ant-picker-months {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: 66px;
+    align-items: center;
+    justify-items: center;
+}
+.ant-picker-cell-inner {
+    position: relative;
+    width: 60px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size);
+    line-height: 24px;
+    cursor: pointer;
+    transition: background-color var(--ant-motion-mid);
+}
+.ant-picker-cell-inner:not(:disabled):hover { background: var(--ant-color-fill-tertiary); }
+/* Past the picker's max: greyed out and not choosable. */
+.ant-picker-cell-inner:disabled {
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+}
+.ant-picker-cell-inner[aria-current="date"]::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: var(--ant-line-width) solid var(--ant-color-primary);
+    border-radius: inherit;
+}
+.ant-picker-cell-inner[aria-pressed="true"],
+.ant-picker-cell-inner[aria-pressed="true"]:hover {
+    background: var(--ant-color-primary);
+    color: var(--ant-color-text-on-primary);
+}
+.ant-picker-cell-inner:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+
+
+/* ─── 12. Message ───────────────────────────────────────────────────────────
+ * The small notice that drops in at the top centre after an action. */
+.ant-message {
+    position: fixed;
+    top: 8px;
+    right: 0;
+    left: 0;
+    z-index: var(--ant-z-message);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+}
+.ant-message-notice {
+    padding: 8px;
+    animation: ant-move-up-in var(--ant-motion-slow) var(--ant-ease-out-circ);
+}
+.ant-message-notice-leave { animation: ant-move-up-out var(--ant-motion-slow) var(--ant-ease-in-out) forwards; }
+.ant-message-notice-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+    color: var(--ant-color-text);
+    pointer-events: auto;
+}
+.ant-message-notice-content .anticon { font-size: var(--ant-font-size-lg); }
+.ant-message-success .anticon { color: var(--ant-color-success); }
+.ant-message-error .anticon { color: var(--ant-color-error); }
+.ant-message-info .anticon { color: var(--ant-color-info); }
+
+
+/* ─── 13. Motion ──────────────────────────────────────────────────────────── */
+@keyframes ant-spin { to { transform: rotate(360deg); } }
+@keyframes ant-fade-in { from { opacity: 0; } }
+@keyframes ant-zoom-in {
+    from { opacity: 0; transform: scale(0.9); }
+}
+@keyframes ant-move-up-in {
+    from { opacity: 0; transform: translateY(-100%); }
+}
+@keyframes ant-move-up-out {
+    to { opacity: 0; transform: translateY(-100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ant-scope,
+    .ant-scope *,
+    .ant-scope *::before,
+    .ant-scope *::after,
+    .confirm-overlay.ant-modal-wrap {
+        transition: none !important;
+        animation-duration: 0.01ms !important;
+    }
+    /* A spinner is the one animation that carries meaning; it slows instead. */
+    .ant-btn-loading::before { animation-duration: 2.4s !important; }
+}
+
+
+/* ─── 14. More buttons: link, ghost ─────────────────────────────────────────
+ * Link is primary text with no box. A primary ghost is the primary colour as
+ * an outline, for a control whose value is set. */
+.ant-btn-link {
+    color: var(--ant-color-primary);
+    box-shadow: none;
+}
+.ant-btn-link:not(:disabled):hover { color: var(--ant-color-primary-hover); }
+.ant-btn-link:not(:disabled):active { color: var(--ant-color-primary-active); }
+.ant-btn-link:disabled {
+    border-color: transparent;
+    background: transparent;
+}
+
+.ant-btn-primary.ant-btn-background-ghost {
+    border-color: var(--ant-color-primary);
+    background: transparent;
+    color: var(--ant-color-primary);
+    box-shadow: none;
+}
+.ant-btn-primary.ant-btn-background-ghost:not(:disabled):hover {
+    border-color: var(--ant-color-primary-hover);
+    background: transparent;
+    color: var(--ant-color-primary-hover);
+}
+.ant-btn-primary.ant-btn-background-ghost:not(:disabled):active {
+    border-color: var(--ant-color-primary-active);
+    background: transparent;
+    color: var(--ant-color-primary-active);
+}
+
+
+/* ─── 15. Affixed input, text area ──────────────────────────────────────────
+ * An input with an icon or a symbol fixed inside its box (the search glass,
+ * the currency before an amount) and, with allowClear, the clear button after
+ * it. The wrapper is the box; the input inside draws none of its own. */
+.ant-input-affix-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: var(--ant-control-height);
+    padding: 4px 11px;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text);
+    cursor: text;
+    transition: border-color var(--ant-motion-mid), box-shadow var(--ant-motion-mid);
+}
+.ant-input-affix-wrapper:hover { border-color: var(--ant-color-primary-hover); }
+.ant-input-affix-wrapper:focus-within {
+    border-color: var(--ant-color-primary);
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
+}
+.ant-input-affix-wrapper:has(> .ant-input[aria-invalid="true"]) { border-color: var(--ant-color-error); }
+.ant-input-affix-wrapper > .ant-input {
+    flex: 1;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.ant-input-prefix,
+.ant-input-suffix {
+    display: flex;
+    flex: none;
+    align-items: center;
+}
+.ant-input-prefix { margin-inline-end: 0; }
+/* A symbol such as the currency reads as part of the label, not the value. */
+.ant-input-prefix-text { color: var(--ant-color-text-tertiary); }
+.ant-input-clear-icon {
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ant-color-text-placeholder);
+    font-size: var(--ant-font-size-sm);
+    cursor: pointer;
+    visibility: hidden;
+    transition: color var(--ant-motion-mid);
+}
+.ant-input-clear-icon:hover { color: var(--ant-color-text-tertiary); }
+.ant-input-clear-icon:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 1px;
+    border-radius: 50%;
+}
+.ant-input-affix-wrapper:has(> .ant-input:not(:placeholder-shown)) .ant-input-clear-icon { visibility: visible; }
+
+textarea.ant-input {
+    height: auto;
+    min-height: var(--ant-control-height);
+    resize: vertical;
+}
+
+
+/* ─── 16. Select with tags, and the options dropdown ────────────────────────
+ * The multiple Select (ant.js: Ant.multiSelect): a box of tags, one per
+ * picked option, that opens a list of every option under it. The tags that
+ * do not fit collapse into one "+ N …" tag, Ant's maxTagCount="responsive".
+ * The box is a focusable combobox; the dropdown is a listbox placed by ant.js. */
+.ant-select-multiple {
+    position: relative;
+    display: inline-block;
+    width: auto;
+    min-width: 0;
+    vertical-align: top;
+}
+.ant-select-multiple .ant-select-selector {
+    position: relative;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    height: var(--ant-control-height);
+    padding: 1px 28px 1px 4px;
+    overflow: hidden;
+    cursor: pointer;
+}
+.ant-select-multiple.ant-select-open .ant-select-selector,
+.ant-select-multiple:has(.ant-select-selection-search:focus-visible) .ant-select-selector {
+    border-color: var(--ant-color-primary);
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
+}
+.ant-select-selection-placeholder {
+    position: absolute;
+    inset-inline: 11px 28px;
+    overflow: hidden;
+    color: var(--ant-color-text-placeholder);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+.ant-select-selection-item {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    height: 24px;
+    padding: 0 4px 0 8px;
+    border-radius: var(--ant-radius-sm);
+    background: var(--ant-color-fill-secondary);
+    color: var(--ant-color-text);
+    line-height: 22px;
+    white-space: nowrap;
+    cursor: default;
+}
+.ant-select-selection-item-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* The "+ N …" tag has nothing to remove. */
+.ant-select-selection-rest { padding-inline-end: 8px; }
+.ant-select-selection-item-remove {
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ant-color-icon);
+    font-size: 10px;
+    cursor: pointer;
+}
+.ant-select-selection-item-remove:hover { color: var(--ant-color-icon-hover); }
+/* allowClear: on hover over a box with a value, the clear button covers the
+   arrow. */
+.ant-select-clear {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 11px;
+    z-index: 2;
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text-placeholder);
+    font-size: var(--ant-font-size-sm);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: color var(--ant-motion-mid), opacity var(--ant-motion-slow);
+}
+.ant-select-clear:hover { color: var(--ant-color-text-tertiary); }
+.ant-select-multiple:hover .ant-select-clear,
+.ant-select-clear:focus-visible { opacity: 1; }
+.ant-select-multiple:not(.ant-select-has-value) .ant-select-clear { display: none; }
+
+.ant-select-dropdown {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: var(--ant-z-popup);
+    box-sizing: border-box;
+    max-height: 256px;
+    padding: 4px;
+    overflow-y: auto;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+    outline: none;
+}
+.ant-select-dropdown { scrollbar-width: thin; scrollbar-color: var(--ant-color-fill) transparent; }
+.ant-select-dropdown[hidden] { display: none; }
+.ant-select-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    box-sizing: border-box;
+    padding: 5px 12px;
+    border-radius: var(--ant-radius-sm);
+    color: var(--ant-color-text);
+    line-height: var(--ant-line-height);
+    cursor: pointer;
+    transition: background-color var(--ant-motion-slow);
+}
+.ant-select-item-group {
+    min-height: 0;
+    padding-block: 8px 4px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    cursor: default;
+}
+.ant-select-item-option-grouped { padding-inline-start: 24px; }
+.ant-select-item-option-content {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.ant-select-item-option-active { background: var(--ant-color-fill-tertiary); }
+.ant-select-item-option-selected {
+    background: var(--ant-color-primary-bg);
+    font-weight: var(--ant-font-weight-strong);
+}
+.ant-select-item-option-state {
+    display: inline-flex;
+    color: var(--ant-color-primary);
+    visibility: hidden;
+}
+.ant-select-item-option-selected .ant-select-item-option-state { visibility: visible; }
+.ant-select-item-empty {
+    padding: 5px 12px;
+    color: var(--ant-color-text-tertiary);
+    cursor: default;
+}
+/* The search typed into a showSearch Select, inline after the tags. */
+.ant-select-selection-search {
+    flex: 1 1 4px;
+    width: 4px;
+    min-width: 4px;
+    height: 24px;
+    margin: 0;
+    padding: 0 0 0 4px;
+    border: 0;
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    outline: none;
+}
+.ant-select-selection-search[readonly] {
+    cursor: pointer;
+    caret-color: transparent;
+}
+
+
+/* ─── 17. Range picker and the date panel ───────────────────────────────────
+ * RangePicker's trigger: two inputs either side of an arrow, the one being
+ * picked underlined in the primary colour. Its dropdown (ant.js:
+ * Ant.rangePicker) is the presets beside a month of days: today ringed, the
+ * two ends filled, the days between tinted. */
+.ant-picker-range {
+    position: relative;
+    gap: 0;
+    cursor: pointer;
+}
+.ant-picker-range .ant-picker-input {
+    position: relative;
+    display: inline-flex;
+    flex: 1;
+    min-width: 0;
+}
+.ant-picker-input > input {
+    width: 100%;
+    min-width: 1px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    text-overflow: ellipsis;
+    outline: none;
+    cursor: pointer;
+}
+.ant-picker-input > input::placeholder { color: var(--ant-color-text-placeholder); }
+.ant-picker-range .ant-picker-input::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: -5px;
+    left: 0;
+    height: 2px;
+    background: var(--ant-color-primary);
+    opacity: 0;
+    transition: opacity var(--ant-motion-mid);
+}
+.ant-picker-range.ant-picker-focused .ant-picker-input-active::after { opacity: 1; }
+.ant-picker-range-separator {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--ant-color-text-placeholder);
+}
+.ant-picker-range .ant-picker-suffix { margin-inline-start: 4px; }
+.ant-picker-clear {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 11px;
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text-placeholder);
+    font-size: var(--ant-font-size-sm);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity var(--ant-motion-slow), color var(--ant-motion-mid);
+}
+.ant-picker-clear:hover { color: var(--ant-color-text-tertiary); }
+.ant-picker-range:hover .ant-picker-clear,
+.ant-picker-clear:focus-visible { opacity: 1; }
+.ant-picker-range:not(.ant-picker-has-value) .ant-picker-clear { display: none; }
+
+.ant-picker-panel-container {
+    display: flex;
+    overflow: hidden;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+}
+.ant-picker-panel-container .ant-picker-panel {
+    width: auto;
+    border-radius: 0;
+    box-shadow: none;
+}
+.ant-picker-presets {
+    min-width: 120px;
+    margin: 0;
+    padding: 8px;
+    border-inline-end: var(--ant-line-width) solid var(--ant-color-split);
+    list-style: none;
+}
+.ant-picker-presets button {
+    display: block;
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    line-height: 24px;
+    text-align: start;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--ant-motion-slow);
+}
+.ant-picker-presets li:last-child button { margin-bottom: 0; }
+.ant-picker-presets button:hover { background: var(--ant-color-fill-tertiary); }
+.ant-picker-presets button:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+.ant-picker-header-super-prev,
+.ant-picker-header-super-next { font-size: var(--ant-font-size-sm); }
+.ant-picker-date-body { padding: 8px 18px; }
+.ant-picker-content {
+    width: 252px;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.ant-picker-content th {
+    height: 30px;
+    color: var(--ant-color-text);
+    font-weight: 400;
+}
+.ant-picker-content td {
+    position: relative;
+    padding: 3px 0;
+    text-align: center;
+}
+/* The tint behind the days of the range, drawn full-width so the days join
+   into one band; the two ends draw only their inner half. */
+.ant-picker-cell::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    z-index: 0;
+    height: 24px;
+    transform: translateY(-50%);
+}
+.ant-picker-cell-in-range::before { background: var(--ant-color-primary-bg); }
+.ant-picker-cell-range-start::before { left: 50%; }
+.ant-picker-cell-range-end::before { right: 50%; }
+.ant-picker-cell-range-start.ant-picker-cell-range-end::before { display: none; }
+/* While the second end is being chosen, the days it would take in. */
+.ant-picker-cell-in-preview::before { background: var(--ant-color-fill-secondary); }
+.ant-picker-content .ant-picker-cell-inner {
+    position: relative;
+    z-index: 1;
+    width: auto;
+    min-width: 24px;
+    height: 24px;
+    padding: 0;
+    line-height: 24px;
+}
+.ant-picker-cell-out .ant-picker-cell-inner { color: var(--ant-color-text-disabled); }
+.ant-picker-cell-range-start .ant-picker-cell-inner,
+.ant-picker-cell-range-end .ant-picker-cell-inner,
+.ant-picker-cell-range-start .ant-picker-cell-inner:hover,
+.ant-picker-cell-range-end .ant-picker-cell-inner:hover {
+    background: var(--ant-color-primary);
+    color: var(--ant-color-text-on-primary);
+}
+
+
+/* ─── 18. Radio, radio buttons, slider ──────────────────────────────────────
+ * Radio: a native ring drawn as Ant's, filled with the primary colour and a
+ * white dot when chosen. Radio buttons (optionType="button") are one joined
+ * row of buttons, the chosen one outlined in the primary colour. The slider
+ * is a native range: Ant's 4px rail, the filled part in the primary border
+ * tint (ant.js writes --ant-slider-pct), and a ringed handle. */
+.ant-radio-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ant-color-text);
+    cursor: pointer;
+}
+.ant-radio {
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: 50%;
+    background: var(--ant-color-bg-container);
+    appearance: none;
+    cursor: pointer;
+    transition: border-color var(--ant-motion-mid), background-color var(--ant-motion-mid);
+}
+.ant-radio::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ant-color-text-on-primary);
+    opacity: 0;
+    transform: scale(0);
+    transition: transform var(--ant-motion-slow) var(--ant-ease-out-circ), opacity var(--ant-motion-slow);
+}
+.ant-radio:checked {
+    border-color: var(--ant-color-primary);
+    background: var(--ant-color-primary);
+}
+.ant-radio:checked::after {
+    opacity: 1;
+    transform: scale(1);
+}
+.ant-radio-wrapper:hover .ant-radio,
+.ant-radio:hover { border-color: var(--ant-color-primary); }
+.ant-radio:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+
+.ant-radio-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+}
+.ant-radio-button-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    height: var(--ant-control-height);
+    margin: 0;
+    padding: 0 15px;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-inline-start-width: 0;
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text);
+    line-height: calc(var(--ant-control-height) - 2px);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--ant-motion-mid), background-color var(--ant-motion-mid),
+        border-color var(--ant-motion-mid);
+}
+.ant-radio-button-wrapper:first-child {
+    border-inline-start-width: var(--ant-line-width);
+    border-start-start-radius: var(--ant-radius);
+    border-end-start-radius: var(--ant-radius);
+}
+.ant-radio-button-wrapper:last-child {
+    border-start-end-radius: var(--ant-radius);
+    border-end-end-radius: var(--ant-radius);
+}
+/* The hairline between two buttons, coloured with the chosen one beside it. */
+.ant-radio-button-wrapper:not(:first-child)::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    inset-inline-start: -1px;
+    width: 1px;
+    height: calc(100% + 2px);
+    background: var(--ant-color-border);
+    transition: background-color var(--ant-motion-mid);
+}
+.ant-radio-button-wrapper > input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+}
+.ant-radio-button-wrapper:hover { color: var(--ant-color-primary-hover); }
+.ant-radio-button-wrapper:has(> input:checked) {
+    z-index: 1;
+    border-color: var(--ant-color-primary);
+    color: var(--ant-color-primary);
+}
+.ant-radio-button-wrapper:has(> input:checked)::before { background: var(--ant-color-primary); }
+.ant-radio-button-wrapper:has(> input:focus-visible) {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 1px;
+    z-index: 2;
+}
+.ant-radio-button-wrapper:has(> input:disabled) {
+    background: var(--ant-color-fill-tertiary);
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+}
+
+.ant-slider {
+    --ant-slider-pct: 50%;
+    flex: 1;
+    min-width: 0;
+    height: 16px;
+    margin: 6px 0;
+    padding: 0;
+    background: transparent;
+    appearance: none;
+    cursor: pointer;
+}
+.ant-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--ant-color-primary-border) var(--ant-slider-pct),
+        var(--ant-color-fill-tertiary) var(--ant-slider-pct));
+    transition: background var(--ant-motion-mid);
+}
+.ant-slider:hover::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, var(--ant-color-primary) var(--ant-slider-pct),
+        var(--ant-color-fill-secondary) var(--ant-slider-pct));
+}
+.ant-slider::-webkit-slider-thumb {
+    width: 10px;
+    height: 10px;
+    margin-top: -3px;
+    border-radius: 50%;
+    background: var(--ant-color-bg-elevated);
+    box-shadow: 0 0 0 2px var(--ant-color-primary-border);
+    appearance: none;
+    transition: box-shadow var(--ant-motion-mid), transform var(--ant-motion-mid);
+}
+.ant-slider:hover::-webkit-slider-thumb,
+.ant-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 2px var(--ant-color-primary);
+    transform: scale(1.2);
+}
+.ant-slider:focus-visible { outline: none; }
+.ant-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 2px var(--ant-color-primary), 0 0 0 6px var(--ant-control-outline);
+}
+
+
+/* ─── 19. Steps ─────────────────────────────────────────────────────────────
+ * Small horizontal Steps: a numbered disc and a title per step, joined by a
+ * hairline. Done steps tick and tint, the current one is filled, the rest
+ * wait in grey. */
+.ant-steps {
+    display: flex;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.ant-steps-item {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+}
+.ant-steps-item:last-child { flex: none; }
+.ant-steps-item-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-inline-end: 8px;
+    border-radius: 50%;
+    background: var(--ant-color-fill-secondary);
+    color: var(--ant-color-text-secondary);
+    font-size: var(--ant-font-size-sm);
+    line-height: 1;
+    transition: background-color var(--ant-motion-slow), color var(--ant-motion-slow);
+}
+.ant-steps-item-title {
+    position: relative;
+    padding-inline-end: 12px;
+    color: var(--ant-color-text-tertiary);
+    line-height: 24px;
+    white-space: nowrap;
+}
+.ant-steps-item:not(:last-child) .ant-steps-item-title::after {
+    content: '';
+    position: absolute;
+    top: 12px;
+    inset-inline-start: 100%;
+    width: 9999px;
+    height: 1px;
+    background: var(--ant-color-border);
+}
+.ant-steps-item-process .ant-steps-item-icon {
+    background: var(--ant-color-primary);
+    color: var(--ant-color-text-on-primary);
+}
+.ant-steps-item-process .ant-steps-item-title { color: var(--ant-color-text); }
+.ant-steps-item-finish .ant-steps-item-icon {
+    background: var(--ant-color-primary-bg);
+    color: var(--ant-color-primary);
+}
+.ant-steps-item-finish .ant-steps-item-title { color: var(--ant-color-text); }
+.ant-steps-item-finish .ant-steps-item-title::after { background: var(--ant-color-primary); }
+
+
+/* ─── 20. Pagination ────────────────────────────────────────────────────────
+ * The total, the page numbers with « • • • » jumps, the arrows, and the page
+ * size. The current page is outlined in the primary colour. */
+.ant-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ant-color-text);
+}
+.ant-pagination-total-text { margin-inline-end: 8px; }
+.ant-pagination-item,
+.ant-pagination-prev,
+.ant-pagination-next,
+.ant-pagination-jump {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: var(--ant-control-height);
+    height: var(--ant-control-height);
+    padding: 0 6px;
+    border: var(--ant-line-width) solid transparent;
+    border-radius: var(--ant-radius);
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    cursor: pointer;
+    transition: background-color var(--ant-motion-mid), color var(--ant-motion-mid),
+        border-color var(--ant-motion-mid);
+}
+.ant-pagination-item:not(.ant-pagination-item-active):hover,
+.ant-pagination-prev:not(:disabled):hover,
+.ant-pagination-next:not(:disabled):hover { background: var(--ant-color-fill-tertiary); }
+.ant-pagination-item-active {
+    border-color: var(--ant-color-primary);
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-primary);
+    font-weight: var(--ant-font-weight-strong);
+}
+.ant-pagination-item-active:hover {
+    border-color: var(--ant-color-primary-hover);
+    color: var(--ant-color-primary-hover);
+}
+.ant-pagination-prev:disabled,
+.ant-pagination-next:disabled {
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+}
+/* « • • • »: the dots, turning into the double arrow under the pointer. */
+.ant-pagination-jump { color: var(--ant-color-text-disabled); letter-spacing: 2px; }
+.ant-pagination-jump .anticon { display: none; color: var(--ant-color-primary); }
+.ant-pagination-jump:hover .anticon,
+.ant-pagination-jump:focus-visible .anticon { display: inline-flex; }
+.ant-pagination-jump:hover .ant-pagination-jump-dots,
+.ant-pagination-jump:focus-visible .ant-pagination-jump-dots { display: none; }
+.ant-pagination :is(button):focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 1px;
+}
+.ant-pagination-options { margin-inline-start: 8px; }
+.ant-pagination-options .ant-select { width: auto; }
+
+
+/* ─── 21. Table: middle size, sorters, ellipsis ─────────────────────────────
+ * size="middle": 12px 8px cells. A sortable header holds its title and the
+ * sorter's two carets, the active one in the primary colour; the column it
+ * sorts by is tinted under the header and down every row. Ellipsis cells cut
+ * to one line inside a fixed layout. */
+.ant-table-middle th,
+.ant-table-middle td { padding: 12px 8px; }
+.ant-table-fixed { table-layout: fixed; }
+
+.ant-table thead th.ant-table-column-has-sorters {
+    padding: 0;
+    cursor: pointer;
+    transition: background-color var(--ant-motion-mid);
+}
+.ant-table thead th.ant-table-column-has-sorters:hover { background: var(--ant-color-fill-secondary); }
+.ant-table thead th.ant-table-column-sort { background: var(--ant-color-fill-secondary); }
+.ant-table tbody td.ant-table-column-sort { background: var(--ant-color-fill-quaternary); }
+.ant-table-column-sorters {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 8px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+.ant-table-large .ant-table-column-sorters { padding: 16px; }
+.ant-table-column-sorters:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+.ant-table-column-title {
+    flex: 1;
+    min-width: 0;
+}
+.ant-table-cell-end .ant-table-column-title { text-align: end; }
+.ant-table-column-sorter {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--ant-color-text-placeholder);
+    font-size: 11px;
+    line-height: 0;
+}
+.ant-table-column-sorter > span { display: inline-flex; line-height: 0; }
+.ant-table-column-sorter > span + span { margin-top: -0.3em; }
+.ant-table-column-sorter > .ant-table-column-sorter-on { color: var(--ant-color-primary); }
+
+.ant-table-cell-ellipsis {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+
+/* ─── 22. More tags, code ───────────────────────────────────────────────────
+ * The warning tag (a value that needs attention), the filled tag (a plain
+ * label, no edge), and a tag in any hue: --ant-tag-hue mixed into its text,
+ * fill and edge, darker on light and lighter on dark so the text stays
+ * readable on both. */
+.ant-tag-warning {
+    border-color: var(--ant-color-warning-border);
+    background: var(--ant-color-warning-bg);
+    color: color-mix(in srgb, var(--ant-color-warning) 80%, var(--text-primary));
+}
+.ant-tag-filled {
+    border-color: transparent;
+    background: var(--ant-color-fill-secondary);
+}
+.ant-tag-hue {
+    border-color: color-mix(in srgb, var(--ant-tag-hue) 33%, transparent);
+    background: color-mix(in srgb, var(--ant-tag-hue) 11%, transparent);
+    color: color-mix(in srgb, var(--ant-tag-hue) 62%, #000);
+}
+html[data-theme="dark"] .ant-tag-hue {
+    border-color: color-mix(in srgb, var(--ant-tag-hue) 40%, transparent);
+    background: color-mix(in srgb, var(--ant-tag-hue) 17%, transparent);
+    color: color-mix(in srgb, var(--ant-tag-hue) 65%, #fff);
+}
+
+/* Typography.Text code. */
+.ant-typography-code {
+    margin: 0 0.2em;
+    padding: 0.2em 0.4em 0.1em;
+    border: 1px solid color-mix(in srgb, var(--text-primary) 20%, transparent);
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+    font-family: var(--ant-font-family-code);
+    font-size: 85%;
+    overflow-wrap: anywhere;
+}
+.ant-typography-strong { font-weight: var(--ant-font-weight-strong); }
+
+
+/* ─── 23. Upload dragger, Spin ──────────────────────────────────────────────
+ * Upload.Dragger: the dashed drop zone a file is dropped on or picked from,
+ * its edge in the primary colour under the pointer and while a file is held
+ * over it. Spin: Ant's four rotating dots, with its tip under them. */
+.ant-upload-drag {
+    position: relative;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 16px;
+    border: var(--ant-line-width) dashed var(--ant-color-border);
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-fill-quaternary);
+    color: var(--ant-color-text);
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--ant-motion-slow);
+}
+.ant-upload-drag:hover,
+.ant-upload-drag-hover { border-color: var(--ant-color-primary); }
+.ant-upload-drag:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+.ant-upload-drag-icon {
+    margin: 0 0 16px;
+    color: var(--ant-color-primary);
+    font-size: 48px;
+    line-height: 1;
+}
+.ant-upload-text {
+    margin: 0 0 4px;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-lg);
+}
+.ant-upload-hint {
+    max-width: 52ch;
+    margin: 0 auto;
+    color: var(--ant-color-text-tertiary);
+}
+
+.ant-spin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 0;
+    color: var(--ant-color-primary);
+}
+.ant-spin-dot {
+    position: relative;
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    animation: ant-spin 1.2s linear infinite;
+}
+.ant-spin-dot i {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.3;
+    animation: ant-spin-dot 1s linear infinite alternate;
+}
+.ant-spin-dot i:nth-child(1) { top: 0; left: 0; }
+.ant-spin-dot i:nth-child(2) { top: 0; right: 0; animation-delay: 0.4s; }
+.ant-spin-dot i:nth-child(3) { right: 0; bottom: 0; animation-delay: 0.8s; }
+.ant-spin-dot i:nth-child(4) { bottom: 0; left: 0; animation-delay: 1.2s; }
+.ant-spin-text { color: var(--ant-color-text-secondary); }
+@keyframes ant-spin-dot { to { opacity: 1; } }
+
+
+/* ─── 24. Notification ──────────────────────────────────────────────────────
+ * The notice in the bottom-right corner that offers a follow-up (ant.js:
+ * Ant.notification): an icon, a title, a line of detail, its actions and a
+ * close button. It leaves on its own unless the pointer is over it. */
+.ant-notification {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: var(--ant-z-message);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    pointer-events: none;
+}
+.ant-notification-notice {
+    position: relative;
+    box-sizing: border-box;
+    width: 384px;
+    max-width: calc(100vw - 48px);
+    padding: 20px 24px;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+    pointer-events: auto;
+    animation: ant-notification-in var(--ant-motion-mid) var(--ant-ease-out-circ);
+}
+.ant-notification-notice-leave { animation: ant-notification-out var(--ant-motion-mid) var(--ant-ease-in-out) forwards; }
+.ant-notification-notice-icon {
+    position: absolute;
+    top: 22px;
+    inset-inline-start: 24px;
+    font-size: 24px;
+    line-height: 1;
+}
+.ant-notification-notice-with-icon .ant-notification-notice-title,
+.ant-notification-notice-with-icon .ant-notification-notice-description { margin-inline-start: 36px; }
+.ant-notification-notice-title {
+    margin-bottom: 8px;
+    padding-inline-end: 24px;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-lg);
+    line-height: var(--ant-line-height-lg);
+}
+.ant-notification-notice-description { color: var(--ant-color-text-tertiary); }
+.ant-notification-notice-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+.ant-notification-notice-close {
+    position: absolute;
+    top: 20px;
+    inset-inline-end: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-icon);
+    cursor: pointer;
+    transition: background-color var(--ant-motion-mid), color var(--ant-motion-mid);
+}
+.ant-notification-notice-close:hover {
+    background: var(--ant-color-fill-secondary);
+    color: var(--ant-color-icon-hover);
+}
+.ant-notification-notice-close:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+@keyframes ant-notification-in { from { opacity: 0; transform: translateX(100%); } }
+@keyframes ant-notification-out { to { opacity: 0; transform: translateX(100%); } }
+
+
+/* ─── 25. Popover title, editable text ──────────────────────────────────────
+ * A popover's bold title over its content, and Typography's editable text
+ * while it is being edited: the text area in its place, Enter's ↵ in the
+ * corner as the cue that Enter saves. */
+.ant-popover-title {
+    min-width: 177px;
+    margin-bottom: 8px;
+    color: var(--ant-color-text);
+    font-weight: var(--ant-font-weight-strong);
+}
+.ant-typography-edit-content {
+    position: relative;
+    display: block;
+}
+.ant-typography-edit-content > textarea.ant-input {
+    display: block;
+    min-height: 0;
+    padding-inline-end: 28px;
+    resize: none;
+    overflow: hidden;
+}
+.ant-typography-edit-content-confirm {
+    position: absolute;
+    inset-inline-end: 10px;
+    bottom: 8px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    pointer-events: none;
+}
+
+
+/* ─── 26. Dropdown menu ─────────────────────────────────────────────────────
+ * Dropdown's menu (ant.js Ant.dropdown): items on the elevated surface, the
+ * one under the pointer or the focus tinted, a dangerous one in red. */
+.ant-dropdown {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: var(--ant-z-popup);
+}
+.ant-dropdown-menu {
+    min-width: 160px;
+    margin: 0;
+    padding: 4px;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+    list-style: none;
+}
+.ant-dropdown-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    line-height: var(--ant-line-height);
+    text-align: start;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--ant-motion-mid);
+}
+.ant-dropdown-menu-item:not(:disabled):hover,
+.ant-dropdown-menu-item:focus-visible {
+    background: var(--ant-color-fill-tertiary);
+    outline: none;
+}
+.ant-dropdown-menu-item:disabled {
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+}
+.ant-dropdown-menu-item-danger:not(:disabled) { color: var(--ant-color-error); }
+.ant-dropdown-menu-item-danger:not(:disabled):hover,
+.ant-dropdown-menu-item-danger:focus-visible {
+    background: var(--ant-color-error);
+    color: var(--danger-text);
+}
+.ant-dropdown-menu-title-content {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* ─── 27. Drawer ────────────────────────────────────────────────────────────
+ * A panel from the right edge over the mask (ant.js Ant.drawer): a header
+ * of the close × then the title, over a body that scrolls. It slides in on
+ * .ant-drawer-open; .ant-drawer-away slides it back out and lifts the mask
+ * while a drag that started in it is over the page. */
+.ant-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    pointer-events: none;
+}
+.ant-drawer-mask {
+    position: absolute;
+    inset: 0;
+    background: var(--ant-color-bg-mask);
+    opacity: 0;
+    transition: opacity var(--ant-motion-slow);
+}
+.ant-drawer-content-wrapper {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: -6px 0 16px 0 rgba(0, 0, 0, 0.08), -3px 0 6px -4px rgba(0, 0, 0, 0.12),
+        -9px 0 28px 8px rgba(0, 0, 0, 0.05);
+    transform: translateX(100%);
+    transition: transform var(--ant-motion-slow) var(--ant-ease-out-circ);
+}
+/* Under the app's title bar the panel starts below it: the bar is an
+   Electron drag region, which takes real clicks at the OS level whatever is
+   drawn over it, so a close × up there could never be pressed. The mask
+   still dims the bar, as a Modal's does. */
+.titlebar ~ .ant-drawer .ant-drawer-content-wrapper { top: var(--titlebar-height); }
+.ant-drawer-open { pointer-events: auto; }
+.ant-drawer-open .ant-drawer-mask { opacity: 1; }
+.ant-drawer-open .ant-drawer-content-wrapper { transform: none; }
+.ant-drawer-open.ant-drawer-away { pointer-events: none; }
+.ant-drawer-open.ant-drawer-away .ant-drawer-mask { opacity: 0; }
+.ant-drawer-open.ant-drawer-away .ant-drawer-content-wrapper { transform: translateX(100%); }
+.ant-drawer-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--ant-color-bg-elevated);
+    outline: none;
+}
+.ant-drawer-header {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 24px;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-split);
+}
+.ant-drawer-title {
+    flex: 1;
+    min-width: 0;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-lg);
+    font-weight: var(--ant-font-weight-strong);
+    line-height: var(--ant-line-height-lg);
+}
+.ant-drawer-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-inline-start: -4px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-icon);
+    font-size: var(--ant-font-size-lg);
+    cursor: pointer;
+    transition: color var(--ant-motion-mid), background-color var(--ant-motion-mid);
+}
+.ant-drawer-close:hover {
+    background: var(--ant-color-fill-secondary);
+    color: var(--ant-color-icon-hover);
+}
+.ant-drawer-close:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 1px;
+}
+.ant-drawer-body {
+    flex: 1;
+    min-height: 0;
+    padding: 24px;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ant-color-fill) transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+    .ant-drawer-mask,
+    .ant-drawer-content-wrapper { transition: none; }
+}
+
+
+/* ─── 28. Tabs, editable card type ──────────────────────────────────────────
+ * type="editable-card": each tab a tinted card on the nav's hairline, the
+ * active one lifted onto the container with the primary text, a × after a
+ * closable tab's label and the + after the last tab. The tab is a div holding
+ * two buttons (select, close), as a button cannot hold another. */
+.ant-tabs-card {
+    column-gap: 2px;
+}
+.ant-tabs-card .ant-tabs-tab {
+    gap: 6px;
+    padding: 0;
+    border: var(--ant-line-width) solid var(--ant-color-border-secondary);
+    border-bottom: 0;
+    border-radius: var(--ant-radius-lg) var(--ant-radius-lg) 0 0;
+    background: var(--ant-color-fill-quaternary);
+    transition: background-color var(--ant-motion-slow), color var(--ant-motion-slow);
+}
+.ant-tabs-card .ant-tabs-tab::after { display: none; }
+.ant-tabs-card .ant-tabs-tab:has([aria-selected="true"]) {
+    position: relative;
+    z-index: 1;
+    background: var(--ant-color-bg-container);
+}
+.ant-tabs-card .ant-tabs-tab-btn {
+    padding: 8px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    line-height: var(--ant-line-height);
+    white-space: nowrap;
+    cursor: pointer;
+    outline: none;
+    transition: color var(--ant-motion-slow);
+}
+.ant-tabs-card .ant-tabs-tab-btn:hover { color: var(--ant-color-primary-hover); }
+.ant-tabs-card .ant-tabs-tab-btn[aria-selected="true"] {
+    color: var(--ant-color-primary);
+    text-shadow: 0 0 0.25px currentColor;
+}
+.ant-tabs-card .ant-tabs-tab-btn:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -4px;
+    border-radius: var(--ant-radius);
+}
+.ant-tabs-card .ant-tabs-tab:has(.ant-tabs-tab-remove) .ant-tabs-tab-btn { padding-inline-end: 0; }
+.ant-tabs-tab-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-inline-end: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-icon);
+    font-size: var(--ant-font-size-sm);
+    cursor: pointer;
+    transition: color var(--ant-motion-mid), background-color var(--ant-motion-mid);
+}
+.ant-tabs-tab-remove:hover {
+    background: var(--ant-color-fill-secondary);
+    color: var(--ant-color-icon-hover);
+}
+.ant-tabs-tab-remove:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 0;
+}
+.ant-tabs-nav-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    margin-inline-start: 2px;
+    padding: 0 8px;
+    border: var(--ant-line-width) solid var(--ant-color-border-secondary);
+    border-bottom: 0;
+    border-radius: var(--ant-radius-lg) var(--ant-radius-lg) 0 0;
+    background: var(--ant-color-fill-quaternary);
+    color: var(--ant-color-text);
+    cursor: pointer;
+    transition: color var(--ant-motion-slow);
+}
+.ant-tabs-nav-add:not(:disabled):hover { color: var(--ant-color-primary-hover); }
+.ant-tabs-nav-add:disabled {
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+}
+.ant-tabs-nav-add:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -4px;
+}
+
+
+/* ─── 29. CheckableTag ──────────────────────────────────────────────────────
+ * Tag.CheckableTag, here as a series switch: a pill wearing its series
+ * colour (--ant-tag-color), outlined when off and filled when on, with a dot
+ * of the colour before the name. Filled, the name and the dot take
+ * --ant-tag-ink: white, or near-black on a light hue. */
+.ant-tag-checkable {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-inline: 10px;
+    border-color: var(--ant-color-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    font-size: var(--ant-font-size-sm);
+    line-height: 20px;
+    cursor: pointer;
+    transition: color var(--ant-motion-mid), background-color var(--ant-motion-mid),
+        border-color var(--ant-motion-mid);
+}
+.ant-tag-checkable:not([aria-pressed="true"]):hover { color: var(--ant-color-primary-hover); }
+.ant-tag-checkable[aria-pressed="true"] {
+    border-color: var(--ant-tag-color, var(--ant-color-primary));
+    background: var(--ant-tag-color, var(--ant-color-primary));
+    color: var(--ant-tag-ink, #fff);
+}
+.ant-tag-checkable:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+.ant-tag-checkable-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ant-tag-color, var(--ant-color-primary));
+}
+.ant-tag-checkable[aria-pressed="true"] .ant-tag-checkable-dot { background: var(--ant-tag-ink, #fff); }
+
+
+/* ─── 30. Picker presets chosen, picker footer ──────────────────────────────
+ * A preset that is the value in effect wears the primary tint, as a chosen
+ * Select option does. The footer is renderExtraFooter's strip under the
+ * panels, across the whole dropdown. */
+.ant-picker-presets button[aria-pressed="true"],
+.ant-picker-presets button[aria-pressed="true"]:hover {
+    background: var(--ant-color-primary-bg);
+    color: var(--ant-color-primary);
+}
+.ant-picker-footer {
+    padding: 8px 12px;
+    border-top: var(--ant-line-width) solid var(--ant-color-split);
+}

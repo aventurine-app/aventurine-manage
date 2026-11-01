@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>Aventurine Manage | Recurring</title>
     <!-- @include head -->
+    <link rel="stylesheet" href="/static/css/ant.css">
     <link rel="stylesheet" href="/static/css/recurring.css">
 </head>
 <body>
@@ -14,45 +15,42 @@
 
         <div class="page">
 
-<div class="rec-page">
+<!-- The workspace is drawn in Ant Design (ant.css, ant.js): the month controls,
+     the month's totals as three Statistic cards, then the calendar and the
+     schedule list as two cards side by side. The app chrome around it keeps
+     its own design. -->
+<div class="rec-page ant-scope">
 
-    <!-- This page's cards are the calendar/rail pair below, so its month
-         control rides a toolbar row instead of a card header. Adding and
-         detecting schedules live at the foot of the rail, next to the list they
-         act on, so nothing sits on the right of this row.
-         The month label is a picker (recurring.js), same as Dashboard's
-         stepper — the caret .stepper-label draws is not decoration.
-         Today rides beside the stepper as the one-hop way back from any month
-         the arrows wandered into; it stays in place and goes disabled on the
-         current month rather than disappearing, so stepping past today doesn't
-         make the toolbar jump. -->
+    <!-- The month, hard left: a compact previous / month / next control, the
+         month opening Ant's month panel, then Today. No page heading: the
+         sidebar's active link already names the page, as on every other page.
+         Today stays in place and goes disabled on the current month rather
+         than disappearing, so the controls never shift. -->
     <div class="rec-toolbar">
-        <div class="rec-toolbar-left">
-            <div class="stepper stepper-joined rec-month-stepper" aria-label="Recurring month">
-                <button type="button" class="stepper-btn button-primary" id="rec-month-prev" aria-label="Previous month"><svg class="stepper-btn-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"></path></svg></button>
-                <button type="button" class="stepper-label" id="rec-month-label" aria-live="polite">&nbsp;<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
-                <button type="button" class="stepper-btn button-primary" id="rec-month-next" aria-label="Next month"><svg class="stepper-btn-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"></path></svg></button>
-            </div>
-            <button type="button" class="button-secondary rec-today-btn" id="rec-month-today" title="Back to the current month">Today</button>
+        <div class="ant-space-compact" role="group" aria-label="Calendar month">
+            <button type="button" class="ant-btn ant-btn-default ant-btn-icon-only" id="rec-month-prev"
+                aria-label="Previous month" data-tip="Previous month"><span class="anticon" data-ant-icon="left" aria-hidden="true"></span></button>
+            <button type="button" class="ant-picker rec-month-picker" id="rec-month-label"
+                aria-haspopup="dialog" aria-expanded="false">
+                <span class="ant-picker-input" id="rec-month-text" aria-live="polite">&nbsp;</span>
+                <span class="ant-picker-suffix"><span class="anticon" data-ant-icon="calendar" aria-hidden="true"></span></span>
+            </button>
+            <button type="button" class="ant-btn ant-btn-default ant-btn-icon-only" id="rec-month-next"
+                aria-label="Next month" data-tip="Next month"><span class="anticon" data-ant-icon="right" aria-hidden="true"></span></button>
         </div>
+        <button type="button" class="ant-btn ant-btn-default" id="rec-month-today">Today</button>
     </div>
 
-    <!-- The calendar is the listing: each occurrence is a chip carrying its
-         schedule's data — the merchant, the amount, and the rest in its
-         tooltip. Clicking a chip opens that schedule's editor, the same dialog a
-         rail row opens; nothing opens on hover. -->
+    <!-- What the month on screen is expected to bring in, pay out and move.
+         Empty until recurring.js has a month to total. -->
+    <div class="rec-stats" id="rec-summary"></div>
 
-    <!-- Totals, calendar and rail are one grid rather than three stacked blocks:
-         the totals row spans both columns, so the rail's first row starts level
-         with the calendar's top edge instead of with the totals above it.
-         #rec-summary and #rec-rail are empty until recurring.js has a month to
-         total. The rail is never hidden: its foot carries the only Add and
-         Detect controls on the page, so a calendar with nothing on it yet still
-         has both of them in reach. -->
+    <!-- The calendar and the list of every schedule. The list is never hidden:
+         its foot carries Create and Detect, so a calendar with nothing on it yet
+         still has both in reach. -->
     <div class="rec-main" id="rec-main">
-        <div class="rec-summary" id="rec-summary"></div>
-        <div class="rec-calendar" id="rec-calendar"></div>
-        <aside class="rec-rail" id="rec-rail" aria-label="Schedules this month"></aside>
+        <section class="ant-card rec-calendar" id="rec-calendar" aria-label="Calendar"></section>
+        <section class="ant-card rec-rail" id="rec-rail" aria-label="Schedules"></section>
     </div>
 
 </div>
@@ -67,6 +65,9 @@
          window.MERCHANT_ICONS. -->
     <script src="/static/js/core/merchant-icons.js"></script>
     <script src="/static/js/core/avatar.js"></script>
+    <!-- Ant Design's interactive pieces. After the shared block: its Modal is
+         UI.dialog underneath. -->
+    <script src="/static/js/widgets/ant.js"></script>
     <script src="/static/js/pages/recurring.js"></script>
 </body>
 </html>

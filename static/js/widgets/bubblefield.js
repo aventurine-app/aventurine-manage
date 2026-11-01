@@ -16,8 +16,11 @@
 //   field.destroy();
 //
 // Each circle is a real <button>, so hover, keyboard focus and activation come
-// from the platform rather than from mouse handlers. Positioning is a
-// `transform`, which the compositor can move without re-laying-out the page.
+// from the platform rather than from mouse handlers. Positioning is the
+// `translate` property, which the compositor can move without re-laying-out
+// the page. Not `transform`: the page's stylesheet is free to use `scale` or
+// `transform` on a circle (a hover grow), and those apply around the circle's
+// own centre only when the position is the separate `translate`.
 //
 // AREA, NOT RADIUS, carries the value. A budget twice the size gets twice the
 // ink: r = k·√value. Scaling the radius directly would draw double as
@@ -326,8 +329,7 @@
                 const size = node.r * 2;
                 node.el.style.width = `${size}px`;
                 node.el.style.height = `${size}px`;
-                node.el.style.transform =
-                    `translate3d(${node.x - node.r}px, ${node.y - node.r}px, 0)`;
+                node.el.style.translate = `${node.x - node.r}px ${node.y - node.r}px`;
             }
         }
 
@@ -373,7 +375,7 @@
             const el = document.createElement('button');
             el.type = 'button';
             // The layout contract, set here rather than left to the caller's
-            // stylesheet: this file writes `transform`, `width` and `height`
+            // stylesheet: this file writes `translate`, `width` and `height`
             // every time the field moves, and all three are meaningless unless
             // the circle is taken out of flow. Everything else about how a
             // circle LOOKS is the caller's, via paint().
@@ -442,6 +444,11 @@
         // change resizes it without a window resize event.
         const observer = new ResizeObserver(() => {
             if (destroyed) return;
+            // A hidden field (display: none) measures 0×0. Laying the circles
+            // out against that would crush them into one corner, and showing
+            // the field again would re-pack them from scratch, so a hidden
+            // field keeps its last layout until it has a size again.
+            if (!container.clientWidth || !container.clientHeight) return;
             const previousWidth = width;
             const previousHeight = height;
             measure();

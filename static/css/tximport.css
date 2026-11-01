@@ -1,0 +1,179 @@
+/* ============================================================================
+   tximport.css — the import wizard (widgets/txfileimport.js), in Ant Design.
+   ============================================================================
+   Loaded by the two pages that can import: Transactions, and the Dashboard
+   for its first-run setup. The components are ant.css; this file is the
+   wizard's rows. It also holds the few pieces the wizard shares with the
+   ledger's own dialogs (Steps' spacing, the footer's button group, money in
+   and out), since the Dashboard does not load transactions.css.
+
+     1. Shared with the ledger's dialogs
+     2. Account
+     3. File
+     4. Columns
+     5. Review
+     6. Done
+   ============================================================================ */
+
+
+/* ─── 1. Shared with the ledger's dialogs ─────────────────────────────────── */
+.tx-import-modal [hidden] { display: none; }
+.tx-steps { margin: 4px 0 18px; }
+.tx-steps:empty { display: none; }
+.tx-modal-buttons {
+    display: flex;
+    gap: 8px;
+    margin-inline-start: auto;
+}
+.tx-num { font-variant-numeric: tabular-nums; }
+/* A ledger amount: + in the success green for money in, - for money out,
+   a transfer in the info blue. */
+.tx-amount {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.tx-amount-income { color: var(--ant-color-success); }
+.tx-amount-transfer { color: var(--ant-color-info-text); }
+.tx-review-list { margin: 4px 0 0; padding-inline-start: 18px; }
+.tx-review-list li { list-style: disc; }
+/* Fixed column widths for the dialogs' tables; the unsized column takes the
+   rest. */
+.tx-p-check { width: 40px; }
+.tx-p-date { width: 110px; }
+.tx-p-acct { width: 160px; }
+.tx-p-cat { width: 160px; }
+.tx-p-catsel { width: 230px; }
+.tx-p-notes { width: 180px; }
+.tx-p-match { width: 72px; }
+.tx-p-amt { width: 120px; }
+
+.tx-import-modal .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+}
+.tx-import-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 120px;
+}
+.tx-import-body .ant-table-wrapper {
+    border: var(--ant-line-width) solid var(--ant-color-border-secondary);
+    border-radius: var(--ant-radius-lg);
+}
+.tx-import-body .ant-table { min-width: 560px; }
+.tx-import-body .ant-table thead th { border-radius: 0; }
+.tx-import-body .ant-table tbody tr:last-child > td { border-bottom: 0; }
+
+
+/* ─── 2. Account ────────────────────────────────────────────────────────────
+   The user's accounts and "A new account" as one column of radios; a new one
+   opens a small card for its kind and its name. */
+.tx-import-question { margin: 0; }
+.tx-import-accounts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.tx-import-new .ant-card-body {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(200px, 2fr);
+    gap: 12px;
+}
+
+
+/* ─── 3. File ───────────────────────────────────────────────────────────────
+   The drop zone is a button; its three lines are spans laid out as blocks. */
+.tx-import-modal .ant-upload-drag { padding-block: 24px; }
+.tx-import-modal .ant-upload-drag > span { display: block; }
+
+
+/* ─── 4. Columns ────────────────────────────────────────────────────────────
+   Which column is which, as many to a row as fit, over the preview. */
+.tx-import-map {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px 16px;
+}
+.tx-import-map-error { margin: 0; }
+
+
+/* ─── 5. Review ─────────────────────────────────────────────────────────────
+   Four Statistic cards, what could not be read, then every row with its
+   category. A duplicate left out is faded; the bolt beside a category says
+   the categorizer filled it in. */
+.tx-import-title {
+    margin: 0;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-lg);
+    font-weight: var(--ant-font-weight-strong);
+    line-height: var(--ant-line-height-lg);
+}
+.tx-import-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+}
+.tx-import-stats .ant-statistic-content { font-size: 20px; }
+.tx-import-stat-suffix {
+    margin-inline-start: 4px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size);
+}
+.tx-import-balances { margin: 0; }
+.tx-import-table td { vertical-align: middle; }
+/* A duplicate left out: its text greyed, its tick box still live. */
+.tx-import-muted > td,
+.tx-import-muted .tx-amount { color: var(--ant-color-text-disabled); }
+.tx-import-desc {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.tx-import-desc .tx-desc-name {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.tx-import-dupe { flex: none; gap: 6px; }
+.tx-import-cat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tx-import-cat .ant-select { flex: 1; min-width: 0; }
+.tx-import-auto {
+    display: inline-flex;
+    flex: none;
+    color: var(--ant-color-primary);
+    border-radius: var(--ant-radius-sm);
+}
+.tx-import-auto:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+.tx-import-pages { justify-content: flex-end; }
+
+
+/* ─── 6. Done ───────────────────────────────────────────────────────────────
+   First-run setup's last step: Result's success icon over what was done. */
+.tx-import-done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 0 8px;
+    text-align: center;
+}
+.tx-import-done-icon {
+    color: var(--ant-color-success);
+    font-size: 72px;
+    line-height: 1;
+}
+.tx-import-done-title {
+    color: var(--ant-color-text);
+    font-size: 24px;
+    line-height: 1.35;
+}

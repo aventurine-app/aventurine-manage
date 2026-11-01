@@ -60,6 +60,39 @@
   });
 }());
 
+// ── Collapse (very bottom of the sidebar) ───────────────────────────────
+// Narrows the sidebar to a rail of icons, to give the page more room. The
+// choice is remembered ('nav-rail' in localStorage); theme-init.js applies it
+// before first paint so a collapsed sidebar never flashes open. Ctrl/Cmd+B
+// toggles it, as in Prism.
+(function () {
+  const KEY = 'nav-rail';
+  const btn = document.querySelector('.nav-footer [data-action="toggle-rail"]');
+  if (!btn) return;
+  const label = btn.querySelector('.nav-label');
+
+  const setRail = (on) => {
+    document.documentElement.classList.toggle('has-rail', on);
+    const text = on ? 'Expand navigation' : 'Collapse navigation';
+    btn.setAttribute('aria-label', text);
+    btn.title = `${text} (Ctrl+B)`;
+    if (label) label.textContent = on ? 'Expand' : 'Collapse';
+    try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* storage blocked */ }
+  };
+  const isRail = () => document.documentElement.classList.contains('has-rail');
+
+  btn.addEventListener('click', () => setRail(!isRail()));
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'b') return;
+    if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+    e.preventDefault();
+    setRail(!isRail());
+  });
+
+  // Sync the button with the state theme-init.js already painted.
+  if (isRail()) setRail(true);
+}());
+
 // (The Transactions link used to carry an uncategorized-count pill, refreshed
 // here on every page load and by the Transactions page after each edit. It was
 // removed — the count is shown on the Transactions page instead — along with

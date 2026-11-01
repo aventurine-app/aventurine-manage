@@ -1,600 +1,193 @@
 /* ============================================================================
-   recurring.css — the Recurring page (pages/recurring.html).
+   recurring.css — the Recurring page (pages/recurring.html), in Ant Design.
+   ============================================================================
+   The components (cards, buttons, fields, modal, table…) are ant.css; this
+   file is the page: its layout, Ant's full-screen Calendar with the occurrence
+   chips in its cells, the schedule list, and the parts of the two dialogs that
+   are this page's own.
 
-   Its own page again, so this file owns the page padding the way the other
-   standalone pages do (see reportcard.css) — it no longer rides the Reports
-   tab shell. No page heading: the sidebar's active link already names the
-   page, which is how every other page here works.
-
-   The calendar is the page: a grid whose day cells hold occurrence chips
-   (.rec-occ), each carrying its own schedule's name and amount, with its full
-   name and whether the charge is projected in its tooltip. A chip is a button:
-   it opens that schedule's editor, the same dialog a rail row opens. Deleting is
-   the rail's alone, on the trash can its rows carry.
-   Hovering a day cell still reveals its own .rec-day-add "+", which is where
-   adding a schedule by hand starts — on the date it is due, not in a menu.
-
-   Two panels frame it (.rec-main), scoped differently on purpose: .rec-summary
-   above, totalling the month on screen by direction, and .rec-rail beside it,
-   listing EVERY schedule against its next due date whatever month that is in.
-   Neither restates the grid. The old side table did — it was the same rows
-   drawn twice, and it went — but a next-due date is frequently in a month the
-   grid is not showing, and a month's total is not readable off 42 cells.
-
-   The confirm-dialog shell (.confirm-*) the Detect/Add/Remove flows use is a
-   shared global (style.css §7b) — nothing to restate here.
+   The calendar is the page. Every occurrence is a chip in its day, tinted by
+   direction, and a chip is a button that opens its schedule's editor — the same
+   dialog a list row opens. A day's empty space (or the + it shows on hover)
+   starts a new schedule on that date. The list beside it holds EVERY schedule
+   against its next due date, whatever month that falls in, and the three
+   figures above total the month on screen.
    ============================================================================ */
 
 /* Anchor to the top so the cards never scroll out of reach when zoomed in
-   (same pattern as the other pages — see reportcard.css). */
+   (same pattern as the other pages). */
 .page:has(.rec-page) {
     align-items: flex-start;
 }
 
+/* The full width the page is given, with the app's page padding, like every
+   other page. Grown as a flex item rather than width:100%: .page is a scroll
+   container, and a percentage width resolves against a content box that still
+   counts the vertical scrollbar's track, so a tall month would overshoot by
+   the scrollbar width. It is also the container the layout below queries,
+   since the space the page gets depends on the sidebar and the zoom level as
+   much as on the window. */
 .rec-page {
-    display: flex;
-    flex-direction: column;
-    /* Toolbar → cards sits closer than card → card (24px), so the month
-       stepper reads as this page's header rather than a third card. */
-    gap: 16px;
-    padding: var(--page-pad);
-    /* Grow as a flex item rather than width:100%: .page is a scroll container,
-       and a percentage width resolves against a content box that still counts
-       the vertical scrollbar's track, so a long list overshoots by the
-       scrollbar width and raises a horizontal scrollbar under it. */
     flex: 1;
     min-width: 0;
+    padding: var(--page-pad);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    container: rec-page / inline-size;
 }
 
-/* ─── Toolbar ─────────────────────────────────────────────────────────────── */
-/* The month stepper, hard left, and nothing else: this page's cards are the
-   calendar and the rail below, so the month control rides a toolbar row instead
-   of a card header, and the actions that used to sit on the right in a ⋮ menu
-   are buttons at the foot of the rail now.
-   A plain flex row, not the Statements 1fr auto 1fr grid: that grid exists to
-   centre a stepper against a title, and this page has no title to centre
-   against. */
+
+/* ─── Toolbar ───────────────────────────────────────────────────────────────
+   The month controls, hard left like the other pages' steppers. No page
+   heading: the sidebar's active link already names the page. */
 .rec-toolbar {
     display: flex;
-    align-items: center;
-    gap: var(--space-8);
     flex-wrap: wrap;
-}
-
-/* Stepper + Today read as one month control, so they share a group and the
-   toolbar's space-between still has exactly two ends to push apart. */
-.rec-toolbar-left {
-    display: flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: 8px;
 }
+/* Wide enough for the longest month name with its year, so stepping through
+   the months never moves the arrows beside it. */
+.rec-month-picker { width: 168px; }
 
-/* .button-secondary carries the shape/states (buttons.css); this only trims the
-   16px side padding, which is sized for wordier actions and made a five-letter
-   label look like the toolbar's primary act next to the compact stepper. */
-.rec-today-btn {
-    padding: var(--space-8) var(--space-12);
+
+/* ─── Month totals ──────────────────────────────────────────────────────────
+   Three small cards. Ledger amounts are positive magnitudes (direction carries
+   the sign), so the label and the colour tell them apart, never a minus. */
+.rec-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
 }
+.rec-stat-income .ant-statistic-content { color: var(--ant-color-success); }
+.rec-stat-expense .ant-statistic-content { color: var(--ant-color-error); }
+.rec-stat-transfer .ant-statistic-content { color: var(--ant-color-info-text); }
 
-/* Enabled, the button carries the primary accent on its text and its outline
-   instead of .button-secondary's neutral grey: the accent is what the calendar
-   already uses for the current day, so the one control that returns there wears
-   the same colour. The DISABLED state is untouched — on the current month there
-   is nowhere to go back to, and buttons.css already drops it to grey text on a
-   grey border, which is what an inert control should look like.
-   The hover fills with the same accent and swaps in --button-text, the way
-   .button-primary does. Inheriting .button-secondary's charcoal fill here would
-   put a grey hover under an accent outline, so the two states would read as two
-   different buttons. */
-.rec-today-btn:not(:disabled) {
-    color: var(--accent-primary);
-    border-color: var(--accent-primary);
-}
 
-.rec-today-btn:not(:disabled):hover {
-    background: var(--accent-primary);
-    color: var(--button-text);
-}
-
-.rec-month-stepper #rec-month-label {
-    min-width: 132px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-}
-
-/* ─── Page body: totals, calendar, rail ───────────────────────────────────── */
-/* One grid, two columns, three areas. The totals row spans the full width so
-   the rail begins level with the CALENDAR's top edge rather than with the
-   totals — the rail is the calendar's companion, not the totals'.
-
-   Fixed columns rather than auto-fit: auto-fit sizes by available width and
-   would leave the rail a different width on every window size, which is the
-   same reason trends.css pins its rail. The rail's width IS its name column's
-   allowance: everything else in a row is a fixed field (avatar, cadence, due
-   date), so the 388px is those fields plus about 116px of name, which still
-   holds a two-word merchant before the ellipsis. It was 432px while a 28px
-   trash can and its 16px gap sat on the end of every row; deleting moved into
-   the editor, and those 44px went to the day cells rather than to the name,
-   which the calendar needs more than the rail does. `align-items: start` keeps
-   each card at its own height — a rail holding four schedules should not be
-   stretched to a six-week calendar's height and left three quarters empty. */
+/* ─── Calendar and list ─────────────────────────────────────────────────────
+   Ant's 17/7 split of a 24-column row. The list folds under the calendar once
+   the page is too narrow for both: past that point it would squeeze the day
+   cells below a chip's width. `align-items: start` keeps each card at its own
+   height. */
 .rec-main {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--rec-rail-w, 388px);
-    grid-template-areas:
-        "summary summary"
-        "calendar rail";
+    grid-template-columns: minmax(0, 17fr) minmax(0, 7fr);
     gap: 16px;
     align-items: start;
-    min-width: 0;
+}
+@container rec-page (max-width: 960px) {
+    .rec-main { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Below this the rail cannot hold its three fields side by side without the
-   calendar's day cells going too narrow for a chip, so it folds under the grid.
-   It folds earlier than the Spending Trends rail (1100px) because it is nearly
-   twice that rail's width: at 1100px a 388px rail leaves the seven day columns
-   about 66px each, which is under a chip's minimum. */
-@media (max-width: 1200px) {
-    .rec-main {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-areas:
-            "summary"
-            "calendar"
-            "rail";
-    }
-}
 
-/* ─── Month totals ────────────────────────────────────────────────────────── */
-/* What the month on screen is expected to bring in, pay out and move, one
-   figure each. These total the chips the calendar is drawing — projections
-   included — so the row and the grid under it can never disagree.
+/* ─── The calendar: Ant's full-screen Calendar ──────────────────────────────
+   Six weeks always, as Ant draws it, so the card keeps one height whichever
+   month is on it. Each day is a 2px rule with the date at its right, the
+   rule turning primary on today; days outside the month show their date
+   greyed and hold nothing. */
+.rec-calendar > .ant-card-body { padding: 12px; }
 
-   Ledger amounts are positive magnitudes (direction carries the sign, see
-   schema.js), so all three figures are positive and colour is what tells them
-   apart: the same income/expense/transfer trio the chips and the detection
-   picker already use. The label carries the meaning too, so the
-   colour is never the only thing saying which is which.
-
-   Three fixed columns, matching the headline figures on Metrics: a figure is a
-   label over a number, and the tile only has to be as wide as the number. */
-.rec-summary {
-    grid-area: summary;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-20);
-    min-width: 0;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
-    padding: var(--space-16) 20px;
-}
-
-.rec-sum-tile {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-}
-
-.rec-sum-label {
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-    text-transform: uppercase;
-}
-
-.rec-sum-value {
-    font-family: var(--font-numeric);
-    font-size: var(--size-h3);
-    font-weight: var(--weight-bold);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ─── The rail ────────────────────────────────────────────────────────────── */
-/* Every adopted schedule, soonest due first, against the date its next charge
-   actually falls on. The grid answers "what is due on the 14th"; the rail
-   answers "what is running, and what is coming" — which the grid cannot answer
-   at all, since a schedule's next date is frequently months away from the one
-   being looked at. Clicking a row takes the calendar there.
-
-   A card of its own, matching the calendar's frame, so the two read as two
-   panels rather than as one panel with a margin. */
-.rec-rail {
-    grid-area: rail;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
-    padding: var(--space-16) var(--space-12);
-}
-
-/* Column headings, because this is a table: without them the cadence and the
-   date are two bare values with nothing saying which is which. Same micro-caps
-   as the calendar's weekday strip, so the two panels start on the same note.
-
-   It takes the ROW's field template, not a flex row: there are three values of
-   different lengths per row, so each heading has to sit over a column of known
-   width rather than wherever space-between leaves it. Its first cell is the
-   empty span over the avatars. The horizontal padding carries the rows'
-   transparent border as well as their padding, since the rows are bordered
-   buttons and this is not — without it every heading sits a pixel left of the
-   column it names. */
-.rec-rail-head {
-    display: grid;
-    grid-template-columns: var(--rec-rail-fields);
-    align-items: baseline;
-    gap: var(--space-8);
-    padding: 0 calc(var(--space-8) + var(--border-width)) var(--space-8);
-    margin-bottom: var(--space-4);
-    min-width: 0;
-}
-
-.rec-rail-head-label {
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-    text-transform: uppercase;
-}
-
-/* Scrolls at roughly a full calendar's height. A month with thirty schedules in
-   it would otherwise run the rail far past the grid it belongs to and take the
-   whole page's scroll with it. */
-.rec-rail-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    max-height: 640px;
-    overflow-y: auto;
-}
-
-/* --rec-rail-fields is shared because the headings and the rows are two
-   separate grids: the three field columns are FIXED widths and the name takes
-   what is left. Sizing any of them to content would let the two grids disagree,
-   and the headings would sit over nothing in particular. Each is cut to its
-   longest real value: 96px fits "Every 4 months" (the widest cadence ruleLabel
-   produces before the interval stops being plausible) and 88px fits a due date
-   carrying a year, which one falling outside this year does. */
-:root {
-    --rec-rail-cadence-w: 96px;
-    --rec-rail-due-w: 88px;
-    --rec-rail-fields: 20px minmax(0, 1fr) var(--rec-rail-cadence-w) var(--rec-rail-due-w);
-}
-
-/* The row is the button: one hit target over the whole strip, opening this
-   schedule's editor, which is where deleting now lives too. Name and cadence
-   ellipse, the date never does — a truncated date is unreadable, while a
-   truncated merchant name is still a hint and a clipped cadence has its full
-   sentence in a tooltip. */
-.rec-rail-row {
-    display: grid;
-    grid-template-columns: var(--rec-rail-fields);
-    align-items: center;
-    gap: var(--space-8);
+.rec-cal {
     width: 100%;
-    min-width: 0;
-    padding: var(--space-4) var(--space-8);
-    border: var(--border-width) solid transparent;
-    border-radius: 6px;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.12s ease;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+.rec-cal th {
+    padding: 0 12px 4px 0;
+    color: var(--ant-color-text);
+    font-weight: 400;
+    line-height: 18px;
+    text-align: end;
+}
+.rec-cal td {
+    padding: 0;
+    vertical-align: top;
 }
 
-/* The active row keeps the hover fill and takes a border, so the mark survives
-   the pointer leaving the rail — which it must: a clicked row stays marked while
-   the user reads the month it just moved to. Same treatment the Spending Trends
-   rail gives its focused category. */
-.rec-rail-row:hover { background: var(--frost-2); }
-.rec-rail-active {
-    background: var(--frost-2);
-    border-color: var(--stroke-medium);
+.rec-day-inner {
+    margin: 0 4px;
+    padding: 4px 8px 0;
+    border-top: 2px solid var(--ant-color-split);
+    transition: background-color var(--ant-motion-slow);
 }
-.rec-rail-row:active { background: var(--surface3); }
-.rec-rail-row:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 2px;
-}
+.rec-day-today .rec-day-inner { border-top-color: var(--ant-color-primary); }
 
-.rec-rail-row .avatar-circle {
-    width: 20px;
-    height: 20px;
-    font-size: 9px;
-}
+/* An in-month day is a target: its empty space starts a schedule there. */
+.rec-day:not(.rec-day-outside) { cursor: copy; }
+.rec-day:not(.rec-day-outside):hover .rec-day-inner { background: var(--ant-color-fill-tertiary); }
 
-.rec-rail-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-.rec-rail-active .rec-rail-name { font-weight: var(--weight-semibold); }
-
-/* Plain text, not a tag: a column of pills would be the loudest thing in the
-   panel, and the heading above already says what the word is. Tertiary, so the
-   row reads name, then date, then cadence in that order of weight. */
-.rec-rail-cadence {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-
-.rec-rail-date {
-    color: var(--text-secondary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-small);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-/* The due column is the panel's right edge, so its heading and its dates sit
-   flush to it. Left-aligned in a fixed column, a short date would float in the
-   middle of the widest one it has to make room for. */
-.rec-rail-head > :last-child,
-.rec-rail-date { text-align: right; }
-
-/* The panel's two actions, under the list they act on. Stacked and full width
-   rather than side by side: both are primary, so neither should look like the
-   other's afterthought, and the labels are long enough that two in a row would
-   each be a line of wrapped micro-caps. */
-.rec-rail-foot {
+.rec-day-head {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-8);
-    margin-top: var(--space-12);
-    padding-top: var(--space-12);
-}
-
-.rec-rail-foot .button-primary { width: 100%; }
-
-/* Nothing has been adopted at all. The list is not month-scoped, so this is the
-   only state that empties it. */
-.rec-rail-empty {
-    margin: var(--space-8) var(--space-4) 0;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .rec-rail-row { transition: none; }
-}
-
-/* ─── Calendar ────────────────────────────────────────────────────────────── */
-/* The page's main column — the totals sit above it and the rail beside it (see
-   .rec-main), and it takes whatever width those leave. Day cells are tall: they
-   hold chips carrying a name and an amount, not bare dots. */
-.rec-calendar {
-    grid-area: calendar;
-    min-width: 0;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
-    padding: 20px;
-}
-
-.rec-cal-weekdays {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    margin-bottom: 8px;
-}
-.rec-cal-weekdays span {
-    text-align: center;
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-    text-transform: uppercase;
-}
-
-/* One ruled grid, not 42 bordered tiles: the cells share their edges, so every
-   internal line is a single hairline drawn once (each cell owns only its right
-   and bottom edge; the container draws the outer frame, and the last column /
-   last row shed theirs so the frame isn't doubled). `overflow: clip` lets the
-   frame's radius round the square corner cells under it — the cells can't carry
-   their own radius any more without breaking the join. */
-.rec-cal-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 0;
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    overflow: clip;
-}
-
-.rec-day {
-    min-height: 118px;
-    min-width: 0;
-    /* Anchors the add button in the corner (see .rec-day-add). */
-    position: relative;
-    /* Only two edges each — the neighbouring cell draws the other two (see
-       .rec-cal-grid). Back to the app's standard hairline now that each line is
-       drawn once rather than twice adjacently. */
-    border: 0;
-    border-right: var(--border-width) solid var(--border);
-    border-bottom: var(--border-width) solid var(--border);
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 4px;
-    background: var(--surface1);
+    height: 24px;
 }
-/* The frame draws the outer edges, so the last column and last row omit theirs.
-   The grid is always a whole number of weeks (recurring.js pads both ends), so
-   the last seven children are exactly the last row. */
-.rec-day:nth-child(7n) { border-right: 0; }
-.rec-day:nth-last-child(-n + 7) { border-bottom: 0; }
-
-/* Padding days keep their borders: a grid with gaps in the ruling reads as a
-   rendering fault rather than as days outside the month. */
-.rec-day-outside { background: transparent; }
-.rec-day-outside .rec-day-num { color: var(--text-tertiary); }
-/* Today cannot be a border colour any more (a cell no longer draws all four
-   edges), so it is an inset outline: drawn inside the cell, adds no layout, and
-   cannot be covered by a neighbour's shared line. */
-.rec-day-today {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: -2px;
-}
-
 .rec-day-num {
-    font-family: var(--font-mono);
-    font-size: var(--size-small);
-    color: var(--text-secondary);
+    margin-inline-start: auto;
+    line-height: 24px;
     font-variant-numeric: tabular-nums;
-    font-weight: var(--weight-bold);
 }
+.rec-day-outside .rec-day-num { color: var(--ant-color-text-disabled); }
 
+/* Room for two chips and the "+n more" under them (36 + 4 + 36 + 4 + 16), so
+   a busy day does not change its week's height until it is expanded. */
 .rec-day-occs {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
     min-width: 0;
+    min-height: 96px;
+    padding-bottom: 4px;
 }
 
-/* ─── Add-here button ─────────────────────────────────────────────────────── */
-/* The day cell's "+", opposite its number. Adding a schedule by hand is tied to
-   a date, so the control sits on the date: the cell the pointer is in supplies
-   the day, and the dialog opens with it pre-filled.
-   Absolutely positioned so 31 of these take no space in the layout: the grid's
-   spacing is set by the chips, and a permanent gutter for a mostly invisible
-   button would change it.
-   Hidden until the cell is hovered — a + on all 42 cells at rest would compete
-   with every chip on the page — and `pointer-events` follows the opacity so an
-   invisible one cannot be clicked. Keyboard users do not have hover:
-   :focus-visible reveals it the same way, which is why the focus ring is here
-   next to the rule that makes it visible rather than in buttons.css. */
+/* The day's + (Ant's small text icon button), shown while the day is hovered
+   or the button has keyboard focus; it is the keyboard way to the same thing
+   the day's empty space does. */
 .rec-day-add {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-tertiary);
-    cursor: pointer;
+    color: var(--ant-color-icon);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.15s ease, background 0.12s ease, color 0.12s ease;
+    transition: opacity var(--ant-motion-mid), background-color var(--ant-motion-mid);
 }
-.rec-day-add svg { width: 14px; height: 14px; }
-
 .rec-day:hover .rec-day-add,
 .rec-day-add:focus-visible {
     opacity: 1;
     pointer-events: auto;
 }
-
-/* Same one-rung-up fill the chips and the "+n more" toggle use for hover, so
-   pointing at the button reads as the same kind of response everywhere on the
-   grid. */
-.rec-day-add:hover {
-    background: var(--surface3);
-    color: var(--text-primary);
-}
-.rec-day-add:active { color: var(--accent-primary); }
-.rec-day-add:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 1px;
-}
-
-/* No hover to reveal it on a touch screen, so it just stays out. */
+/* No hover on a touch screen, so it just stays out. */
 @media (hover: none) {
     .rec-day-add { opacity: 1; pointer-events: auto; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .rec-day-add { transition: none; }
-}
-
-/* ─── Occurrence chip ─────────────────────────────────────────────────────── */
-/* The schedule's home on the page: the merchant avatar, the name, and the
-   amount that actually applies to THIS date, on a tile tinted by DIRECTION.
-   Reading a chip answers "what is this and how much", and reading the month
-   answers "what is going out" without reading any chip at all. A chip is a
-   button: pressing it opens that schedule's editor, so the surface the schedule
-   is read on is the surface it is changed from. The cadence and the due date
-   stay the rail's columns — a day cell has no room for them. */
-.rec-occ {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    width: 100%;
-    min-width: 0;
-    /* A day cell can get narrow (zoomed in, or a small window): the name
-       ellipses first, then the amount, and nothing escapes the cell. */
-    overflow: hidden;
-    padding: 4px 6px;
-    /* A rounded tile carrying its DIRECTION's colour — income green, expense
-       red, transfer blue, the same trio the amounts and the detection picker
-       already use. It used to be the accent fill of a
-       primary button, which made every chip on the grid the same colour and
-       spent the page's one loudest treatment on saying nothing; direction is
-       the thing a month of chips is actually read for ("what is going out this
-       week"), so it is what the colour carries now, and a glance at the month
-       separates money in from money out before a single label is read.
-       The fill is the stone at full strength, matching the Gemstone graph
-       palette, with white labels on top. The hue is held in a custom property
-       so the fill and the hover both derive from the one direction token
-       below.
-       Still no border: one would take ~12px out of the one field that has none
-       to spare — the merchant name, which is already ellipsing in a narrow cell.
-       The tint carries the tile on its own.
-       box-sizing is explicit rather than left to the UA's border-box default for
-       buttons: width:100% on a content-box chip puts the side padding OUTSIDE
-       the cell, and every chip spills ~12px over its day's right edge. */
-    --rec-chip-hue: var(--rec-chip-expense);
-    box-sizing: border-box;
+/* "+n more" / "Show less": a small text link under the chips. Nothing may sit
+   permanently out of reach behind it. */
+.rec-day-more {
+    align-self: flex-start;
+    margin-inline-start: -4px;
+    padding: 0 4px;
     border: 0;
-    /* A button's UA centring would centre a short merchant name in the space the
-       ellipsis is measured against; the chip's labels align left like the
-       rail's. */
-    text-align: left;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    line-height: 16px;
     cursor: pointer;
-    border-radius: 6px;
-    background: var(--rec-chip-hue);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    transition: background 0.12s ease;
+    transition: color var(--ant-motion-mid);
+}
+.rec-day-more:hover { color: var(--ant-color-primary); }
+.rec-day-more:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 1px;
 }
 
-/* The one direction switch: everything else on the chip reads --rec-chip-hue. */
-.rec-occ-income   { --rec-chip-hue: var(--rec-chip-income); }
-.rec-occ-expense  { --rec-chip-hue: var(--rec-chip-expense); }
-.rec-occ-transfer { --rec-chip-hue: var(--rec-chip-transfer); }
 
-/* The chip fills are the Gemstone graph palette's stones at full strength
-   (themes.css): emerald for income, garnet for expense, lapis for transfer.
-   Copied as hex rather than read from --chart-*, because those tokens only hold
-   the stones while the Gemstone graph palette is selected, and the chips use
-   them under every palette. Light and dark are the two sets themes.css picks
-   for each surface; keep them in step if the stones are ever re-picked. */
+/* ─── Occurrence chip ───────────────────────────────────────────────────────
+   The schedule's name over its amount, on a tile tinted by DIRECTION, so a
+   glance at the month separates money in from money out before a label is
+   read. The fills are deep stones — emerald, garnet, lapis — fixed as hex
+   because the chips use them under every graph palette. They are deep enough
+   to carry white text. */
 :root {
     --rec-chip-income:   #099e71;   /* emerald */
     --rec-chip-expense:  #b00d14;   /* garnet */
@@ -606,439 +199,366 @@ html[data-theme="dark"] {
     --rec-chip-transfer: #3365cc;
 }
 
-/* The avatar keeps the merchant's deterministic colour and initials (the same
-   circle the ledger and the rail draw — avatar.js / ui.css), scaled to chip size
-   and otherwise unchanged. It used to carry a direction-coloured RING, from when
-   the tile was one flat accent and the ring was the only place direction could
-   be shown; the tile carries direction now, so the ring duplicated it in a much
-   smaller area, at ~2-3:1 contrast against the fill. It was removed: the circle
-   identifies the merchant and renders identically here, in the ledger and in
-   the rail. */
-.rec-occ .avatar-circle {
-    width: 18px;
-    height: 18px;
-    font-size: 8px;
+.rec-occ {
+    --rec-chip-hue: var(--rec-chip-expense);
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 2px 8px;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: var(--rec-chip-hue);
+    color: #fff;
+    font-size: var(--ant-font-size-sm);
+    line-height: 16px;
+    text-align: start;
+    cursor: pointer;
+    transition: background-color var(--ant-motion-mid);
 }
+.rec-occ-income   { --rec-chip-hue: var(--rec-chip-income); }
+.rec-occ-expense  { --rec-chip-hue: var(--rec-chip-expense); }
+.rec-occ-transfer { --rec-chip-hue: var(--rec-chip-transfer); }
 
-/* A merchant name is drawn the same way wherever it appears, so this is the
-   LEDGER's treatment: --weight-regular in --font-menu, which is what a
-   description cell inherits from .tx-row td + .tx-col-description
-   (transactions.css). Only the size and colour differ: a day cell is not a
-   table row, and the label sits on a solid stone fill, so it is white.
-   The amount below keeps its own weight — it is the one label on the chip that
-   is not a merchant name, and the ledger gives its amount column a face of its
-   own too. Neither label fades: they used to (name 100% / amount 82%, projected
-   72%) to rank them, and at this size a faded label reads as washed-out rather
-   than as a quieter one. Rank is carried by order and the numeric face. */
-.rec-occ-name {
-    flex: 1;
+/* Both lines ellipse inside a narrow day; neither fades, since a faded label
+   at this size reads as washed out rather than as a quieter one. A projected
+   charge says so in its tooltip instead (the rec-occ-projected class stays as
+   the hook). */
+.rec-occ-name,
+.rec-occ-amount {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: var(--weight-regular);
-    color: #fff;   /* on a solid stone fill in both themes */
 }
-/* A projected charge is NOT stepped back on the grid: dimming its name was the
-   same washed-grey problem as above, and it cost the chip the one thing a label
-   has at this size. The chip's tooltip says "(projected)" instead. The class
-   stays on the element as the hook it always was. */
-
-/* The amount is white like the name: the tile's solid fill already carries
-   the direction, so a coloured number on it would add nothing. */
 .rec-occ-amount {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-family: var(--font-numeric);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-bold);
+    font-weight: var(--ant-font-weight-strong);
     font-variant-numeric: tabular-nums;
-    color: #fff;
 }
 
-/* Every state deepens the chip's own hue rather than switching to another
-   colour: a shared neutral or accent would take the direction colour off every
-   chip it touched. They are one ladder toward black — hover 10%, marked 20%,
-   pressed 30% — so the steps read in order on a tile this small (a few percent
-   would not be visible at all) and the white labels only ever gain contrast.
-
-   .rec-occ-active is the MARKED state, not a pointer state: recurring.js sets it
-   on every chip of the schedule the rail is pointing at, so a monthly bill shows
-   its whole run across the month at once. It outranks hover so the run stays
-   readable while the pointer crosses it. */
-.rec-occ:hover {
-    background: color-mix(in srgb, var(--rec-chip-hue) 90%, #000);
-}
+/* Every state deepens the chip's own hue: hover, then marked, then pressed, so
+   the white text only ever gains contrast. MARKED (.rec-occ-active) is every
+   chip of the schedule the list is pointing at, so a monthly bill shows its
+   whole run at once; it outranks hover so the run stays readable while the
+   pointer crosses it. */
+.rec-occ:hover { background: color-mix(in srgb, var(--rec-chip-hue) 88%, #000); }
 .rec-occ-active,
 .rec-occ-active:hover {
-    background: color-mix(in srgb, var(--rec-chip-hue) 80%, #000);
+    background: color-mix(in srgb, var(--rec-chip-hue) 76%, #000);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
 }
-.rec-occ:active,
-.rec-occ-active:active {
-    background: color-mix(in srgb, var(--rec-chip-hue) 70%, #000);
-}
-/* The focus ring is white, not --accent-primary like the rest of the page: the
-   accent is a muted teal and it sits on a saturated stone here, which is about
-   1.6:1 against garnet and less against emerald. White is the chip's own label
-   colour and clears the 3:1 bar for a UI boundary on all three stones.
-   Offset inward because an outline drawn outside a chip lands on the day cell's
-   edge and on the chip below it, 3px away (.rec-day-occs). */
+.rec-occ:active { background: color-mix(in srgb, var(--rec-chip-hue) 68%, #000); }
+/* White and inset: the accent on a saturated stone is near 1.6:1, and a ring
+   outside the chip would land on the chip below it. */
 .rec-occ:focus-visible {
     outline: 2px solid #fff;
     outline-offset: -2px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .rec-occ { transition: none; }
-}
 
-/* Overflow toggle. A button, not a label: the calendar is the only way to
-   reach a schedule now, so nothing may sit permanently hidden behind it. */
-.rec-day-more {
-    align-self: flex-start;
-    border: none;
-    background: transparent;
-    padding: 1px 4px;
-    border-radius: 4px;
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    color: var(--text-tertiary);
-    cursor: pointer;
-}
-.rec-day-more:hover { background: var(--surface3); color: var(--text-primary); }
-
-/* ─── Amounts by direction ──────────────────────────────────────────────────
-   Same red/green/blue mapping the calendar chips use (see .rec-occ above). There
-   is no legend, so this colour pairing is what conveys direction, and it is used
-   on every surface showing an amount, the month totals and the detection
-   picker's rows alike. Transfer reuses the ledger's transfer colour
-   (--accent-info, see transactions.css .tx-amount-transfer) rather than
-   red/green, since it is neither a gain nor a
-   spend. */
-.rec-amount-expense  { color: var(--accent-negative); }
-.rec-amount-income   { color: var(--accent-positive); }
-.rec-amount-transfer { color: var(--accent-info); }
-
-/* ─── Detection picker ──────────────────────────────────────────────────────
-   The rail's "Detect Schedules" dialog is the shared multi-select dialog
-   (picker.css, .pick-*); only the amount colours below are this page's. */
-
-/* Every checkbox this page draws, in one place: the page's and the editor's.
-   accent-color, like every other checkbox in the app
-   (the DB modal's, the ledger's row checkboxes) — the browser default blue
-   belongs to no theme here. The picker's checkboxes are styled in picker.css. */
-.rec-page input[type="checkbox"],
-.rec-edit-dialog input[type="checkbox"] {
-    accent-color: var(--accent-primary);
-    width: 15px;
-    height: 15px;
-    flex: 0 0 auto;
-    cursor: pointer;
-}
-
-/* Nothing ticked → nothing to add, so the confirm button is disabled rather than
-   posting a request the backend would reject. The dimming and the cursor come
-   from the shared .button-primary:disabled rule (buttons.css), same as every
-   other disabled dialog button. */
-
-/* ─── The schedule editor ─────────────────────────────────────────────────── */
-/* One dialog for creating and for editing, and the only place a schedule is
-   changed. It replaced an edit mode inside the floating card the chips used to
-   open, which was one row wide: enough for a name, a type, a cadence and an
-   amount, and nowhere near enough for a repeat rule (a frequency, an interval, a
-   day or an nth weekday, an end date) plus the amount range. That card is gone
-   entirely now, and this dialog is what a rail row opens.
-
-   Wider than the app's other dialogs because the repeat block reads as a
-   sentence across a row — "every [2] [weeks] on [Friday]" — and stacking those
-   into a column turns one setting into three unrelated ones. */
-/* max-width too, like the other dialogs here: .confirm-dialog caps every dialog
-   at 340px, which is right for a confirm and half of what a repeat rule needs.
-   The side padding is a token because the section rules below are drawn edge to
-   edge and have to cancel exactly this much of it. */
-.rec-edit-dialog {
-    --rec-edit-pad-x: 28px;
-    width: 520px;
-    max-width: 100%;
-    padding: var(--space-20) var(--rec-edit-pad-x) var(--space-20);
-}
-
-/* .confirm-dialog p sets a margin, a colour and a size for dialog prose, and it
-   outranks a single class — so the editor's own paragraphs qualify themselves.
-   They are not prose: one is a title, one a section name, one a readout. */
-.rec-edit-dialog > .rec-edit-title {
-    margin: 0 0 var(--space-16);
-    color: var(--text-primary);
-    font-size: var(--size-body);
-}
-
-/* Full bleed, by cancelling the dialog's own side padding. A rule that stops
-   short of both edges reads as a divider inside one block; one that runs the
-   whole width reads as the join between two, which is what these are. */
-.rec-edit-rule {
-    height: 0;
-    border: 0;
-    border-top: var(--border-width) solid var(--border);
-    margin: var(--space-16) calc(var(--rec-edit-pad-x) * -1);
-}
-/* The action row sits on plain space, like every other dialog in the app — a
-   rule immediately above two buttons reads as a line drawn through them. */
-.rec-edit-dialog .confirm-actions { margin-top: var(--space-20); }
-
-/* Delete is pushed to the row's left edge and Save stays at the right, so the
-   destructive button is the dialog's width away from the one the user reaches
-   for on every other pass through this form. margin-right: auto rather than
-   space-between, because the creating form has no Delete and its Save must
-   still sit at the right. */
-.rec-edit-dialog .rec-edit-delete { margin-right: auto; }
-
-/* Two columns, with the fields that hold a sentence spanning both. Fixed rather
-   than auto-fit: a repeat row that rewraps as the mode changes moves every
-   control under the pointer mid-edit. */
-.rec-edit-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-12) var(--space-16);
-    align-items: end;
-}
-
-.rec-field {
+/* ─── The calendar as a list ────────────────────────────────────────────────
+   When the calendar card is too narrow for seven readable columns (a small
+   window, a big zoom) it becomes the month's days with something due, each
+   with its chips in full (recurring.js switches it by the card's width). */
+.rec-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    min-width: 0;
+    gap: 12px;
 }
-.rec-field-wide { grid-column: 1 / -1; }
-
-.rec-field-label {
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-    text-transform: uppercase;
+.rec-list-day {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.rec-list-date { font-weight: var(--ant-font-weight-strong); }
+.rec-list-today { color: var(--ant-color-primary); }
+.rec-list .rec-occ {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 12px;
+    font-size: var(--ant-font-size);
+    line-height: var(--ant-line-height);
 }
 
-/* Two controls that answer one question ("every [2] [months]", "on the [third]
-   [Friday]") sit on one line, so the pair reads as one answer. */
-.rec-field-pair {
+
+/* ─── The schedule list ─────────────────────────────────────────────────────
+   Every schedule, soonest due first: the merchant, its cadence and amount
+   under it, and the date it is next due with a dot in its direction's colour.
+   A row is the edit control for its schedule. Hovering one marks that
+   schedule's chips on the calendar; the row a save lands on stays marked. */
+.rec-rail > .ant-card-body { padding: 0; }
+
+/* Scrolls at about a full calendar's height, so thirty schedules do not run
+   the card far past the calendar it belongs to. */
+.rec-rail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 640px;
+    overflow-y: auto;
+    padding: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ant-color-fill) transparent;
+}
+
+.rec-rail-row {
     display: flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: 12px;
+    width: 100%;
     min-width: 0;
-}
-.rec-field-pair .rec-select-wrap { min-width: 0; flex: 1; }
-
-.rec-field-unit {
-    flex: 0 0 auto;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-
-/* Wide enough for three digits and no wider: it holds 1 to 120. Qualified by the
-   pair so it outranks .rec-dialog-input's width:100% wherever the two land in
-   this file. */
-.rec-field-pair .rec-input-interval { width: 72px; flex: 0 0 auto; }
-
-/* The mode control decides which field belongs here, so this cell is redrawn
-   rather than being three cells that take turns hiding. */
-.rec-edit-detail { min-width: 0; display: flex; }
-.rec-edit-detail .rec-field { flex: 1; min-width: 0; }
-
-/* One tick, and the date it reveals. Unticked there is no date field at all:
-   almost every schedule runs until it is cancelled, and a row of controls for
-   the rare case costs every user a decision. */
-.rec-edit-ends {
-    display: flex;
-    align-items: center;
-    gap: var(--space-12);
-    margin-top: var(--space-12);
-}
-.rec-edit-ends .rec-dialog-input { width: auto; flex: 1; min-width: 0; }
-.rec-edit-ends .rec-dialog-input[hidden] { display: none; }
-
-.rec-check {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-8);
+    padding: 8px;
+    border: 0;
+    border-radius: var(--ant-radius-lg);
+    background: transparent;
+    color: inherit;
+    text-align: start;
     cursor: pointer;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
+    transition: background-color var(--ant-motion-mid);
+}
+.rec-rail-row:hover { background: var(--ant-color-fill-tertiary); }
+.rec-rail-active,
+.rec-rail-active:hover { background: var(--ant-color-primary-bg); }
+.rec-rail-row:active { background: var(--ant-color-fill-secondary); }
+.rec-rail-row:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+
+.rec-rail-row .avatar-circle {
+    width: 28px;
+    height: 28px;
+}
+
+.rec-rail-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.rec-rail-name,
+.rec-rail-sub {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rec-rail-sub {
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    line-height: var(--ant-line-height-sm);
+}
+/* Over: its end date has passed. Listed until deleted, because a row that
+   vanished on its end date would read as data the app lost. */
+.rec-rail-ended .rec-rail-name { color: var(--ant-color-text-tertiary); }
+
+.rec-rail-next {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.rec-rail-date {
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-/* ─── The Name field ─────────────────────────────────────────────────────────
-   An avatar, the input, and the merchants the bundled lexicon matched.
+/* Direction, as the chips wear it. The row's accessible name carries the word. */
+.rec-dir-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--rec-chip-hue);
+}
+.rec-dir-income   { --rec-chip-hue: var(--rec-chip-income); }
+.rec-dir-expense  { --rec-chip-hue: var(--rec-chip-expense); }
+.rec-dir-transfer { --rec-chip-hue: var(--rec-chip-transfer); }
 
-   The avatar is the same circle the calendar chip and the rail row draw, from
-   the same function: it is a preview of the schedule, not decoration, so naming
-   a merchant the app ships an icon for shows that icon here before saving. */
+/* The page's two whole-list actions, under the list they act on. */
+.rec-rail-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-top: var(--ant-line-width) solid var(--ant-color-border-secondary);
+}
+
+
+/* ─── Amounts by direction ──────────────────────────────────────────────────
+   The detection table's amounts, in the trio the totals use. */
+.rec-amount-income   { color: var(--ant-color-success); }
+.rec-amount-expense  { color: var(--ant-color-error); }
+.rec-amount-transfer { color: var(--ant-color-info-text); }
+
+
+/* ─── The schedule editor ───────────────────────────────────────────────────
+   One dialog for creating and editing, and the only place a schedule is
+   changed. Two bands — what it is, and how it repeats — split by a rule, then
+   the end date, the rule read back with its next dates, and any error. Two
+   fixed columns rather than auto-fit: a repeat row that re-wrapped as the mode
+   changed would move every control under the pointer mid-edit. */
+.rec-edit-dialog .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.rec-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+}
+.rec-edit-band {
+    padding-top: 16px;
+    border-top: var(--ant-line-width) solid var(--ant-color-border-secondary);
+}
+
+/* The fields are Ant's Form.Item (ant.css); Name spans both columns. */
+.rec-field-wide { grid-column: 1 / -1; }
+
+/* The mode decides which control belongs here, so this cell is redrawn
+   rather than being three cells that take turns hiding. */
+.rec-edit-detail {
+    display: flex;
+    min-width: 0;
+}
+.rec-edit-detail .ant-form-item { flex: 1; }
+
+/* "Every [2] weeks": the field and its unit as one control. */
+.rec-input-interval { width: 80px; }
+
+/* One tick, and the date it reveals. */
+.rec-edit-ends {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--ant-control-height);
+}
+.rec-edit-ends .ant-input { width: 180px; }
+
+.rec-edit-footnote { color: var(--ant-color-text-tertiary); }
+.rec-edit-error { color: var(--ant-color-error); }
+.rec-edit-footnote[hidden],
+.rec-edit-error[hidden] { display: none; }
+
+/* Delete at the far left, the dialog's width from Save. */
+.rec-edit-delete { margin-inline-end: auto; }
+
+/* ─── The Name field ────────────────────────────────────────────────────────
+   An avatar, the input, and the merchants the bundled lexicon matched. The
+   avatar is the same circle the list draws, so naming a merchant the app ships
+   an icon for shows that icon before saving. */
 .rec-name-field { position: relative; }
-
 .rec-name-row {
     display: flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: 8px;
     min-width: 0;
 }
-.rec-name-row .rec-dialog-input { flex: 1; min-width: 0; }
-
-/* Fixed, so the input's left edge does not step sideways as the avatar swaps
-   between a brand icon and an initials circle. */
 .rec-name-avatar {
     display: flex;
-    flex: 0 0 auto;
+    flex: none;
+}
+.rec-name-avatar .avatar-circle {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
 }
 
-/* Over the fields below rather than pushing them down: the form is a fixed
-   shape, and a list that reflowed it would move the Type control out from under
-   the pointer on its way to being picked. */
+/* AutoComplete's dropdown, over the fields below rather than pushing them
+   down: a list that reflowed the form would move Type out from under the
+   pointer on its way to being picked. */
 .rec-suggest {
     position: absolute;
     top: 100%;
-    left: 0;
     right: 0;
+    left: 40px;   /* under the input, clear of the avatar */
     z-index: 3;
-    max-height: 244px;
+    max-height: 256px;
+    margin-top: 4px;
+    padding: 4px;
     overflow-y: auto;
-    margin-top: var(--space-4);
-    padding: var(--space-4);
-    border: var(--border-width) solid var(--border);
-    border-radius: 8px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-popover);
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
 }
 .rec-suggest[hidden] { display: none; }
 
 .rec-suggest-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
-    box-sizing: border-box;
-    padding: var(--space-8);
-    border: none;
-    border-radius: 6px;
-    background: none;
-    text-align: left;
+    min-height: 32px;
+    padding: 4px 12px;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: transparent;
+    color: var(--ant-color-text);
+    text-align: start;
     cursor: pointer;
 }
-/* One highlight for both ways in: the pointer and the arrow keys mark the row
-   the same, so Enter always takes what the user is looking at. */
+/* One highlight for both ways in, so Enter takes what the user is looking at. */
 .rec-suggest-row:hover,
-.rec-suggest-row.rec-suggest-active { background: var(--surface3); }
-.rec-suggest-row:active { background: var(--frost-3); }
-
+.rec-suggest-active { background: var(--ant-color-fill-tertiary); }
+.rec-suggest-row .avatar-circle {
+    width: 20px;
+    height: 20px;
+    font-size: 9px;
+}
 .rec-suggest-name {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    font-weight: var(--weight-medium);
 }
 
-/* The rule the controls above currently describe, in one line. A readout, not a
-   caption: it says what is set, and it is the only way to check an nth-weekday
-   rule without saving it and looking at the calendar.
-   On its own tinted strip, so it reads as the form's answer rather than as one
-   more line of the form. */
-/* Blue, not the UI accent: the accent is user-swappable and is the colour of
-   things to press, while this is a notice about what the form currently says.
-   --accent-info is the app's one informational blue (the transfer pill, the
-   transfer chart series); --accent-info-light is its lighter step, which is what
-   a 4px stripe wants — the deep light-theme value exists to clear AA as TEXT,
-   and nothing here is text. The wash is the same blue at 12%, so the strip is
-   tinted by the stripe rather than by a neutral grey beside it. */
-.rec-edit-dialog > .rec-edit-readout {
-    margin: var(--space-16) 0 0;
-    padding: var(--space-8) var(--space-16);
-    border-radius: 6px;
-    border-left: 4px solid var(--accent-info-light);
-    background: color-mix(in srgb, var(--accent-info-light) 12%, transparent);
-    /* The stripe's blue, carried into the text so the strip reads as one thing.
-       --accent-info rather than the -light step the stripe uses, because this IS
-       text: the two are the same value in the dark theme, and the light theme's
-       deeper step is what clears AA at 13px on a wash this pale (3.4:1 against
-       5.8:1). A stripe has no such floor to meet, which is why they differ. */
-    color: var(--accent-info);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    font-weight: var(--weight-bold);
-    line-height: var(--lh-normal);
+
+/* ─── Detect schedules ──────────────────────────────────────────────────────
+   The series detection found, as a table with row selection. */
+.rec-detect-dialog .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
-
-/* Shared by every dialog on this page: the editor and the picker.
-
-   The <select> gets the same box as the text inputs beside it, plus the app's
-   own caret in place of the platform's. appearance:none is what makes that
-   possible, and without it these read as raw browser controls sitting next to
-   fields that do not — which is precisely how they looked while this block was
-   missing. The glyph is the shared Phosphor caret-down (.picker-caret, ui.css),
-   the same one the report pickers, the group chevrons and the ledger's row
-   selects carry, so every caret in the app is one drawing. */
-.rec-select {
-    width: 100%;
-    box-sizing: border-box;
-    height: var(--control-height);
-    background: var(--frost-2);
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    /* Room on the right for the caret painted over it. */
-    padding: 4px 28px 4px 10px;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-body);
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-.rec-select:hover { background: var(--frost-3); }
-.rec-select:focus { border-color: var(--accent-primary); outline: none; }
-/* The menu itself is the platform's, and only its colours can be set. Without
-   these it opens white-on-white in the dark themes. */
-.rec-select option { background: var(--surface1); color: var(--text-primary); }
-
-/* A <select> cannot hold a child element, so the caret is a SIBLING in a
-   positioned wrapper rather than a background-image on the control — the same
-   arrangement the ledger's row selects use (transactions.css .tx-select-wrap),
-   for the same reason. The caret is painted over the control and would
-   otherwise eat the click that opens the menu; .picker-caret already sets
-   pointer-events:none, and the z-index states the stacking rather than leaving
-   it to source order. */
-.rec-select-wrap {
-    position: relative;
-    display: block;
-    width: 100%;
+.rec-detect-dialog .ant-table { min-width: 640px; }
+.rec-detect-dialog tbody tr { cursor: pointer; }
+.rec-detect-dialog .rec-col-cadence { width: 120px; }
+.rec-detect-dialog .rec-col-amount { width: 120px; }
+.rec-detect-dialog .rec-col-next { width: 100px; }
+.rec-detect-dialog .rec-col-confidence { width: 140px; }
+.rec-cand-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     min-width: 0;
-    color: var(--text-primary);
 }
-.rec-select-wrap .picker-caret { z-index: 1; }
-
-.rec-dialog-input {
-    width: 100%;
-    box-sizing: border-box;
-    height: var(--control-height);
-    background: var(--frost-2);
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    padding: 4px 10px;
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-body);
-    caret-color: var(--frost-caret);
+.rec-cand-name .avatar-circle {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
 }
-.rec-dialog-input:focus { border-color: var(--accent-primary); outline: none; }
+.rec-cand-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rec-cand-amount,
+.rec-cand-next {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
 
-.rec-dialog-input.invalid,
-.rec-select.invalid {
-    border-color: var(--accent-negative);
+
+@media (prefers-reduced-motion: reduce) {
+    .rec-day-inner,
+    .rec-day-add,
+    .rec-occ,
+    .rec-rail-row { transition: none; }
 }

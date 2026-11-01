@@ -192,48 +192,43 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    font-family: var(--font-h3);
+    font-family: var(--ant-font-family, var(--font-h3));
     font-size: 11px;
-    font-weight: var(--weight-bold);
+    font-weight: 400;
+    line-height: 1;
     letter-spacing: var(--track-normal);
     user-select: none;
     flex-shrink: 0;
-    color: var(--avatar-ink);
 }
 
-/* 8 fixed slots off the merchant spectrum (--spectrum-* in style.css, which
-   also documents how the hues were picked). The values used to live here; they
-   moved to the token file when the Reports charts started drawing categories
-   from the same eight hues, so a category's line on the Spending chart and its
-   merchants' avatars in the ledger come from one list.
+/* 10 fixed slots, the way the Ant Design artifact draws them: an Ant preset
+   hue's step 2 (a light tint) as the disc and the same hue's step 8 (a deep
+   shade) as the initials, so the text is always a darker version of its own
+   disc. The values are Ant's own palette steps (@ant-design/colors), fixed
+   rather than derived from the theme, so a merchant keeps its hue under every
+   accent and theme. Ant's dark algorithm runs the same two steps the other way:
+   a deep, muted disc under a light initial of the same hue. */
+.avatar-circle-0 { background: #bae0ff; color: #003eb3; } /* blue */
+.avatar-circle-1 { background: #b5f5ec; color: #006d75; } /* cyan */
+.avatar-circle-2 { background: #d9f7be; color: #237804; } /* green */
+.avatar-circle-3 { background: #fff1b8; color: #ad6800; } /* gold */
+.avatar-circle-4 { background: #ffd8bf; color: #ad2102; } /* volcano */
+.avatar-circle-5 { background: #ffd6e7; color: #9e1068; } /* magenta */
+.avatar-circle-6 { background: #efdbff; color: #391085; } /* purple */
+.avatar-circle-7 { background: #d6e4ff; color: #10239e; } /* geekblue */
+.avatar-circle-8 { background: #f4ffb8; color: #5b8c00; } /* lime */
+.avatar-circle-9 { background: #ffe7ba; color: #ad4e00; } /* orange */
 
-   An avatar paints the colour as a FILL with initials on top, so it takes the
-   PALE step here and the MID step on dark — the reverse of the charts, which
-   paint it as ink on the page (see --cat-* in style.css). Every swatch in a
-   theme lands at the same lightness, so one ink colour per theme covers all 8
-   instead of a per-swatch pick. */
-.avatar-circle-0 { background: var(--spectrum-pale-1); } /* blue */
-.avatar-circle-1 { background: var(--spectrum-pale-2); } /* orange */
-.avatar-circle-2 { background: var(--spectrum-pale-3); } /* aqua */
-.avatar-circle-3 { background: var(--spectrum-pale-4); } /* yellow */
-.avatar-circle-4 { background: var(--spectrum-pale-5); } /* magenta */
-.avatar-circle-5 { background: var(--spectrum-pale-6); } /* green */
-.avatar-circle-6 { background: var(--spectrum-pale-7); } /* violet */
-.avatar-circle-7 { background: var(--spectrum-pale-8); } /* red */
-
-/* Dark mode steps the same 8 hues to the muted mid-tone (not a separate
-   palette) — pastel-light would glow against a near-black background, the
-   opposite of "desaturated"; a darker, less saturated step reads as calm there
-   instead. Ink flips to white for all 8 (see above for why one ink suffices). */
-html[data-theme="dark"] .avatar-circle { color: var(--avatar-ink-dark); }
-html[data-theme="dark"] .avatar-circle-0 { background: var(--spectrum-mid-1); }
-html[data-theme="dark"] .avatar-circle-1 { background: var(--spectrum-mid-2); }
-html[data-theme="dark"] .avatar-circle-2 { background: var(--spectrum-mid-3); }
-html[data-theme="dark"] .avatar-circle-3 { background: var(--spectrum-mid-4); }
-html[data-theme="dark"] .avatar-circle-4 { background: var(--spectrum-mid-5); }
-html[data-theme="dark"] .avatar-circle-5 { background: var(--spectrum-mid-6); }
-html[data-theme="dark"] .avatar-circle-6 { background: var(--spectrum-mid-7); }
-html[data-theme="dark"] .avatar-circle-7 { background: var(--spectrum-mid-8); }
+html[data-theme="dark"] .avatar-circle-0 { background: #021636; color: #64a8f2; }
+html[data-theme="dark"] .avatar-circle-1 { background: #022627; color: #57d0c8; }
+html[data-theme="dark"] .avatar-circle-2 { background: #0e2803; color: #8ed35f; }
+html[data-theme="dark"] .avatar-circle-3 { background: #352202; color: #f2cb61; }
+html[data-theme="dark"] .avatar-circle-4 { background: #350e03; color: #f29469; }
+html[data-theme="dark"] .avatar-circle-5 { background: #310720; color: #f27eb6; }
+html[data-theme="dark"] .avatar-circle-6 { background: #15072b; color: #aa79df; }
+html[data-theme="dark"] .avatar-circle-7 { background: #070e31; color: #7e9df2; }
+html[data-theme="dark"] .avatar-circle-8 { background: #1f2d01; color: #c8e65c; }
+html[data-theme="dark"] .avatar-circle-9 { background: #351b02; color: #f2b664; }
 
 /* Brand-icon variants. A logo carries its own colour, so these slots use none of
    the eight above; the shared circle is what keeps a column of merchants reading
@@ -303,7 +298,7 @@ html[data-theme="dark"] .avatar-circle-7 { background: var(--spectrum-mid-8); }
     top: calc(100% + 4px);
     right: 0;
     /* Right-aligned by default — suits the ⋮ openers near the right edge. The
-     * stepper pickers (Statements year, Dashboard month) sit at the far left of the
+     * stepper pickers (the Dashboard's month) sit at the far left of the
      * page instead, where their narrow button hugs the .page overflow edge next
      * to the sidebar; a right-aligned menu would spill left off that scroll box
      * and be clipped under the nav. Left-align them so they open into the page.
@@ -336,17 +331,6 @@ html[data-theme="dark"] .avatar-circle-7 { background: var(--spectrum-mid-8); }
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
-}
-
-/* Stepper pickers open centered under the ‹ label › cluster: the opener is the
- * middle label button, flanked by equal arrow buttons, so centering on the
- * stepper container places the menu centred below the label. (This also avoids
- * the right-aligned default overflowing the .page scroll box's left edge — see
- * the note on .p-table-dropdown above.) */
-.stepper .p-table-dropdown {
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%);
 }
 
 .p-dropdown-item, .range-selector-menu button {
@@ -383,112 +367,6 @@ html[data-theme="dark"] .avatar-circle-7 { background: var(--spectrum-mid-8); }
 
 .rep-panel[hidden], .stmt-panel[hidden] { display: none; }
 .rep-panel:focus, .stmt-panel:focus { outline: none; }
-
-/* ─── Segmented tab control + toolbar row ───────────────────────────────────
- * Shared by Statements (.stmt-*), Reports (.rep-*), the manager modal's panel
- * switch (.mgr-*, built by openManagerModal in tables.js — the track sits in
- * the modal rather than on a toolbar row, but it is the same control doing the
- * same job) and the Dashboard (.dash-*): its layout tabs on the toolbar row and
- * the Widgets / Settings switch in its customize panel.
- * Moved here from statements.css when Dashboard adopted it.
- *
- * The tabs are a segmented control: an unbordered grey track holding both
- * labels, with the active one filled in the accent — the same fill/text pair
- * .button-primary uses (buttons.css), so a selected tab reads as a sibling of
- * the page's primary action. The track hugs its content.
- *
- * The toolbar row layouts differ per page and live in each page's stylesheet:
- * Statements (statements.css) pins its year stepper dead-center between the
- * tabs and the actions; Dashboard (dashboard.css) has no tab bar — its month
- * stepper sits on the Month to Month section's heading row. */
-
-/* The stepper is display:flex, which overrides the UA's
- * [hidden] { display: none }, so it is restated at author level for any page
- * that hides one. */
-.stepper[hidden] { display: none; }
-
-.stmt-tabs, .rep-tabs, .mgr-tabs, .dash-tabs {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px;
-    background: var(--segctl-track);
-    /* Rounded rectangle, not a pill. The radius is concentric with the
-       segments inside it: 8px segment + the 4px track padding = 12px, so the
-       track's inner edge runs parallel to a segment's corner instead of
-       cutting across it. */
-    border-radius: 12px;
-    /* The card elevation, the same one .dashboard-card / .db-wrapper take — the
-       track is the one raised surface on the toolbar row, so it sits at the same
-       height as the cards below it rather than lying flat against the page. */
-    box-shadow: var(--shadow-card);
-}
-
-/* Type + box tokens mirror the action-button shape (buttons.css) — same
-   32px control height, uppercase micro type — so the segments read as
-   siblings of the other 32px controls across the row. */
-.stmt-tab, .rep-tab, .mgr-tab, .dash-tab {
-    appearance: none;
-    background: transparent;
-    /* Transparent hairline reserves the active tab's border so the label never
-       shifts when selection lands (buttons must stand still). */
-    border: 1px solid transparent;
-    /* 8px, the action-button radius (buttons.css) — the fill/type tokens
-       already mirror .button-primary, so the corner matches now too. */
-    border-radius: 8px;
-    box-sizing: border-box;
-    height: var(--control-height);
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-superbold);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
-    white-space: nowrap;
-    padding: var(--space-8) var(--space-16);
-    cursor: pointer;
-    /* border-color rides the same 0.15s as the fill — left off this list it
-       snapped to the accent a beat ahead of the background on selection. (The
-       box-shadow that used to be here went with the raised-card active state.) */
-    transition: color 0.15s, background 0.15s, border-color 0.15s;
-}
-
-/* One stop along the base ramp from the track, rather than a translucent frost
-   tint — an opaque rung reads the same wherever the toolbar sits. */
-.stmt-tab:hover, .rep-tab:hover, .mgr-tab:hover, .dash-tab:hover {
-    color: var(--text-primary);
-    background: var(--segctl-hover);
-}
-
-/* No weight bump on active — a bolder label is wider, and in a content-hugging
-   track that width change would shove the sibling tab sideways. The accent fill
-   carries the selected state on its own. */
-.stmt-tab.active, .stmt-tab[aria-selected="true"],
-.rep-tab.active, .rep-tab[aria-selected="true"],
-.mgr-tab.active, .mgr-tab[aria-selected="true"],
-.dash-tab[aria-selected="true"] {
-    color: var(--segctl-active-text);
-    background: var(--segctl-active);
-    border-color: var(--segctl-active);
-}
-
-.stmt-tab:focus-visible, .rep-tab:focus-visible, .mgr-tab:focus-visible, .dash-tab:focus-visible {
-    outline: 2px solid var(--color-accent-400);
-    outline-offset: -2px;
-}
-
-/* Inset on an accent fill, the accent ring vanishes — draw the active tab's
-   ring in the label colour instead. */
-.stmt-tab.active:focus-visible, .stmt-tab[aria-selected="true"]:focus-visible,
-.rep-tab.active:focus-visible, .rep-tab[aria-selected="true"]:focus-visible,
-.mgr-tab.active:focus-visible, .mgr-tab[aria-selected="true"]:focus-visible,
-.dash-tab[aria-selected="true"]:focus-visible {
-    outline-color: var(--segctl-active-text);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .stmt-tab, .rep-tab, .mgr-tab, .dash-tab { transition: none; }
-}
 
 /* ─── Segmented switch ────────────────────────────────────────────────────────
    The two-option switch: one accent-bordered frame, the chosen half FILLED and
@@ -553,49 +431,6 @@ html[data-theme="dark"] .avatar-circle-7 { background: var(--spectrum-mid-8); }
 .p-dropdown-item-selected {
     color: var(--text-primary);
     font-weight: var(--weight-semibold);
-}
-
-/* ─── Stepper (‹ label ›) ──────────────────────────────────────────────────
- * Prev/label/next picker — Dashboard's month stepper and Statements' year
- * stepper. Moved here from dashboard.css when Statements began using it. The
- * label is a button: clicking it opens a UI.openMenu picker, and it shares its
- * rules with the range selector (see below). */
-.stepper {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* Each menu-opener gets a positioned slot, so a stepper with more than one
- * picker (the Dashboard's year + month pair) anchors each menu under its own
- * button rather than under the whole ‹ › cluster — UI.openMenu mounts into the
- * opener's parent, and .stepper .p-table-dropdown centers on that positioned
- * parent. A single-picker stepper needs no wrapper: the .stepper is the slot,
- * and centering on it places the menu under the single label. */
-.stepper-picker {
-    position: relative;
-    display: flex;
-}
-
-/* The arrows wear .button-primary (buttons.css) for fill/hover/press/disabled;
- * this override only squares the box, undoing the eyebrow padding. Compound
- * selector so it outranks .button-primary, which loads later.
- * The glyphs are Phosphor caret-left/caret-right (static/icons/Phosphor),
- * inlined in the markup like every other icon here — they used to be the ‹ ›
- * text entities, which meant the arrows were typography and drifted from the
- * caret the label below draws. */
-.stepper-btn.button-primary {
-    width: var(--control-height);
-    padding: 0;
-}
-
-/* 14px matches the other small glyphs (.tx-desc-chevron) and keeps the caret
- * from crowding the 32px button. currentColor inherits .button-primary's
- * --button-text, so the fill tracks hover/disabled with no extra rule. */
-.stepper-btn-icon {
-    width: 14px;
-    height: 14px;
-    flex: none;
 }
 
 /* The toolbar control box, shared by the stepper label, the range selector

@@ -122,10 +122,17 @@ app.whenReady().then(async () => {
       await js(`document.getElementById('rec-name-input').value`) === 'Netflix',
       await js(`document.getElementById('rec-name-input').value`));
 
-    const readout = await js(`(function(){ const r=getComputedStyle(document.getElementById('rec-edit-readout'));
-      return { border: r.borderLeftWidth + ' ' + r.borderLeftColor, bg: r.backgroundColor }; })()`);
-    check('the cadence readout has a 4px blue stripe and a blue wash',
-      readout.border.startsWith('4px'), readout);
+    // The readout is Ant's info Alert: the rule as a sentence over the next
+    // dates it falls on, which the backend answers once the form settles.
+    const readout = await js(`(function(){ const el=document.getElementById('rec-edit-readout'); const r=getComputedStyle(el);
+      return { info: el.classList.contains('ant-alert-info'), border: r.borderTopWidth, bg: r.backgroundColor,
+        rule: document.getElementById('rec-readout-rule').textContent,
+        next: document.getElementById('rec-readout-next').textContent }; })()`);
+    check('the cadence readout is an info alert, bordered and tinted',
+      readout.info && readout.border === '1px' && readout.bg !== 'rgba(0, 0, 0, 0)', readout);
+    check('it reads the rule back as a sentence',
+      /^Every month on the \d+(st|nd|rd|th)\.$/.test(readout.rule), readout);
+    check('and lists the next three dates', /^Next: .+, .+, .+$/.test(readout.next), readout);
     console.log('   readout:', JSON.stringify(readout));
   } catch (err) {
     console.error('FAIL —', err && err.message);

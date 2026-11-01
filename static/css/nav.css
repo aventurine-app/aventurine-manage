@@ -1,4 +1,10 @@
 /* == Menu Styles == */
+:root {
+    /* The collapse's motion, the same 200ms ease-in-out as Prism's menu. */
+    --nav-duration: 0.2s;
+    --nav-ease: cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
 /* Uses --surface1, --border */
 div.menu {
     background-color: var(--surface1);
@@ -7,13 +13,20 @@ div.menu {
     padding: var(--space-12);       /* The space between the left and right edges of the menu and the items */
     padding-top: var(--space-4);
     left: 0px;
-    min-width: 190px;
-    max-width: 180px;
+    /* 190px of items + the 12px padding either side. An explicit width (rather
+       than the old min-width) so the collapse below can animate it. */
+    width: 214px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    transition: width var(--nav-duration) var(--nav-ease);
     /* The sidebar stretches to the height of .body_container (which clips its
        own overflow). When the user zooms in far enough that the nav items
        exceed that height, scroll the sidebar itself rather than clipping the
        lower links. Match the frosted thin scrollbar used by .page / modals. */
     overflow-y: auto;
+    /* Clips the labels as the sidebar narrows (overflow-y: auto alone would
+       turn this into a horizontal scrollbar). */
+    overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: var(--border) var(--surface1);
     /* A column, so the File / Settings list can sit at the bottom
@@ -156,7 +169,40 @@ li {
     transform: rotate(180deg);
 }
 
+/* ── Collapsed: a rail of icons ─────────────────────────────────────────────
+   html.has-rail is set before first paint (theme-init.js) and kept in step by
+   nav.js. Collapsing only narrows the sidebar: the icons do not move or change
+   size (the rail is exactly the icon plus the sidebar's and the link's own
+   padding, so each icon stays where it was), and the labels are clipped by the
+   narrowing sidebar while they fade. The page beside it simply gets the width,
+   so it follows the animation frame by frame instead of jumping at the end. */
+html.has-rail div.menu {
+    width: calc(4 * var(--space-12) + 1.25em);
+}
+
+.nav-label {
+    white-space: nowrap;
+    transition: opacity var(--nav-duration) var(--nav-ease);
+}
+
+.nav li button svg.nav-caret {
+    transition: transform 200ms ease, opacity var(--nav-duration) var(--nav-ease);
+}
+
+html.has-rail .nav-label,
+html.has-rail .nav li button svg.nav-caret {
+    opacity: 0;
+}
+
+/* Keeps a label's overflow inside the link, where the narrowing sidebar clips it. */
+.nav li a,
+.nav li button {
+    overflow: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
+    div.menu,
+    .nav-label,
     .nav-file-options,
     .nav li button svg.nav-caret {
         transition: none;

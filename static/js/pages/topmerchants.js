@@ -37,14 +37,10 @@
 // Without the map the bars keep the palette's first stop, which is what the
 // card drew when every bar wore one hue.
 //
-// THE AMOUNT RIDES INSIDE THE BAR, at its left end, so the bar and the total
-// are one column instead of two, and it appears only while the row is hovered
-// or focused — the ranking is read by length, and twenty standing numbers sit
-// on top of the shape they are drawn inside. The number is printed twice, one
-// copy over the track and one clipped to the fill's own width, so whichever
-// background a digit lands on it is drawn in the ink that reads against it — a
-// short bar's amount spills onto the track in body ink rather than being
-// clipped away.
+// THE BAR IS ANT'S PROGRESS LINE, its figure at the end. The total sits beside
+// the bar it measures, in its own right-aligned column, the way Progress prints
+// its percentage: the ranking is still read down one edge of lengths, and every
+// total is on screen without hovering a row for it.
 //
 // ONE LIST, RANK 1 TO 20, UNDER A HEADER ROW. Every row is drawn the same way,
 // so the ranking is read down one column of lengths with nothing promoted out
@@ -75,7 +71,7 @@
 // them moving up.
 //
 // Globals: apiFetch (api.js), escapeHtml (escape.js), formatCurrency
-// (currency.js), merchantAvatarHtml (avatar.js), UI (ui.js).
+// (currency.js), merchantAvatarHtml (avatar.js), UI (ui.js), Ant (ant.js).
 
 (function () {
   // The windows the picker offers, matching the Spending Trends card beside it
@@ -127,16 +123,17 @@
     renderChart();
   }
 
-  // ─── Category chip ─────────────────────────────────────────────────────────
+  // ─── Category tag ──────────────────────────────────────────────────────────
+  // Ant's closable Tag in the processing blue: it names the filter in effect.
 
   function renderFilter() {
     const el = document.getElementById('merchants-filter');
     if (!el) return;
     if (!state.category) { el.innerHTML = ''; return; }
     const name = escapeHtml(state.category.name);
-    el.innerHTML = `<span class="tm-chip">${name}<button type="button" class="tm-chip-x"
-      aria-label="Clear the ${name} filter">&times;</button></span>`;
-    el.querySelector('.tm-chip-x').addEventListener('click', () => {
+    el.innerHTML = `<span class="ant-tag ant-tag-processing tm-chip">${name}<button type="button"
+      class="ant-tag-close-icon" aria-label="Clear the ${name} filter">${Ant.icon('close')}</button></span>`;
+    el.querySelector('.ant-tag-close-icon').addEventListener('click', () => {
       // Dispatched rather than applied directly: the rail owns the focus, and
       // its own listener is what puts this card back to the full ranking.
       window.dispatchEvent(new CustomEvent(FOCUS_EVENT, { detail: null }));
@@ -144,39 +141,6 @@
   }
 
   // ─── Bar colour ────────────────────────────────────────────────────────────
-
-  /** #rgb / #rrggbb / rgb(...) -> [r,g,b], or null. The map arrives as whatever
-   *  getComputedStyle resolved the --cat-* ramp to, which is a hex under both
-   *  shipped palettes but need not stay one. */
-  function parseColor(c) {
-    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c || '').trim());
-    if (hex) {
-      const h = hex[1].length === 3 ? hex[1].replace(/./g, (d) => d + d) : hex[1];
-      return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
-    }
-    const rgb = /^rgba?\(([^)]+)\)$/i.exec(String(c || '').trim());
-    if (rgb) {
-      const parts = rgb[1].split(/[\s,/]+/).filter(Boolean).slice(0, 3).map(Number);
-      if (parts.length === 3 && parts.every(Number.isFinite)) return parts;
-    }
-    return null;
-  }
-
-  /** Ink that reads against a bar, picked per bar rather than fixed. The card
-   *  drew every bar in one hue and could name one ink for it; with eight the
-   *  ramp runs dark to light under the accent palette, so a single ink would be
-   *  unreadable at one end of it. WCAG relative luminance, against the same 0.4
-   *  cut the ramp was checked at. */
-  function inkFor(color) {
-    const rgb = parseColor(color);
-    if (!rgb) return null;
-    const lin = rgb.map((v) => {
-      const c = v / 255;
-      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-    return L > 0.4 ? 'var(--text-primary)' : '#fff';
-  }
 
   /** Paint the rows on screen from the current map. In place, on the rows that
    *  are already there: the map can arrive before or after the first response,
@@ -186,15 +150,8 @@
     if (!el) return;
     el.querySelectorAll('.tm-row[data-cat]').forEach((row) => {
       const color = state.colors && state.colors.get(row.dataset.cat);
-      if (!color) {
-        row.style.removeProperty('--tm-bar');
-        row.style.removeProperty('--tm-bar-ink');
-        return;
-      }
-      row.style.setProperty('--tm-bar', color);
-      const ink = inkFor(color);
-      if (ink) row.style.setProperty('--tm-bar-ink', ink);
-      else row.style.removeProperty('--tm-bar-ink');
+      if (color) row.style.setProperty('--tm-bar', color);
+      else row.style.removeProperty('--tm-bar');
     });
   }
 
@@ -232,29 +189,29 @@
     // tooltip beside the transaction count.
     const shareText = spent > 0 ? `, ${(share * 100).toFixed(1)}% of spending` : '';
     // Cents are always drawn, even on a whole-dollar total, so every amount
-    // breaks at the same place down the column.
+    // lines up on its decimal point down the column.
     const amount = escapeHtml(formatCurrency(m.total));
-    const width = `width:${pct.toFixed(2)}%`;
     // data-cat carries the category the bar is coloured from; applyColors reads
     // it off the row rather than the row being re-rendered for a colour.
     const cat = m.category ? ` data-cat="${escapeHtml(m.category)}"` : '';
     return `<li class="tm-row"${cat}>
       <span class="tm-rank">${rank}</span>
       ${merchantLink(m, inner, 'tm-merchant')}
-      <span class="tm-track" title="${label}: ${times}${shareText}">
-        <span class="tm-fill" style="${width};animation-delay:${delay}ms"></span>
-        <span class="tm-amount">${amount}</span>
-        <span class="tm-amount-in" style="${width};animation-delay:${delay}ms"
-          aria-hidden="true">${amount}</span>
+      <span class="ant-progress tm-bar" title="${label}: ${times}${shareText}">
+        <span class="ant-progress-outer"><span class="ant-progress-inner">
+          <span class="ant-progress-bg tm-fill" style="width:${pct.toFixed(2)}%;animation-delay:${delay}ms"></span>
+        </span></span>
+        <span class="ant-progress-text tm-amount">${amount}</span>
       </span>
     </li>`;
   }
 
-  // The column labels. Aligned by the row grid itself, so each label sits over
-  // the cell it names at every breakpoint.
+  // The column labels, as Ant's table header. Aligned by the row grid itself,
+  // so each label sits over the cell it names at every breakpoint.
   const HEAD_ROW = `<div class="tm-row tm-head">
       <span>#</span>
       <span>Merchant</span>
+      <span>Share of spending</span>
       <span class="tm-h-total">Total</span>
     </div>`;
 
@@ -271,8 +228,8 @@
       // in this time frame, it is all in categories the rail switched off, so
       // pointing at a longer time frame would be wrong advice.
       const hiding = state.hidden.length > 0 && !state.category;
-      el.innerHTML = UI.emptyState({
-        icon: 'chart', compact: true,
+      el.innerHTML = Ant.empty({
+        compact: true,
         title: state.category
           ? `Nothing in ${state.category.name}`
           : (hiding ? 'Nothing left to rank' : 'No spending to rank yet'),

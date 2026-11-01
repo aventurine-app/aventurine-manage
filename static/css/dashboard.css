@@ -1,36 +1,33 @@
 /* ============================================================================
-   dashboard.css — Dashboard page.
+   dashboard.css — Dashboard page, drawn in Ant Design.
    ============================================================================
-   All typography flows through the tokens defined in style.css §2 (sizes,
-   weights, line-heights, tracking). Card titles compose the standard
-   "all-caps micro eyebrow" treatment from those tokens directly. No
-   hard-coded rem values in this file.
-
-   The page is a toolbar (layout tabs, Customize) over a grid of cards, with
-   the Customize panel beside the grid while customizing (dashboard.js). Each
-   card is drawn by its widget in dashcards.js.
+   The page is the layouts as line Tabs, Customize as their extra content,
+   over a grid of Ant's small Cards (dashboard.js); each card's body is drawn
+   by its widget in dashcards.js. Ant's components come from ant.css; this file
+   sets them out on the page and draws what Ant has no component for: the grid
+   and its Customize chrome, the card bodies and the chart chrome, in Ant's
+   tokens (--ant-*), so the theme, the tints and the accent still apply.
 
    Section layout:
-     1. Page layout + first-run hero
-     2. Card shell
-     3. Card header — eyebrow title left, gear and period picker right
-     4. Card body + empty state
-     5. Net Worth card
-     6. Breakdown card (donut + legend)
-     7. Selector chips + the card gear
-     8. Charts: unified frame chrome + entrance animation
-     9. Active hover on the line charts (hit columns, guide, floating reading)
-    10. Bar charts (cash-flow + spending), the goal rule
-    11. List cards (budgets, merchants, transactions, bills)
-    12. Balance Forecast card
-    13. Toolbar (layout tabs + actions)
-    14. The grid, and the cards' Customize chrome
-    15. Popovers (menus, the period picker, the gear)
-    16. Customize panel (widgets, settings, widget thumbnails)
+     1. Page, link colours, first-run hero
+     2. Toolbar: the layout Tabs and their extra content
+     3. Card: head, title, controls, the period control
+     4. Card body: figure, change, chips, plot, empty
+     5. Charts: G2's axis chrome, entrance, hover reading
+     6. Columns and the goal rule
+     7. Monthly Cash Flow
+     8. Rings (Breakdown, Monthly Spending)
+     9. List cards (budgets, merchants, transactions, bills)
+    10. Balance Forecast
+    11. The grid, and the cards' Customize chrome
+    12. Period picker
+    13. Gear
+    14. Widget Drawer
+    15. The import wizard's name field
    ============================================================================ */
 
 
-/* ─── 1. Page layout + first-run hero ───────────────────────────────────── */
+/* ─── 1. Page, link colours, first-run hero ─────────────────────────────── */
 .page:has(.dashboard-page) {
     align-items: flex-start;
     padding: var(--page-pad);
@@ -40,246 +37,260 @@
 .dashboard-page {
     display: flex;
     flex-direction: column;
-    gap: 16px;
     width: 100%;
 }
 
-/* ─── First-run hero ──────────────────────────────────────────────────────────
-   Shown INSTEAD of the dashboard while the database holds nothing the user put
+/* The link colours, Ant's preset palette at step 6 (red at 5, as Ant's error
+   is): a fixed set that reads on both themes. */
+:root {
+    --dash-link-red: #ff4d4f;
+    --dash-link-orange: #fa8c16;
+    --dash-link-green: #52c41a;
+    --dash-link-blue: #1677ff;
+    --dash-link-purple: #722ed1;
+    --dash-link-pink: #eb2f96;
+}
+[data-color="red"]    { --dash-link: var(--dash-link-red); }
+[data-color="orange"] { --dash-link: var(--dash-link-orange); }
+[data-color="green"]  { --dash-link: var(--dash-link-green); }
+[data-color="blue"]   { --dash-link: var(--dash-link-blue); }
+[data-color="purple"] { --dash-link: var(--dash-link-purple); }
+[data-color="pink"]   { --dash-link: var(--dash-link-pink); }
+
+/* Shown INSTEAD of the dashboard while the database holds nothing the user put
    there (dashboard.js maybeOfferOnboarding). The dashboard (.dash-shell) is
    marked .is-preempted rather than removed, so skipping restores it without a
-   reload — and so a database with data never has to wait on the check.
-
-   One card, one sentence, one obvious action: at this point the user has no data
-   to look at, and every empty chart behind it is noise. */
+   reload, and a database with data never has to wait on the check. One card,
+   one sentence, one obvious action, and a skip that stays in reach. */
 .is-preempted { display: none !important; }
 
 .dashboard-firstrun {
     display: flex;
     justify-content: center;
-    padding: clamp(16px, 6vh, 64px) 0;
+    padding: 6vh 0;
 }
-
-/* The display:flex above outranks the UA's [hidden] rule, so the attribute
-   needs an explicit override (same trap buttons.css documents). Without this the
+/* The display:flex above outranks the UA's [hidden] rule. Without this the
    hero would render for every user, on every page load. */
 .dashboard-firstrun[hidden] { display: none; }
 
 .dashboard-firstrun-card {
-    max-width: 560px;
-    text-align: center;
+    width: 100%;
+    max-width: 640px;
 }
-
-.dashboard-firstrun-title {
-    margin: 0 0 12px;
-    color: var(--text-primary);
-    font-family: var(--font-h1);
-    font-size: var(--size-h1);
-    font-weight: var(--weight-semibold);
-    line-height: var(--lh-snug);
-}
-
-.dashboard-firstrun-sub {
-    margin: 0 auto;
-    max-width: 46ch;
-    color: var(--text-secondary);
-    font-family: var(--font-h3);
-    font-size: var(--size-body);
-    line-height: var(--lh-relaxed);
-}
-
-.dashboard-firstrun-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    margin-top: 24px;
-}
-
-/* Skipping stays visible and cheap — an onboarding you can't leave contradicts
-   "five minutes a month, then it leaves you alone". */
-.dashboard-firstrun-skip {
-    background: none;
-    border: none;
-    padding: 8px 4px;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    cursor: pointer;
-    border-radius: 4px;
-    transition: color 0.15s ease;
-}
-
-.dashboard-firstrun-skip:hover { color: var(--text-primary); text-decoration: underline; }
-
-
-/* ─── 2. Card shell ──────────────────────────────────────────────────────── */
-/* Flex column: the header row, then the body taking the rest of the box the
-   grid gives the card (§4, §14). */
-.dashboard-card {
-    min-width: 0;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
-    padding: 24px 28px;
+.dashboard-firstrun-card > .ant-card-body {
     display: flex;
     flex-direction: column;
-}
-
-
-/* ─── 3. Card header ─────────────────────────────────────────────────────── */
-.dashboard-card-header {
-    display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    min-height: 22px;
+    gap: 16px;
+    padding: 32px 24px;
+    text-align: center;
+}
+.dashboard-firstrun-logo { border-radius: 12px; }
+.dashboard-firstrun-title {
+    margin: 0;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-heading-3);
+    font-weight: var(--ant-font-weight-strong);
+    line-height: 1.3333;
+    text-wrap: balance;
+}
+.dashboard-firstrun-sub {
+    max-width: 520px;
+    margin: 0;
+    color: var(--ant-color-text-secondary);
+}
+.dashboard-firstrun-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
 }
 
-/* The card title is an all-caps section eyebrow. One step up from the
-   micro 11px tier so it reads as a section header, not a tag. Legend
-   labels inside the card stay at micro to create a hierarchy.
-   Colour is base-500, the same rung the Transactions table's column
-   headers use (.tx-header-row th, transactions.css), so the card names
-   sit back and the figures and charts read loudest. See that rule for
-   why 500 is the right step on both themes and for the contrast note. */
-.dashboard-card-title {
-    color: var(--color-base-500);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-    line-height: var(--lh-tight);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
+
+/* ─── 2. Toolbar ─────────────────────────────────────────────────────────── */
+/* The layouts hard left on the Tabs' hairline, the extra content hard right
+   on the same line. Too narrow for both, the extra content wraps ABOVE the
+   tabs, so the hairline stays under them. */
+.dash-bar {
+    flex-wrap: wrap-reverse;
+    column-gap: 16px;
+    row-gap: 8px;
 }
 
-/* A card's header row: the title (ellipsed, never wrapped) on the left, then
-   where the card has one its gear, then the period picker, on the right. The
-   picker is the Reports cards' header picker (.range-selector, ui.css), sized to
-   its label. */
-.dash-card-head {
-    gap: var(--space-8);
+.dash-layouts {
+    display: flex;
+    align-items: flex-end;
+    align-self: stretch;
+    min-width: 0;
+}
+
+.dash-tablist {
+    display: flex;
+    align-items: flex-end;
+    column-gap: 32px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.dash-tablist.ant-tabs-card { column-gap: 2px; }
+
+.dash-extra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-inline-start: auto;
+    padding-block: 6px;
+}
+
+.dash-name-input { width: 180px; }
+
+.dash-main {
+    min-width: 0;
+    padding-top: 16px;
+}
+
+/* Sticky while customizing, so Save and the tabs stay in reach wherever the
+   grid is scrolled to. Its backdrop reaches up through the page's padding and
+   8px past the bar on each side, and a band under it gives the cells
+   scrolling beneath a clean edge. */
+.is-editing .dash-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+}
+.is-editing .dash-bar::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: calc(-1 * var(--page-pad));
+    bottom: -14px;
+    left: -8px;
+    right: -8px;
+    background: var(--ant-color-bg-layout);
+    pointer-events: none;
+}
+
+
+/* ─── 3. Card ────────────────────────────────────────────────────────────── */
+/* Ant's small Card, its head a little taller (46px) to seat the controls and
+   its body 10px 16px 12px: the cards of the Ant Design dashboard. */
+.dash-card {
+    display: flex;
+    flex-direction: column;
+    container: dash-card / inline-size;
+}
+.dash-card > .dash-card-head {
     flex: none;
+    min-height: 46px;
 }
 
 .dash-card-title {
     display: flex;
     align-items: center;
-    flex: 1 1 auto;
     min-width: 0;
-    margin: 0;
 }
-
 .dash-card-name {
     min-width: 0;
+    margin: 0;
     overflow: hidden;
+    font: inherit;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
-.dash-card-title .fc-info { flex: none; }
+.dash-card-title .ant-info-tip { flex: none; }
 
 .dash-card-controls {
     display: flex;
-    align-items: center;
-    gap: var(--space-4);
     flex: none;
+    align-items: center;
+    gap: 4px;
     min-width: 0;
 }
+.dash-card-controls [hidden] { display: none; }
+.dash-gear[hidden] { display: none; }
 
-/* The link colours. A fixed palette that reads on both themes. */
-:root {
-    --dash-link-red: #e5484d;
-    --dash-link-orange: #f08a24;
-    --dash-link-green: #30a46c;
-    --dash-link-blue: #3e8bff;
-    --dash-link-purple: #9b6bde;
-    --dash-link-pink: #e5549f;
+/* The period control. A small DatePicker trigger between its arrows, or a
+   small button with Dropdown's caret. */
+.dash-period-btn {
+    gap: 6px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
-
-/* A linked card's period button takes its colour as the border, so cards
-   sharing a period read as a set. */
-.dash-period-btn[data-color] { border-width: calc(var(--border-width) + 1px); }
-.dash-period-btn[data-color="red"]    { border-color: var(--dash-link-red); }
-.dash-period-btn[data-color="orange"] { border-color: var(--dash-link-orange); }
-.dash-period-btn[data-color="green"]  { border-color: var(--dash-link-green); }
-.dash-period-btn[data-color="blue"]   { border-color: var(--dash-link-blue); }
-.dash-period-btn[data-color="purple"] { border-color: var(--dash-link-purple); }
-.dash-period-btn[data-color="pink"]   { border-color: var(--dash-link-pink); }
-
-.dash-swatch[data-color="red"]    { background: var(--dash-link-red); }
-.dash-swatch[data-color="orange"] { background: var(--dash-link-orange); }
-.dash-swatch[data-color="green"]  { background: var(--dash-link-green); }
-.dash-swatch[data-color="blue"]   { background: var(--dash-link-blue); }
-.dash-swatch[data-color="purple"] { background: var(--dash-link-purple); }
-.dash-swatch[data-color="pink"]   { background: var(--dash-link-pink); }
-
-/* In the picker, the chosen range segment is filled with the picker's own
-   border colour instead of the accent. */
-.dash-period-pop .range-group-btn[aria-pressed="true"],
-.dash-period-pop .range-group-btn[aria-pressed="true"]:hover {
-    background-color: var(--border);
-    border-color: var(--border);
-    color: var(--text-primary);
+.dash-period-btn.ant-picker {
+    width: 112px;
+    height: var(--ant-control-height-sm);
+    padding: 0 7px;
+    border-radius: var(--ant-radius-sm);
 }
-
-.dash-link-label {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-4);
+.dash-period-btn .anticon-down {
+    color: var(--ant-color-text-placeholder);
+    font-size: var(--ant-font-size-sm);
 }
-.dash-link-label svg {
-    width: 12px;
-    height: 12px;
-    flex: none;
+.dash-period-btn[aria-expanded="true"] {
+    border-color: var(--ant-color-primary);
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
 }
-
-.dash-swatches {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--space-8);
-}
-.dash-swatch {
-    flex: 1 1 0;
-    max-width: 32px;
-    height: 28px;
-    padding: 0;
-    box-sizing: border-box;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    background: transparent;
-    cursor: pointer;
-}
-.dash-swatch:hover { transform: scale(1.08); }
-.dash-swatch:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
-.dash-swatch.is-selected { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--surface1, var(--background)) inset; }
-
-.dash-period { --stepper-label-min: 0px; min-width: 0; }
-.dash-period .range-selector-btn { white-space: nowrap; }
-.dash-period[hidden] { display: none; }
-
-/* On a narrow card a range reads by its short name (YTD, 6M) instead of its
-   dates, so the title keeps its room; the dates stay in the button's tooltip. */
-.dash-card { container: dash-card / inline-size; }
 .dash-period-short { display: none; }
-@container dash-card (max-width: 340px) {
+
+/* A linked card's period control: a dot in its link colour before the period,
+   and its edge and a faint wash in the same colour, so the cards that share a
+   period read as a set across the grid. */
+.dash-link-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dash-link);
+}
+.dash-link-dot[hidden] { display: none; }
+.dash-period-btn[data-color],
+.dash-period-btn[data-color]:not(:disabled):hover {
+    position: relative;
+    z-index: 1;
+    border-color: var(--dash-link);
+    background: color-mix(in srgb, var(--dash-link) 7%, var(--ant-color-bg-container));
+}
+
+/* On a narrow card the arrows go and a range reads by its short name (YTD,
+   6M) instead of its dates; the dates stay in the control's tooltip. */
+@container dash-card (max-width: 330px) {
+    .dash-step { display: none; }
+    .dash-period-month > .dash-period-btn { border-radius: var(--ant-radius-sm); }
     .dash-period-btn.has-short .dash-period-long { display: none; }
     .dash-period-btn.has-short .dash-period-short { display: inline; }
 }
+@container dash-card (max-width: 250px) {
+    .dash-period-btn.ant-picker { width: auto; }
+    .dash-period-btn .ant-picker-suffix { display: none; }
+}
+
+/* Customize: the drag handle before the title and Remove after the controls;
+   the info tip steps aside. */
+.dash-grip {
+    display: none;
+    flex: none;
+    margin-inline-end: 6px;
+    color: var(--ant-color-text-tertiary);
+}
+.dash-remove { display: none; }
+.is-editing .dash-grip { display: inline-flex; }
+.is-editing .dash-remove { display: inline-flex; }
+.is-editing .dash-card-title .ant-info-tip { display: none; }
 
 
 /* ─── 4. Card body ───────────────────────────────────────────────────────── */
-/* Everything under the header: the widget draws into this box and sizes itself
+/* Everything under the head: the widget draws into this box and sizes itself
    to it (dashcards.js). A chart takes .dash-plot, whatever height is left under
    its chips or headline figure. */
-.dash-card-body {
+.dash-card > .dash-card-body {
     position: relative;
-    flex: 1 1 auto;
-    min-height: 0;
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
-    gap: var(--space-8);
+    gap: 8px;
+    min-height: 0;
+    padding: 10px 16px 12px;
     overflow: hidden;
 }
 
@@ -289,250 +300,87 @@
     overflow: hidden;
 }
 
-/* A card's empty state takes the whole body and centres in it. */
-.dash-card-body > .empty-state { flex: 1 1 auto; max-width: none; }
+/* A card's Empty centres in whatever room the body has left. */
+.dash-card-body > .ant-empty { margin: auto; }
 
-/* The chips and the headline figure space themselves through the body's gap. */
-.dash-card-body .account-selector,
-.dash-card-body .networth-summary { margin-bottom: 0; flex: none; }
-
-/* .empty-state's default padding is sized for a chart area. Inside a card it is
-   already vertically centred, so that padding only offsets the centring on short
-   cards; the block supplies its own gap between heading and CTA. */
-.dashboard-card .empty-state { padding: var(--space-16) var(--space-8); }
-
-/* ─── 5. Net Worth card ──────────────────────────────────────────────────── */
-.networth-summary {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-bottom: 18px;
+/* The headline figure, in Statistic's voice. */
+.dash-figure { flex: none; }
+.dash-figure-value {
+    color: var(--ant-color-text);
+    font-size: 26px;
+    font-weight: var(--ant-font-weight-strong);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
 }
-
-/* Hero numerical value — paired with the small eyebrow above for contrast
-   (semibold tiny label sitting on top of a light display number). */
-.networth-value {
-    color: var(--text-primary);
-    font-family: var(--font-h1);
-    font-size: var(--size-h1);
-    font-weight: var(--weight-regular);
-    line-height: var(--lh-tight);
-    letter-spacing: var(--track-normal);
+.dash-figure-value.is-neg { color: var(--ant-color-error); }
+.dash-figure-sub {
+    margin-top: 2px;
+    color: var(--ant-color-text-secondary);
+    font-size: 13px;
     font-variant-numeric: tabular-nums;
 }
 
-.networth-change {
-    font-family: var(--font-numeric);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wide);
-    font-variant-numeric: tabular-nums;
-}
-
-
-/* ─── 6. Breakdown card (donut + legend) ──────────────────────────────────── */
-/* Legend list on the left, ring on the right. The card sits in a third-width
-   grid column, which a fixed 220px ring would eat whole, so the ring is sized
-   as a share of the body (square via aspect-ratio, capped at its old 220px) and
-   the gap shrinks with it. Stacking instead would double the card's height
-   while its chart-card neighbours stayed short — the legend's four rows already
-   set the card's height, so side by side is what keeps the row even. */
-.accounts-body {
-    display: flex;
-    align-items: center;
-    gap: clamp(14px, 5%, 32px);
-}
-
-.accounts-legend { flex: 1 1 auto; }
-
-/* The ring is the elastic half: it reads fine at any size (everything inside it
-   is viewBox-scaled), while the legend has a floor — below roughly 175px its
-   account names and figures start ellipsing. Hence the modest share. */
-.accounts-pie {
-    flex: 0 1 auto;
-    width: min(38%, 220px);
-    aspect-ratio: 1;
-    height: auto;
-}
-
-/* The ring and the legend rows are styled in donut.css, shared with Portfolio. */
-
-/* Monthly Spending and Breakdown: the ring takes about half the card (never taller than the
-   body), and each category is one line, name then amount then share, with no
-   rules between rows. */
-.spend-body .accounts-pie {
-    flex: 0 1 auto;
-    width: 48%;
-    max-height: 100%;
-}
-.spend-legend {
-    flex: 1 1 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-width: 0;
-}
-.spend-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    color: inherit;
-    text-decoration: none;
-    font-size: var(--size-small);
-}
-.spend-legend-label {
-    flex: 1 1 auto;
-    min-width: 0;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: color 0.15s ease;
-}
-.spend-legend-item:hover .spend-legend-label { color: var(--accent-primary); }
-.spend-legend-value,
-.spend-legend-pct {
-    flex: 0 0 auto;
-    font-family: var(--font-numeric);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-.spend-legend-value { color: var(--text-primary); font-weight: var(--weight-bold); }
-.spend-legend-pct { min-width: 3ch; text-align: right; color: var(--text-tertiary); }
-
-/* ─── 7. Selector chips + the card gear ──────────────────────────────────── */
-
-/* Selector chips (shared by both cards) — click to toggle a series in/out
-   of the chart. */
-.account-selector {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 20px;
-}
-
-/* With no series there are no chips, and the empty row's margin would push the
-   card's empty state off centre by half a gap. */
-.account-selector:empty { display: none; }
-
-/* The chip wears its own series colour: the border is that colour whether the
-   series is on or off, so the swatch is always readable, and switching it on
-   fills the pill with the same colour. That makes on/off a fill rather than a
-   dot's opacity, which is why there is no dot inside the chip any more — under
-   a filled pill it would sit invisibly on its own colour. --pill-color and
-   --pill-ink are set per chip in dashboard.js; --pill-ink is picked from the
-   fill's luminance (the ramp runs dark to light, so no one ink reads on all of
-   it — the Top Merchants bar rule). */
-.account-toggle {
-    display: flex;
-    align-items: center;
-    padding: 5px 12px;
-    border-radius: 20px;
-    border: var(--border-width) solid var(--pill-color, var(--stroke-soft));
-    background: transparent;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, opacity 0.15s;
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wider);
-    color: var(--text-secondary);
-    user-select: none;
-}
-
-.account-toggle.active {
-    background: var(--pill-color, var(--frost-3));
-    color: var(--pill-ink, var(--text-primary));
-}
-
-.account-toggle:hover { color: var(--text-primary); }
-.account-toggle.active:hover { color: var(--pill-ink, var(--text-primary)); }
-
-
-/* A card's gear (Account Balances: which accounts its chips offer) sits at the
-   right of its header row, before the period picker, and opens the card's
-   own popover (§15). */
-
-.card-gear-btn {
+.dash-change {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    margin: -1px 0;
-    padding: 0;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    gap: 2px;
+    color: var(--ant-color-text-tertiary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.dash-change.is-up { color: var(--ant-color-success); }
+.dash-change.is-down { color: var(--ant-color-error); }
+
+.dash-chips {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
-.card-gear-btn[hidden] { display: none; }
-.card-gear-btn svg { width: 16px; height: 16px; }
-.card-gear-btn:hover,
-.card-gear-btn[aria-expanded="true"] { background: var(--surface3); color: var(--text-primary); }
-.card-gear-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
 
-/* In a card body the donut and its legend share whatever box the card has. */
-.dash-card-body .accounts-body { flex: 1 1 auto; min-height: 0; }
-
-
-/* ─── 8. Charts: unified frame chrome + entrance animation ───────────────── */
-/* All three line charts share the .dashboard-chart renderer in widgets/chart.js —
-   one frame, one grid, one label style. Chrome colors come from theme variables
-   so a palette change (or the light theme) retones the charts too. */
-
+/* ─── 5. Charts ──────────────────────────────────────────────────────────── */
+/* The app's three chart engines in G2's chrome: 12px labels in the tertiary
+   text over dashed hairlines. */
 .dashboard-chart .chart-grid {
-    stroke: var(--border);
+    stroke: var(--ant-color-split);
     stroke-width: 1;
-    stroke-dasharray: 3 5;
+    stroke-dasharray: 3 3;
 }
-
 .dashboard-chart .chart-zero {
-    stroke: var(--text-tertiary);
+    stroke: var(--ant-color-text-tertiary);
     stroke-width: 1;
-    stroke-dasharray: 5 4;
-    opacity: 0.55;
+    stroke-dasharray: 4 4;
+    opacity: 0.6;
 }
-
 .dashboard-chart .chart-label {
-    fill: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: 11px;
-    font-weight: var(--weight-semibold);
-    letter-spacing: 0.05em;
+    fill: var(--ant-color-text-tertiary);
+    font-family: var(--ant-font-family);
+    font-size: var(--ant-font-size-sm);
+    font-weight: 400;
+    letter-spacing: 0;
 }
 
 /* Entrance: each line sweeps left→right (pathLength="1" in the markup
    normalises the dash math to 0–1), then its area fill and dots fade in
-   behind it. Per-element delays are set inline by the renderer. The
-   animation replays on user-driven re-renders (range picker, account
-   toggles) but not on window resizes — observeChart() flags those renders
-   with .chart-no-anim. */
+   behind it. Per-element delays are set inline by the renderer. A redraw for
+   a resize carries .chart-no-anim and skips it, so charts don't strobe. */
 .dashboard-chart .chart-line {
     stroke-dasharray: 1;
     stroke-dashoffset: 1;
     animation: chart-draw 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-
 .dashboard-chart .chart-area-fill,
 .dashboard-chart .chart-dot {
     opacity: 0;
     animation: chart-fade 0.5s ease forwards;
 }
-
-/* Hover affordance on every data dot, all charts alike. Driven by the hover
-   column below rather than by :hover on the dot itself — the hit rects are
-   drawn over the whole plot, so a dot never sees the pointer. */
 .dashboard-chart .chart-dot { transition: r 0.15s ease; }
 
 @keyframes chart-draw { to { stroke-dashoffset: 0; } }
 @keyframes chart-fade { to { opacity: 1; } }
 
-/* Resize re-renders skip the entrance so charts don't strobe mid-drag. */
 .chart-no-anim .chart-line {
     animation: none;
     stroke-dasharray: none;
@@ -544,152 +392,100 @@
     opacity: 1;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .dashboard-chart .chart-line {
-        animation: none;
-        stroke-dasharray: none;
-        stroke-dashoffset: 0;
-    }
-    .dashboard-chart .chart-area-fill,
-    .dashboard-chart .chart-dot {
-        animation: none;
-        opacity: 1;
-    }
-    /* The hover still marks the month and prints its amounts — only the fades
-       and the dot's grow go. */
-    .dashboard-chart .chart-dot,
-    .dashboard-chart .chart-guide,
-    .chart-tip { transition: none; }
-}
-
-
-/* ─── 9. Active hover on the line charts ───────────────────────────────── */
-/* Reading a month off a line chart, built in dashboard.js (buildHoverLayer +
-   wireChartHover): a transparent hit rect per month takes the pointer for its
-   whole column, a dashed rule marks it, the month's dots come up out of the
-   line, and a floating card names the month and prints each series' amount. */
-
-/* fill:none with pointer-events:all — the rect must be invisible AND hittable,
-   and visiblePainted (the default) would skip an unfilled shape. */
+/* Reading a month off a line chart (dashboard.js): a transparent hit rect
+   per month takes the pointer for its whole column, a dashed rule marks it,
+   the month's dots come up out of the line, and G2's tooltip names the month
+   and prints each series' amount. fill:none with pointer-events:all: the rect
+   must be invisible AND hittable. */
 .dashboard-chart .chart-hit {
     fill: none;
     pointer-events: all;
     cursor: crosshair;
 }
-
 .dashboard-chart .chart-guide {
-    stroke: var(--text-tertiary);
+    stroke: var(--ant-color-text-tertiary);
     stroke-width: 1;
     stroke-dasharray: 4 4;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
 }
-
-.dashboard-chart .chart-guide-on { opacity: 0.55; }
-
-/* The card-coloured ring is what lifts the dot off its own line, which matters
-   where two series cross and both dots are raised at the same x. */
+.dashboard-chart .chart-guide-on { opacity: 0.6; }
+/* The card-coloured ring lifts the dot off its own line, which matters where
+   two series cross and both dots are raised at the same x. */
 .dashboard-chart .chart-dot-active {
-    r: 5.5;
-    stroke: var(--surface1);
+    r: 5;
+    stroke: var(--ant-color-bg-container);
     stroke-width: 2;
 }
 
-/* The reading. Fixed-positioned against its point by dashboard.js, like the
-   Forecast hover card (.fc-pop): .chart-area clips its overflow on purpose and
-   the .page scroll container would clip it again, so it cannot sit in the card.
-   visibility rather than [hidden] so it can fade, and so it can be measured for
-   placement before it is shown. */
-.chart-tip {
+/* G2's tooltip: the month over a row per series, on the elevated surface.
+   Fixed to the viewport (the cards and the .page scroll box clip), and faded
+   with visibility so it can be measured for placement before it shows. */
+.dash-chart-tip {
     position: fixed;
-    left: 0;
     top: 0;
-    z-index: 60;
+    left: 0;
+    z-index: var(--ant-z-tooltip);
     box-sizing: border-box;
-    min-width: 160px;
+    min-width: 150px;
     max-width: 280px;
-    padding: var(--space-8) var(--space-12);
-    border: var(--border-width) solid var(--border);
-    border-radius: 8px;
-    background: var(--surface1);
-    /* The chart rung of the elevation ladder, shared with the Balance Forecast's
-       pin card (.fc-pop): this is raised off the chart it is reading, not out of
-       a menu button, so --shadow-menu reads as detached from what it describes. */
-    box-shadow: var(--shadow-popover);
+    padding: 8px 12px;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
     pointer-events: none;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.15s ease, visibility 0.15s;
 }
-
-.chart-tip-on {
+.dash-chart-tip.chart-tip-on {
     opacity: 1;
     visibility: visible;
 }
-
-/* The month, as the card eyebrow one tier down — it names the reading, the
-   amounts under it are the reading. */
-.chart-tip-when {
-    margin-bottom: var(--space-8);
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    line-height: var(--lh-tight);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
+.dash-chart-tip .chart-tip-when {
+    margin-bottom: 6px;
+    color: var(--ant-color-text-secondary);
+    font-size: var(--ant-font-size-sm);
 }
-
-.chart-tip-rows {
+.dash-chart-tip .chart-tip-rows {
     display: grid;
-    gap: var(--space-4);
+    gap: 4px;
     margin: 0;
     padding: 0;
     list-style: none;
 }
-
-.chart-tip-row {
+.dash-chart-tip .chart-tip-row {
     display: flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: 8px;
+    font-size: var(--ant-font-size-sm);
 }
-
-/* The series' own line colour, so a row is matched to a line without reading
-   the name — the name is still there, so colour is never the only cue. */
-.chart-tip-swatch {
-    flex: 0 0 auto;
+.dash-chart-tip .chart-tip-swatch {
+    flex: none;
     width: 8px;
     height: 8px;
     border-radius: 50%;
 }
-
-.chart-tip-name {
+.dash-chart-tip .chart-tip-name {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
+    color: var(--ant-color-text-secondary);
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
 }
-
-.chart-tip-amount {
-    flex: 0 0 auto;
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
+.dash-chart-tip .chart-tip-amount {
+    flex: none;
+    color: var(--ant-color-text);
+    font-weight: var(--ant-font-weight-strong);
     font-variant-numeric: tabular-nums;
 }
 
 
-
-/* ─── 10. Bar charts (cash-flow + spending) ─────────────────────────────── */
-
-/* Bars grow up from the baseline on entrance; per-bar delays are set inline
-   by the renderer (dashboard.js), same pattern as the line charts' draw-in. */
+/* ─── 6. Columns and the goal rule ───────────────────────────────────────── */
+/* Savings Rate's columns grow up from the baseline on entrance; the Spending
+   stack's are transfers.css's (.chart-col). Hovering one dims the rest. */
 .dashboard-chart .chart-bar {
     transform-box: fill-box;
     transform-origin: center bottom;
@@ -697,356 +493,376 @@
     animation: chart-bar-grow 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
     transition: opacity 0.15s ease;
 }
-
-/* Horizontal variant (Monthly Cash Flow): bars grow rightward from the axis. */
-.dashboard-chart .chart-hbar {
-    transform-box: fill-box;
-    transform-origin: left center;
-    transform: scaleX(0);
-    animation: chart-hbar-grow 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-    transition: opacity 0.15s ease;
-}
-
-/* Exact value annotated at the end of each horizontal bar — one size up from
-   the axis labels, primary ink, so the figures read as data, not chrome. */
-.dashboard-chart .chart-bar-value {
-    fill: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: 12px;
-    font-weight: var(--weight-regular);
-    letter-spacing: 0.02em;
-    font-variant-numeric: tabular-nums;
-    opacity: 0;
-    animation: chart-fade 0.5s ease forwards;
-}
-
-/* Hovering a bar spotlights it by dimming the rest — the same affordance as
-   the Balances donut. :has() scopes the dim to actual bar hovers, so
-   sweeping the empty plot area doesn't grey the whole chart. The dim targets
-   only the non-hovered bars (:not(:hover)); dimming *all* bars and then
-   re-lighting the hovered one would fail, because :has() lifts the dim rule's
-   specificity above a plain :hover override, leaving the hovered bar greyed. */
 .dashboard-chart:has(.chart-bar:hover) .chart-bar:not(:hover) { opacity: 0.55; }
-.dashboard-chart:has(.chart-hbar:hover) .chart-hbar:not(:hover) { opacity: 0.55; }
-
-/* Every bar — and every category segment of a Monthly Cash Flow bar — is an
-   <a> into the Transactions ledger, filtered to that category and the month on
-   screen. The spotlight above is already the hover feedback, so the link adds
-   the cursor and a keyboard focus ring; the ring is drawn as a stroke on the
-   bar's own contour, since an outline box around a segment inside a bar would
-   cover its neighbours. */
-.dashboard-chart .chart-link { cursor: pointer; }
-.dashboard-chart .chart-link:focus { outline: none; }
-.dashboard-chart .chart-link:focus-visible .chart-bar,
-.dashboard-chart .chart-link:focus-visible .chart-hbar {
-    stroke: var(--accent-primary);
-    stroke-width: 1.5;
-}
-
-@keyframes chart-bar-grow  { to { transform: scaleY(1); } }
-@keyframes chart-hbar-grow { to { transform: scaleX(1); } }
-
+@keyframes chart-bar-grow { to { transform: scaleY(1); } }
 .chart-no-anim .chart-bar {
     animation: none;
     transform: scaleY(1);
 }
-.chart-no-anim .chart-hbar {
-    animation: none;
-    transform: scaleX(1);
-}
-.chart-no-anim .chart-bar-value {
-    animation: none;
-    opacity: 1;
-}
 
-@media (prefers-reduced-motion: reduce) {
-    .dashboard-chart .chart-bar {
-        animation: none;
-        transform: scaleY(1);
-    }
-    .dashboard-chart .chart-hbar {
-        animation: none;
-        transform: scaleX(1);
-    }
-    .dashboard-chart .chart-bar-value {
-        animation: none;
-        opacity: 1;
-    }
-}
-
-
-/* ─── 10b. The goal rule ─────────────────────────────────────────────────── */
-/* Savings Rate's 20% goal, drawn across the columns as the zero line is. */
+/* Savings Rate's goal, a dashed rule across the columns with its name at
+   the right end. */
 .dashboard-chart .chart-goal {
-    stroke: var(--text-tertiary);
-    stroke-width: 1.5;
-    stroke-dasharray: 5 4;
+    stroke: var(--ant-color-text-secondary);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+}
+.dashboard-chart .chart-goal-label {
+    fill: var(--ant-color-text-secondary);
+    font-family: var(--ant-font-family);
+    font-size: 11px;
 }
 
 
-/* ─── 11. List cards ─────────────────────────────────────────────────────── */
-/* Budgets, Top Merchants, Recent Transactions and Upcoming Bills show as many
-   44px rows as their card has room for (dashcards.js ROW_H), divided by the
-   hairline the Balances legend uses. A row that opens something is an <a>. */
-.dash-stat {
+/* ─── 7. Monthly Cash Flow ───────────────────────────────────────────────── */
+/* A row per kind of money (name, a bar split into its categories, the total)
+   over what was left over. The bar's segments are links into the ledger. */
+.dash-cf {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    min-height: 0;
+}
+.dash-cf-row {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+}
+.dash-cf-label {
+    color: var(--ant-color-text-secondary);
+    font-size: 13px;
+    text-decoration: none;
+    transition: color var(--ant-motion-mid);
+}
+.dash-cf-label:hover { color: var(--ant-color-primary); }
+.dash-cf-track { min-width: 0; }
+.dash-cf-bar {
+    display: flex;
+    height: 22px;
+    overflow: hidden;
+    border-radius: var(--ant-radius-sm);
+}
+.dash-cf.is-entering .dash-cf-bar {
+    transform-origin: left center;
+    animation: dash-grow-x 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+.dash-cf.is-entering .dash-cf-row:nth-child(2) .dash-cf-bar { animation-delay: 80ms; }
+.dash-cf.is-entering .dash-cf-row:nth-child(3) .dash-cf-bar { animation-delay: 160ms; }
+.dash-seg {
+    display: block;
+    flex-basis: 0;
+    min-width: 3px;
+    border-right: 1px solid var(--ant-color-bg-container);
+    transition: opacity var(--ant-motion-mid);
+}
+.dash-seg:last-child { border-right: 0; }
+.dash-cf-bar:has(.dash-seg:hover) .dash-seg:not(:hover) { opacity: 0.55; }
+.dash-seg:focus { outline: none; }
+.dash-seg:focus-visible { box-shadow: inset 0 0 0 2px var(--ant-color-text); }
+.dash-cf-amount {
+    color: var(--ant-color-text);
+    font-size: 13px;
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.dash-cf-net {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px dashed var(--ant-color-border-secondary);
+}
+.dash-cf-net-label { color: var(--ant-color-text-secondary); }
+.dash-cf-net-value {
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
+}
+.dash-cf-net-value.is-up { color: var(--ant-color-success); }
+.dash-cf-net-value.is-down { color: var(--ant-color-error); }
+
+@keyframes dash-grow-x { from { transform: scaleX(0); } }
+
+
+/* ─── 8. Rings ───────────────────────────────────────────────────────────── */
+/* The ring over its legend, or beside it on a card at least 380px wide. The
+   ring is donut.js's (styled in donut.css, shared with Portfolio); here its
+   centre takes Ant's type, and it scales into whatever room is left. */
+.dash-donut {
+    display: flex;
+    flex: 1;
+    flex-direction: column-reverse;
+    gap: 8px;
+    min-height: 0;
+}
+.dash-donut.is-side {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+}
+.dash-donut .dash-legend { flex: none; }
+.dash-donut.is-side .dash-legend { width: 52%; }
+.dash-donut-ring {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    align-self: stretch;
+}
+.dash-donut-ring .accounts-pie-svg {
+    position: absolute;
+    inset: 0;
+}
+.dash-donut-ring .donut-center-label {
+    fill: var(--ant-color-text-tertiary);
+    font-family: var(--ant-font-family);
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+}
+.dash-donut-ring .donut-center-value {
+    fill: var(--ant-color-text);
+    font-family: var(--ant-font-family);
+    font-weight: var(--ant-font-weight-strong);
+    letter-spacing: 0;
+}
+
+.dash-legend {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    flex: none;
+    min-width: 0;
 }
-
-/* The card's headline figure, in the Net Worth figure's voice. */
-.dash-stat-value {
-    color: var(--text-primary);
-    font-family: var(--font-h1);
-    font-size: var(--size-h1);
-    font-weight: var(--weight-regular);
-    line-height: var(--lh-tight);
-    letter-spacing: var(--track-normal);
+.dash-legend-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: var(--ant-radius);
+    color: var(--ant-color-text);
+    text-decoration: none;
+    transition: background-color var(--ant-motion-mid);
+}
+.dash-legend-row:hover { background: var(--ant-color-fill-quaternary); }
+.dash-legend-row:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+.dash-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.dash-legend-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash-legend-value {
+    font-weight: var(--ant-font-weight-strong);
     font-variant-numeric: tabular-nums;
 }
-
-.dash-stat-value.is-neg { color: var(--accent-negative); }
-
-.dash-stat-sub {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
+.dash-legend-share {
+    min-width: 32px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
     font-variant-numeric: tabular-nums;
+    text-align: right;
 }
 
-.dash-card-alert {
-    flex: none;
-    color: var(--accent-negative);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-    line-height: var(--lh-snug);
-}
 
+/* ─── 9. List cards ──────────────────────────────────────────────────────── */
+/* Budgets, Top Merchants, Recent Transactions and Upcoming Bills show as many
+   rows as their card has room for, each list at its own row height
+   (--dash-row-h, set by dashcards.js). A row that opens something is a link
+   with the fill-quaternary hover. */
 .dash-list {
-    flex: 1 1 0;
-    min-height: 0;
     display: flex;
+    flex: 1 1 0;
     flex-direction: column;
+    min-height: 0;
     overflow: hidden;
 }
 
 .dash-row {
-    display: grid;
+    display: flex;
+    flex: 0 0 var(--dash-row-h, 44px);
     align-items: center;
-    column-gap: var(--space-8);
-    flex: 0 0 44px;
-    height: 44px;
+    gap: 10px;
     box-sizing: border-box;
-    border-top: var(--border-width) solid var(--stroke-divider);
-    color: inherit;
+    min-width: 0;
+    height: var(--dash-row-h, 44px);
+    padding: 0 4px;
+    border-radius: var(--ant-radius);
+    color: var(--ant-color-text);
     text-decoration: none;
+    transition: background-color var(--ant-motion-mid);
 }
-
-.dash-row:first-child { border-top: none; }
-
-a.dash-row .dash-row-title { transition: color 0.15s ease; }
-a.dash-row:hover .dash-row-title { color: var(--accent-primary); }
+a.dash-row:hover { background: var(--ant-color-fill-quaternary); }
 a.dash-row:focus { outline: none; }
 a.dash-row:focus-visible {
-    outline: 2px solid var(--accent-primary);
+    outline: 2px solid var(--ant-color-primary);
     outline-offset: -2px;
-    border-radius: 6px;
 }
 
 .dash-row-main {
     display: flex;
+    flex: 1;
     flex-direction: column;
-    gap: 2px;
     min-width: 0;
 }
-
-.dash-row-title {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-}
-
-.dash-row-sub,
-.dash-row-date {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-variant-numeric: tabular-nums;
-}
-
-.dash-row-amt {
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    text-align: right;
-}
-
-.dash-row-amt.is-over { color: var(--accent-negative); }
-.dash-row-of { color: var(--text-tertiary); font-weight: var(--weight-regular); }
-
-/* A ledger row's amount, coloured the way the ledger colours it
-   (transactions.css .tx-amount-*). */
-.dash-amt-income   { color: var(--accent-positive); }
-.dash-amt-expense  { color: var(--accent-negative); }
-.dash-amt-transfer { color: var(--accent-info); }
-
-/* Bar rows: name and amount over a track. */
-.dash-row-bar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
-    row-gap: 6px;
-    align-content: center;
-}
-.dash-row-bar .dash-track { grid-column: 1 / -1; }
-.dash-row-bar.has-avatar { grid-template-columns: 28px minmax(0, 1fr) auto; }
-.dash-row-bar.has-avatar .avatar-circle { grid-row: 1 / span 2; }
-.dash-row-bar.has-avatar .dash-track { grid-column: 2 / -1; }
-
-.dash-track {
-    position: relative;
-    display: block;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--frost-2);
-}
-
-.dash-track-fill {
-    position: absolute;
-    inset: 0 auto 0 0;
-    border-radius: 3px;
-    transform-origin: left center;
-    animation: chart-hbar-grow 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
-}
-
-/* Ledger rows: avatar, name over date and category, amount. Wide cards spread
-   the same row into columns, with the category as the ledger's pill. */
-.dash-row-tx { grid-template-columns: 28px minmax(0, 1fr) auto; }
-.dash-row-tx.is-wide { grid-template-columns: 52px 28px minmax(0, 1fr) auto auto; }
-.dash-row-tx .tx-category-pill { font-size: var(--size-micro); padding: 2px 10px; }
-
-/* Bill rows: the due date as a chip, then the merchant. */
-.dash-row-bill { grid-template-columns: 36px 28px minmax(0, 1fr) auto; }
-.dash-row-bill.is-tight { grid-template-columns: 36px minmax(0, 1fr) auto; }
-
-.dash-datechip {
+.dash-row-line {
     display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+.dash-row-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash-row-sub {
+    overflow: hidden;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash-row-date {
+    flex: none;
+    width: 52px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    font-variant-numeric: tabular-nums;
+}
+.dash-row-amt {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.dash-row-amt .is-over { color: var(--ant-color-error); }
+.dash-row-of { color: var(--ant-color-text-tertiary); }
+.dash-row .avatar-circle {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    font-size: 10px;
+}
+.dash-tag { flex: none; }
+
+/* Budget rows: the name and spent / target over the Progress bar. */
+.dash-row-budget {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 2px;
+}
+
+/* Ant's Progress, the figure left off: 6px, or 4px under a merchant. Its
+   parts are spans here (they sit inside a link), so they are made blocks. */
+.dash-progress { line-height: 1; }
+.dash-progress .ant-progress-inner,
+.dash-progress .ant-progress-bg { display: block; }
+.dash-progress.is-thin .ant-progress-inner { height: 4px; }
+.dash-row-merchant .dash-progress { margin-top: 4px; }
+.dash-progress-bg {
+    transform-origin: left center;
+    animation: dash-grow-x 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+/* Bill rows: the due date as a chip, the merchant, how soon, the amount. */
+.dash-datechip {
+    display: inline-flex;
+    flex: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    width: 36px;
-    height: 36px;
-    box-sizing: border-box;
-    border-radius: 8px;
-    background: var(--surface2);
-    line-height: 1;
-}
-
-.dash-datechip span {
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: 9px;
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-widest);
+    width: 38px;
+    height: 38px;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-fill-tertiary);
+    color: var(--ant-color-text-secondary);
+    font-size: 10px;
+    line-height: 1.1;
     text-transform: uppercase;
 }
-
 .dash-datechip b {
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-small);
-    font-weight: var(--weight-bold);
+    color: var(--ant-color-text);
+    font-size: 15px;
     font-variant-numeric: tabular-nums;
 }
-
 .dash-datechip.is-today {
-    background: var(--chip-active-bg);
-    box-shadow: inset 0 0 0 var(--border-width) var(--chip-active-stroke);
+    background: var(--ant-color-primary-bg);
+    color: var(--ant-color-primary);
 }
-.dash-datechip.is-today span,
-.dash-datechip.is-today b { color: var(--chip-active-text); }
+.dash-datechip.is-today b { color: var(--ant-color-primary); }
 
-/* The last row when there are more items than rows. */
+/* The last row when there are more items than rows: Ant's link. */
 .dash-more {
-    display: flex;
+    display: inline-flex;
+    flex: 0 0 var(--dash-row-h, 44px);
     align-items: center;
-    flex: 0 0 44px;
-    height: 44px;
-    box-sizing: border-box;
-    border-top: var(--border-width) solid var(--stroke-divider);
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
+    gap: 4px;
+    padding: 0 4px;
+    color: var(--ant-color-primary);
+    font-size: 13px;
     text-decoration: none;
-    transition: color 0.15s ease;
 }
-.dash-more:hover { color: var(--accent-primary); }
-.dash-more:focus { outline: none; }
-.dash-more:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; border-radius: 6px; }
+.dash-more .anticon { font-size: 10px; }
+.dash-more:hover { color: var(--ant-color-primary-hover); }
+.dash-more:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+    border-radius: var(--ant-radius);
+}
 
-/* Upcoming Bills on a wide card: the month's calendar beside the list. */
+/* Upcoming Bills on a wide card: the month beside the list, the days a bill
+   falls on in the error tint and today ringed in the primary. */
 .dash-bills {
-    flex: 1 1 0;
-    min-height: 0;
     display: flex;
-    gap: var(--space-24);
+    flex: 1 1 0;
+    gap: 16px;
+    min-height: 0;
 }
 .dash-bills .dash-list { flex: 1 1 auto; min-width: 0; }
-
-.dash-cal { flex: 0 0 196px; }
-
-.dash-cal-title {
-    margin-bottom: var(--space-8);
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
+.dash-cal {
+    flex: none;
+    width: 196px;
 }
-
+.dash-cal-title {
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: var(--ant-font-weight-strong);
+}
 .dash-cal-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
+    gap: 2px;
+    font-size: 11px;
+    text-align: center;
 }
-
-.dash-cal-dow,
+.dash-cal-dow { color: var(--ant-color-text-tertiary); }
 .dash-cal-day {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 24px;
-    border-radius: 6px;
-    font-family: var(--font-numeric);
-    font-size: var(--size-micro);
+    padding: 3px 0;
+    border-radius: var(--ant-radius);
     font-variant-numeric: tabular-nums;
 }
-.dash-cal-dow { color: var(--text-tertiary); font-weight: var(--weight-semibold); }
-.dash-cal-day { color: var(--text-secondary); }
 .dash-cal-day.is-due {
-    background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
-    color: var(--text-primary);
-    font-weight: var(--weight-bold);
+    background: var(--ant-color-error-bg);
+    color: var(--ant-color-error);
+    font-weight: var(--ant-font-weight-strong);
 }
-.dash-cal-day.is-today { box-shadow: inset 0 0 0 var(--border-width) var(--text-primary); }
+.dash-cal-day.is-today { outline: 1.5px solid var(--ant-color-primary); }
 
 
-/* ─── 12. Balance Forecast card ──────────────────────────────────────────── */
+/* ─── 10. Balance Forecast ───────────────────────────────────────────────── */
 /* The Reports forecast's two halves in miniature (forecast.css carries the
    why): recorded weeks solid over a filled area and drawn in, the projection
    dashed and a step back, the divider at today. */
@@ -1055,41 +871,35 @@ a.dash-row:focus-visible {
     stroke-dashoffset: 1;
     animation: chart-draw 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-
 .dash-forecast-chart .dash-fc-projected {
     stroke-dasharray: 6 5;
     stroke-linecap: butt;
     opacity: 0;
     animation: chart-fade 0.45s ease 0.5s forwards;
 }
-
 .dash-forecast-chart .dash-fc-area {
     opacity: 0;
     animation: chart-fade 0.5s ease 0.4s forwards;
 }
-
 .dash-forecast-chart .dash-fc-today {
-    stroke: var(--text-tertiary);
+    stroke: var(--ant-color-text-tertiary);
     stroke-width: 1;
-    opacity: 0.55;
+    stroke-dasharray: 3 3;
 }
-
 .dash-forecast-chart .dash-fc-today-label {
-    fill: var(--text-secondary);
-    font-weight: var(--weight-superbold);
+    fill: var(--ant-color-text-secondary);
+    font-weight: var(--ant-font-weight-strong);
 }
-
 .dash-forecast-chart .dash-fc-dot { r: 2.5; }
 .dash-forecast-chart .dash-fc-dot:hover { r: 5; }
 .dash-forecast-chart .dash-fc-dot.is-projected { fill-opacity: 0.5; }
-.dash-forecast-chart .dash-fc-dot.is-neg { fill: var(--accent-negative); fill-opacity: 1; }
+.dash-forecast-chart .dash-fc-dot.is-neg { fill-opacity: 1; }
 .dash-forecast-chart .dash-fc-dot.is-anchor {
-    r: 3.5;
-    stroke: var(--text-primary);
-    stroke-width: 1.5;
+    r: 4;
+    stroke: var(--ant-color-bg-container);
+    stroke-width: 2;
     fill-opacity: 1;
 }
-
 .chart-no-anim .dash-fc-actual {
     animation: none;
     stroke-dasharray: none;
@@ -1098,101 +908,15 @@ a.dash-row:focus-visible {
 .chart-no-anim .dash-fc-projected,
 .chart-no-anim .dash-fc-area { animation: none; opacity: 1; }
 
-
-/* ─── 13. Toolbar ────────────────────────────────────────────────────────── */
-/* Layout tabs left (the app's segmented control, ui.css .dash-tabs), Customize
-   right. The toolbar spans the grid's column only, so Customize stays at the
-   grid's right edge, and the Customize panel takes the column beside both rows,
-   its heading in the toolbar's row. No row gap: the grid keeps its distance
-   with padding, and the panel's card matches it. */
-.dash-shell {
-    /* The bar's height: the layout tabs' track, a tab plus 4px of padding on
-       each side (ui.css .dash-tabs). The panel's heading shares it. */
-    --dash-bar-h: calc(var(--control-height) + 8px);
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    /* The grid's row flexible, so the panel, spanning both rows, grows only it
-       when the panel is the taller of the two. An auto row here would take a
-       share of that height and open a gap under the toolbar. */
-    grid-template-rows: auto 1fr;
-    align-items: start;
+/* Runs out of money: Ant's error Alert, one line, under the figure. */
+.dash-alert {
+    flex: none;
+    padding: 6px 12px;
+    font-size: 13px;
 }
 
-.dash-toolbar {
-    grid-column: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--space-8);
-    min-height: var(--dash-bar-h);
-}
 
-/* Column 1 named outright: under 900px the panel leaves the grid's flow, and
-   auto-placement would otherwise drop the grid into the panel's empty column. */
-.dash-main {
-    grid-column: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-16);
-    padding-top: var(--space-16);
-}
-
-/* Sticky while customizing, so the bar stays level with the panel's heading
-   wherever the grid is scrolled to. Its backdrop is a solid cover that reaches
-   up through the page's padding and 8px past the bar on each side. The grid's
-   cells stick out 2px past the canvas, so a cover only as wide as the bar left
-   their edges showing at its sides, and scrolling cells ran up past the bar. */
-.is-editing .dash-toolbar {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-}
-
-.is-editing .dash-toolbar::before {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    top: calc(-1 * var(--page-pad));
-    bottom: 0;
-    left: -8px;
-    right: -8px;
-    background: var(--background);
-    pointer-events: none;
-}
-
-/* A solid band under the bar, so the cells scrolling beneath it end on a clean
-   edge with room to spare instead of being cut right against the bar. 2px shorter
-   than the gap above the grid, so the first row's 2px rim is not covered. */
-.is-editing .dash-toolbar::after {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    top: 100%;
-    left: -8px;
-    right: -8px;
-    height: calc(var(--space-16) - 2px);
-    background: var(--background);
-    pointer-events: none;
-}
-
-.dash-layouts,
-.dash-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--space-8);
-    min-width: 0;
-}
-
-.dash-layouts .dash-tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; }
-
-/* Icon only: the glyph size. The square and the fills are .button-icon
-   (buttons.css). */
-.dash-customize svg { width: 14px; height: 14px; flex: none; }
-
-.dash-toolbar .p-menu-btn svg { width: 16px; height: 16px; }
-/* ─── 14. The grid ───────────────────────────────────────────────────────── */
+/* ─── 11. The grid ───────────────────────────────────────────────────────── */
 /* Cards are placed absolutely by dashboard.js on a 12-column grid of 48px rows
    with 16px gaps, so a move or a resize animates every card it pushes. Below
    640px the cards stack in reading order instead. */
@@ -1201,32 +925,15 @@ a.dash-row:focus-visible {
     min-height: 0;
 }
 
-.dash-card {
+.dash-canvas > .dash-card {
     position: absolute;
     top: 0;
     left: 0;
-    box-sizing: border-box;
     transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
                 width 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
                 height 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
                 box-shadow 0.15s ease;
 }
-
-/* The info tip (style.css §4) opens from its badge, and even hidden its box
-   counts toward the page's scroll width, so a card near the right edge widened
-   the page. In a card it opens across the card under the header instead, and
-   its card is lifted over the next one in case it runs past the bottom. */
-.dash-card .fc-info { position: static; }
-.dash-card .fc-info::after {
-    top: 64px;
-    left: 28px;
-    right: 28px;
-    width: auto;
-    max-width: none;
-}
-.dash-card:has(.fc-info:hover),
-.dash-card:has(.fc-info:focus-visible) { z-index: 5; }
-
 .dash-canvas.no-anim .dash-card,
 .dash-canvas.no-anim .dash-placeholder { transition: none; }
 
@@ -1237,44 +944,44 @@ a.dash-row:focus-visible {
     from { opacity: 0; translate: 0 8px; }
     to   { opacity: 1; translate: 0 0; }
 }
-
 @keyframes dash-card-flash {
-    from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 55%, transparent); }
+    from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ant-color-primary) 50%, transparent); }
     to   { box-shadow: 0 0 0 3px transparent; }
 }
 
-.dash-empty { padding: var(--space-48) 0; }
+/* The layout with no cards: Empty, in a card, with its way in. */
+.dash-empty { padding: 24px; }
 .dash-empty[hidden] { display: none; }
+.dash-empty > .ant-empty { margin: 16px 8px; }
 
-/* Customize: every card shows it can be picked up. */
+/* Customize: every card shows it can be picked up, ringed in Ant's dashed
+   primary edge. */
 .is-editing .dash-card {
     cursor: grab;
-    /* No border of its own: the grid cell behind it, 2px larger on every side,
-       shows around it as the edge. The colour is cleared, not the width, so the
-       card's content does not move. */
-    border-color: transparent;
-    box-shadow: none;
     user-select: none;
     touch-action: none;
+    outline: 1px dashed var(--ant-color-primary);
+    outline-offset: 2px;
 }
-.is-editing .dash-card:focus { outline: none; }
-.is-editing .dash-card:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+.is-editing .dash-card:focus { outline-style: dashed; }
+.is-editing .dash-card:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 3px;
+}
 
 /* Customize: the grid drawn as cells, one per column and row, so a card's snap
-   positions and the size it will land at are visible. The pitch is one column plus
-   its 16px gap across and one 48px row plus its gap (64px) down, matching
+   positions and the size it will land at are visible. The pitch is one column
+   plus its 16px gap across and one 48px row plus its gap (64px) down, matching
    dashboard.js. Each tile is a solid fill masked to the cell (grid-cell.svg, a
-   rounded rect with the gap cut out of its right and bottom). Every cell is 2px
-   larger on each side (the layer is inset -2px and the cut-out gap is 12px), so a
-   card sitting on the grid leaves a 2px rim of cell showing, which reads as the
-   card's border. The cell's 14px corner radius is the card's 12px plus that rim.
+   rounded rect with the gap cut out of its right and bottom), 2px larger than
+   a card on every side, so the cell's 10px corner sits round the card's 8px.
    Painted under the cards, and not at all once they stack. */
 .is-editing .dash-canvas::before {
     content: "";
     position: absolute;
     inset: -2px;
     pointer-events: none;
-    background: oklch(from var(--accent-primary) calc(l + 0.08) calc(c * 1.7) h / 0.2);
+    background: var(--ant-color-fill-tertiary);
     -webkit-mask-image: url("../icons/dashboard/grid-cell.svg");
     -webkit-mask-size: calc((100% + 12px) / 12) 64px;
     -webkit-mask-repeat: repeat;
@@ -1283,22 +990,9 @@ a.dash-row:focus-visible {
     mask-repeat: repeat;
     animation: dash-grid-in 0.24s ease both;
 }
-
-/* One step stronger on the dark theme, where the same tint reads weaker. */
-html[data-theme="dark"] .is-editing .dash-canvas::before {
-    background: oklch(from var(--accent-primary) calc(l + 0.08) calc(c * 1.7) h / 0.28);
-}
-
-@keyframes dash-grid-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
+html[data-theme="dark"] .is-editing .dash-canvas::before { background: var(--ant-color-fill-secondary); }
+@keyframes dash-grid-in { from { opacity: 0; } }
 .is-editing.is-stacked .dash-canvas::before { display: none; }
-
-@media (prefers-reduced-motion: reduce) {
-    .is-editing .dash-canvas::before { animation: none; }
-}
 
 /* A card's own links, chips and hover are off while it is being arranged. */
 .is-editing .dash-card-body { pointer-events: none; }
@@ -1306,70 +1000,12 @@ html[data-theme="dark"] .is-editing .dash-canvas::before {
 .dash-card.is-dragging {
     z-index: 20;
     cursor: grabbing;
-    box-shadow: var(--shadow-menu);
+    box-shadow: var(--ant-shadow);
     transition: none;
 }
 .dash-card.is-resizing { z-index: 20; transition: none; }
 
-.dash-grip {
-    display: none;
-    flex: none;
-    width: 10px;
-    height: 16px;
-    color: var(--text-tertiary);
-}
-.dash-grip svg { width: 10px; height: 16px; }
-.is-editing .dash-grip { display: inline-flex; }
-
-/* Settings and Remove, bottom left, while a card is hovered or selected. */
-.dash-card-tools {
-    position: absolute;
-    left: var(--space-12);
-    bottom: var(--space-12);
-    z-index: 2;
-    display: none;
-    gap: var(--space-4);
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-.is-editing .dash-card-tools { display: flex; }
-.is-editing .dash-card:hover .dash-card-tools,
-.is-editing .dash-card:focus-within .dash-card-tools { opacity: 1; }
-.dash-card.is-dragging .dash-card-tools { opacity: 0; }
-
-.dash-tool {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-.dash-tool svg { width: 16px; height: 16px; }
-.dash-tool:hover { background: var(--surface3); color: var(--text-primary); }
-.dash-tool:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
-/* Remove mirrors the Transactions delete button: red outline and icon at rest,
-   filled red with a white icon on hover. --danger-text, not a theme text token,
-   so the icon stays white on both themes. */
-.dash-tool[data-act="remove"] {
-    border: 2px solid var(--accent-negative);
-    background: var(--surface1);
-    color: var(--accent-negative);
-    box-shadow: var(--shadow-popover);
-}
-.dash-tool[data-act="remove"]:hover {
-    background: var(--accent-negative);
-    border-color: var(--accent-negative);
-    color: var(--danger-text);
-}
-
-/* The resize corner: a larger hit area around a small drawn corner. */
+/* The resize corner: a larger hit area round a small drawn corner. */
 .dash-resize {
     position: absolute;
     right: 0;
@@ -1383,17 +1019,17 @@ html[data-theme="dark"] .is-editing .dash-canvas::before {
 .dash-resize::after {
     content: '';
     position: absolute;
-    right: 7px;
-    bottom: 7px;
+    right: 6px;
+    bottom: 6px;
     width: 8px;
     height: 8px;
-    border-right: 2px solid var(--text-tertiary);
-    border-bottom: 2px solid var(--text-tertiary);
+    border-right: 2px solid var(--ant-color-text-tertiary);
+    border-bottom: 2px solid var(--ant-color-text-tertiary);
     border-bottom-right-radius: 3px;
 }
 .is-editing .dash-resize { display: block; }
 .dash-resize:hover::after,
-.dash-card.is-resizing .dash-resize::after { border-color: var(--accent-primary); }
+.dash-card.is-resizing .dash-resize::after { border-color: var(--ant-color-primary); }
 
 /* Where a moved card, a resized one or a dropped widget will land. */
 .dash-placeholder {
@@ -1401,9 +1037,9 @@ html[data-theme="dark"] .is-editing .dash-canvas::before {
     top: 0;
     left: 0;
     box-sizing: border-box;
-    border: 2px dashed color-mix(in srgb, var(--accent-primary) 60%, transparent);
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+    border: 2px dashed var(--ant-color-primary-border);
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-primary-bg);
     pointer-events: none;
     transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
                 width 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -1411,333 +1047,281 @@ html[data-theme="dark"] .is-editing .dash-canvas::before {
 }
 .dash-placeholder[hidden] { display: none; }
 
+/* The size a resize will land at, in columns × rows, as a Tooltip reads. */
 .dash-size-badge {
     position: absolute;
-    right: var(--space-32);
-    bottom: var(--space-8);
+    right: 30px;
+    bottom: 8px;
     z-index: 3;
-    padding: 2px var(--space-8);
-    border-radius: 6px;
-    background: var(--accent-primary);
-    color: var(--button-text);
-    font-family: var(--font-numeric);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-bold);
+    padding: 2px 8px;
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-bg-spotlight);
+    box-shadow: var(--ant-shadow);
+    color: #fff;
+    font-size: var(--ant-font-size-sm);
     font-variant-numeric: tabular-nums;
     pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dash-card,
-    .dash-placeholder,
-    .dash-card-tools { transition: none; }
+    .dash-canvas > .dash-card,
+    .dash-placeholder { transition: none; }
     .dash-card.is-entering,
     .dash-card.is-flash,
-    .dash-track-fill { animation: none; }
+    .dash-progress-bg,
+    .dash-cf.is-entering .dash-cf-bar,
+    .is-editing .dash-canvas::before { animation: none; }
+    .dashboard-chart .chart-line,
     .dash-forecast-chart .dash-fc-actual {
         animation: none;
         stroke-dasharray: none;
         stroke-dashoffset: 0;
     }
+    .dashboard-chart .chart-area-fill,
+    .dashboard-chart .chart-dot,
     .dash-forecast-chart .dash-fc-projected,
     .dash-forecast-chart .dash-fc-area { animation: none; opacity: 1; }
+    .dashboard-chart .chart-bar { animation: none; transform: scaleY(1); }
+    .dashboard-chart .chart-dot,
+    .dashboard-chart .chart-guide,
+    .dash-chart-tip { transition: none; }
 }
 
 
-/* ─── 15. Popovers ───────────────────────────────────────────────────────── */
-/* Menus wear the app's dropdown (.p-table-dropdown) and the period picker and
-   gear the Transactions filter popover (.tx-filter-popover, its eyebrows and
-   pills). Both are fixed to the viewport by dashboard.js, which places them, so
-   a card or the page's scroll box cannot clip them. Two classes in every
-   selector: transactions.css loads after this file. */
-.p-table-dropdown.dash-menu {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: auto;
-    z-index: 600;
-    min-width: 180px;
+/* ─── 12. Period picker ──────────────────────────────────────────────────── */
+/* DatePicker's dropdown in an arrowless Popover: the presets down the left,
+   the month panel, and the footer across both (Follow the current month, the
+   link colours). */
+.dash-period-pop { max-width: calc(100vw - 16px); }
+.dash-period-pop .ant-popover-arrow { display: none; }
+.dash-period-pop .ant-popover-inner {
+    padding: 0;
+    overflow: hidden;
 }
-
-/* Focus starts on the first item (arrow keys move it), so it needs the app's
-   ring rather than the browser's. */
-.dash-menu .p-dropdown-item:focus { outline: none; }
-.dash-menu .p-dropdown-item:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: -2px;
+.dash-period-panels {
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
-.dash-menu .p-dropdown-item:disabled { opacity: 0.45; cursor: not-allowed; background: none; }
-
-.tx-filter-popover.dash-pop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 600;
+.dash-period-panels > .ant-picker-presets:only-child {
+    min-width: 200px;
+    border-inline-end: 0;
 }
+.dash-period-panels .ant-picker-presets button { line-height: 28px; }
+/* The month panel at DatePicker's own width (the range picker's container
+   lets its panels shrink to their content). */
+.dash-period-panel .ant-picker-panel { width: 288px; }
 
-.tx-filter-popover.dash-period-pop {
-    width: 328px;
-    box-sizing: border-box;
-    padding: var(--space-16);
-    gap: var(--space-12);
-}
-.tx-filter-popover.dash-gear-pop { min-width: 200px; max-width: 260px; }
-
-/* A percent field: the % sign sits outside the box, to its left, so typed
-   digits never run under it. The spin buttons are dropped, as the year box's
-   are (tables.css). */
-.dash-percent-field {
-    display: flex;
-    align-items: center;
-    gap: var(--space-8);
-}
-.dash-percent-input {
-    flex: 1 1 auto;
-    min-width: 0;
-    -moz-appearance: textfield;
-    appearance: textfield;
-}
-.dash-percent-input::-webkit-outer-spin-button,
-.dash-percent-input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-.dash-percent-sign {
-    flex: none;
-    color: var(--text-tertiary);
-    font-size: var(--size-body);
-}
-
-/* The period picker reads as one centred column: every group the full width of
-   the popover, its segments sharing that width equally. */
-.dash-period-pop .tx-pop-field { align-items: stretch; text-align: center; }
-.dash-period-pop .range-group { display: flex; width: 100%; }
-.dash-period-pop .stepper { align-self: center; }
-.dash-period-pop .range-group-btn { flex: 1 1 0; min-width: 0; padding: 0; justify-content: center; }
-
-
-.dash-pop .tx-pop-preset:disabled { opacity: 0.35; cursor: not-allowed; }
-.dash-pop .tx-pop-preset:disabled:hover { background: transparent; color: var(--text-secondary); }
-
-
-
-
-/* ─── 16. Customize panel ────────────────────────────────────────────────── */
-/* Beside the grid and the toolbar while customizing, pushing both narrower
-   rather than covering them, and pinned at the page's visible height while the
-   grid scrolls. Its tabs sit in the toolbar's row, and the card under them
-   starts level with the grid's first row. Under 900px it covers the grid
-   instead, from the right edge, as one card with its heading inside. */
-.dash-drawer {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    position: sticky;
-    top: 0;
+.dash-period-footer {
     display: flex;
     flex-direction: column;
-    width: 0;
-    height: calc(100vh - 40px - 2 * var(--page-pad));
-    margin-left: 0;
-    overflow: hidden;
-    visibility: hidden;
-    transition: width 0.22s ease, margin-left 0.22s ease, visibility 0s linear 0.22s;
+    gap: 10px;
 }
-
-.dash-drawer.is-open {
-    width: 340px;
-    margin-left: var(--space-16);
-    visibility: visible;
-    transition: width 0.22s ease, margin-left 0.22s ease;
-}
-
-.dash-drawer-head {
-    flex: none;
+.dash-link {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    min-height: var(--dash-bar-h);
+    gap: 8px 16px;
 }
-
-.dash-drawer-title {
-    margin: 0;
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-h3);
-    font-weight: var(--weight-semibold);
+.dash-link-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ant-color-text-secondary);
 }
+.dash-link-label .ant-info-tip { margin-inline-start: 0; }
 
-/* The grid's top padding (.dash-main) above it, so its top meets the cards'. */
-.dash-drawer-card {
-    flex: 1 1 auto;
-    min-height: 0;
+/* The colours as ColorPicker's preset blocks: rounded squares, the chosen one
+   carrying a check, and No link drawn struck through. */
+.dash-swatches {
+    display: flex;
+    gap: 6px;
+}
+.dash-swatch {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--ant-color-text) 6%, transparent);
+    border-radius: var(--ant-radius-sm);
+    background: var(--dash-link);
+    cursor: pointer;
+    transition: transform var(--ant-motion-fast);
+}
+.dash-swatch:hover { transform: scale(1.08); }
+.dash-swatch:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+.dash-swatch[aria-checked="true"]::after {
+    content: '';
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    width: 5px;
+    height: 10px;
+    border: 2px solid #fff;
+    border-top: 0;
+    border-left: 0;
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+.dash-swatch.is-none {
+    border-color: var(--ant-color-border);
+    background: linear-gradient(to top right, transparent calc(50% - 1px), var(--ant-color-error) calc(50% - 1px),
+        var(--ant-color-error) calc(50% + 1px), transparent calc(50% + 1px)), var(--ant-color-bg-container);
+}
+.dash-swatch.is-none[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ant-color-primary-border); }
+.dash-swatch.is-none[aria-checked="true"]::after { display: none; }
+
+
+/* ─── 13. Gear ───────────────────────────────────────────────────────────── */
+.dash-gear-list {
     display: flex;
     flex-direction: column;
-    margin-top: var(--space-16);
-    overflow: hidden;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
+    gap: 8px;
 }
+.dash-gear-field + .dash-gear-list { margin-top: 12px; }
+.dash-percent { width: 140px; }
+.dash-percent .ant-input { text-align: right; }
 
-.dash-drawer-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-16);
-    padding: var(--space-16);
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+
+/* ─── 14. Widget Drawer ──────────────────────────────────────────────────── */
+/* Every widget in its group: a small card with its schematic, its name, a
+   note when the open layout has one, and Add. A card can also be dragged out
+   onto the grid. */
+.dash-widgets-hint {
+    margin: 0 0 16px;
+    color: var(--ant-color-text-secondary);
 }
-
-@media (max-width: 900px) {
-    .dash-drawer,
-    .dash-drawer.is-open {
-        position: fixed;
-        top: 48px;
-        right: var(--space-8);
-        bottom: var(--space-8);
-        z-index: 70;
-        width: min(340px, calc(100vw - 16px));
-        height: auto;
-        margin: 0;
-        box-sizing: border-box;
-        border: var(--card-border-width) solid var(--border);
-        border-radius: 12px;
-        background: var(--surface1);
-        box-shadow: var(--shadow-menu);
-    }
-    .dash-drawer {
-        transform: translateX(calc(100% + 16px));
-        transition: transform 0.22s ease, visibility 0s linear 0.22s;
-    }
-    .dash-drawer.is-open {
-        transform: none;
-        transition: transform 0.22s ease;
-    }
-    .dash-drawer-head { padding: var(--space-16) var(--space-16) var(--space-12); }
-    .dash-drawer-card {
-        margin-top: 0;
-        border: 0;
-        border-radius: 0;
-        box-shadow: none;
-    }
+.dash-widget-group + .dash-widget-group { margin-top: 20px; }
+.dash-widget-group-title {
+    margin: 0 0 8px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
-
-@media (prefers-reduced-motion: reduce) {
-    .dash-drawer,
-    .dash-drawer.is-open { transition: none; }
-}
-
-/* Widgets: the Categories editor's group cards (categories.css). */
 .dash-widget-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     margin: 0;
-    padding: 0 var(--space-8) var(--space-8);
+    padding: 0;
     list-style: none;
 }
-.dash-widget-list[hidden] { display: none; }
-
-/* Round the header's own hover wash, so an open group's bottom corners match. */
-.dash-group .cat-group-head { border-radius: 8px; }
-
 .dash-widget {
-    display: flex;
-    align-items: center;
-    gap: var(--space-8);
-    padding: var(--space-8) var(--space-12) var(--space-8) var(--space-12);
-    border-radius: 8px;
     cursor: grab;
     user-select: none;
     touch-action: none;
-    transition: background 0.15s ease;
+    transition: border-color var(--ant-motion-mid), box-shadow var(--ant-motion-mid);
 }
-.dash-widget:hover { background: var(--frost-2); }
-.dash-widget:active { cursor: grabbing; }
-
-.dash-widget-thumb {
-    flex: none;
+.dash-widget:hover {
+    border-color: var(--ant-color-border);
+    box-shadow: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 0 3px 6px 0 rgba(0, 0, 0, 0.12);
+}
+.dash-widget > .dash-widget-body {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 72px;
-    height: 46px;
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    background: var(--background);
+    gap: 12px;
+    padding: 10px 12px;
 }
-
-.dash-thumb { width: 60px; height: 36px; display: block; }
-
+.dash-widget-thumb {
+    display: block;
+    flex: none;
+    width: 96px;
+    height: 58px;
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-fill-quaternary);
+}
 .dash-widget-text {
-    flex: 1 1 auto;
-    min-width: 0;
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
 }
-
-.dash-widget-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-}
-
+.dash-widget-name { font-weight: var(--ant-font-weight-strong); }
 .dash-widget-meta {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
 }
 
-/* A widget being dragged onto the grid. */
+/* The widget under the pointer while it is dragged onto the grid. */
 .dash-drag-ghost {
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 700;
+    z-index: 1300;
     display: flex;
     align-items: center;
-    gap: var(--space-8);
-    padding: var(--space-8) var(--space-12) var(--space-8) var(--space-8);
-    border: var(--border-width) solid var(--border);
-    border-radius: 8px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-menu);
+    gap: 10px;
+    padding: 8px 12px 8px 8px;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
     pointer-events: none;
-    opacity: 0.85;
 }
-.dash-drag-ghost.is-over { opacity: 1; border-color: var(--accent-primary); }
-
-/* The thumbnails' three inks: the series colours, a muted shape, the frame. */
-.dash-thumb .t-ink   { fill: var(--text-tertiary); opacity: 0.6; }
-.dash-thumb .t-mute  { fill: var(--border); color: var(--border); }
-.dash-thumb .t-fill,
-.dash-thumb .t-chip  { fill: currentColor; }
-.dash-thumb .t-line  { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; }
-.dash-thumb .t-ring  { fill: none; stroke: currentColor; stroke-width: 7; }
-.dash-thumb .t-dash  { stroke-dasharray: 5 4; }
-.dash-thumb .t-goal  { fill: none; stroke: var(--text-tertiary); stroke-width: 1.5; stroke-dasharray: 4 3; }
-.dash-thumb .t-a     { color: var(--accent-primary); }
-.dash-thumb .t-b     { color: var(--chart-expense); }
-.dash-thumb .t-c     { color: var(--chart-transfer); }
-.dash-thumb .t-pos   { color: var(--accent-positive); }
-.dash-thumb .t-neg   { color: var(--accent-negative); }
-
-.dash-rename-dialog .dash-rename-input { margin-bottom: var(--space-16); }
-
-.dash-sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
+.dash-drag-ghost .dash-widget-thumb {
+    width: 64px;
+    height: 38px;
 }
+.dash-drag-ghost.is-over { outline: 2px solid var(--ant-color-primary); }
+
+/* The schematics, in Ant's inks. */
+.dash-thumb {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.dash-thumb .t-ink { fill: var(--ant-color-text-secondary); }
+.dash-thumb .t-mute { fill: var(--ant-color-fill-secondary); }
+.dash-thumb .t-a { fill: var(--ant-color-primary); stroke: var(--ant-color-primary); }
+.dash-thumb .t-b { fill: #f0884d; stroke: #f0884d; }
+.dash-thumb .t-c { fill: var(--ant-color-info); stroke: var(--ant-color-info); }
+.dash-thumb .t-pos { fill: var(--ant-color-success); stroke: var(--ant-color-success); }
+.dash-thumb .t-neg { fill: var(--ant-color-error); stroke: var(--ant-color-error); }
+.dash-thumb .t-line {
+    fill: none;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+}
+.dash-thumb .t-dash { stroke-dasharray: 4 3; }
+.dash-thumb .t-ring {
+    fill: none;
+    stroke-width: 7;
+}
+.dash-thumb .t-ring.t-mute { stroke: var(--ant-color-fill-secondary); }
+.dash-thumb .t-goal {
+    stroke: var(--ant-color-text-tertiary);
+    stroke-dasharray: 3 3;
+}
+
+
+/* ─── 15. The import wizard's name field ─────────────────────────────────────
+   First-run setup's account step (txfileimport.js accountChoicesHtml) names a
+   new account in a .tx-input, a rule the old Transactions page carried. */
+.tx-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: var(--control-height);
+    padding: 4px 10px;
+    border: var(--border-width) solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--text-primary);
+    font-family: var(--font-menu);
+    font-size: var(--size-body);
+    font-weight: var(--weight-regular);
+    outline: none;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.tx-input:focus {
+    border-color: var(--accent-primary);
+    background: var(--background);
+}
+.tx-input::placeholder { color: var(--text-tertiary); }

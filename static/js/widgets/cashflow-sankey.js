@@ -21,7 +21,7 @@
 // in forecast.css under the .cashflow-sankey namespace.
 //
 // Globals in play (loaded before this script): apiFetch (api.js), escapeHtml
-// (escape.js), UI.emptyState (ui.js), formatCurrency (currency.js).
+// (escape.js), UI (ui.js), Ant.empty (ant.js), formatCurrency (currency.js).
 
 (function () {
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -43,24 +43,17 @@
   //       biggest band wears the gold the Dashboard's Expenses line wears
   //       (core/chartramp.js carries that rule, which this shares with the
   //       Dashboard's two gold cards).
-  //       Under Aventurine that walks a deep gold out to a pale yellow; under
-  //       Gemstone it keeps the crimson → red → orange → gold walk it always
-  //       had. Bands are laid out in size order, so the biggest spend takes the
-  //       strongest colour and the ramp grades MAGNITUDE rather than identity —
-  //       which it can afford to do because every band prints its own name and
-  //       figure on itself. (Eight separate HUES were measured against the
-  //       dataviz validator and cannot clear its adjacent-pair separation on
-  //       either surface: the warm span is too narrow to hold eight. A ramp is
-  //       allowed to step smoothly, and stepping in lightness and hue at once is
-  //       what buys back the separation. See the token block in style.css.)
+  //       The ramp is a set of hues (ant.css maps it onto the --ant-chart-*
+  //       palette), laid out in size order, so neighbouring bands never share
+  //       a hue family; every band prints its own name and figure on itself,
+  //       so colour never has to carry identity alone.
   //
   // This is the one place the expense side stopped sharing --cat-* with the
   // Spending report and the Saved & Invested stack. Those two rank and itemize
   // categories, where a colour is a NAME; here it is a direction.
   //
-  // The hub is neither ramp: --chart-net is the deepest step of the BALANCE
-  // family (--chart-balance-1), which the Dashboard's Balances donut is drawn in
-  // too — grey under Aventurine, blue under Gemstone. The two hub bars are the
+  // The hub is neither ramp: --chart-net is the palette's green (ant.css). The
+  // two hub bars are the
   // one place all the money on each side has landed as a single amount, which
   // makes them something held rather than something flowing, and a hub from a
   // third family cannot be read as one more source. Both bars take the same
@@ -292,11 +285,11 @@
     // a zoomed (scaled-down) diagram still lands at boxH on screen.
     const wantH = boxH > 0 ? Math.round(boxH / k) : Math.round(W * CHART_RATIO);
     const H = Math.max(wantH, labelRoom, 260);
-    // Every column hangs from ONE shared top edge — the diagram reads as a flat
-    // lid with the bands growing downward off it, so the top ribbon on each side
-    // runs straight across and the two sides are comparable from the same line.
-    // Only the space beneath the edge is available to the bands; PAD.t +
-    // LABEL_MARGIN is the inset that keeps the topmost band's own label on screen.
+    // Every column is centred on ONE shared horizontal midline — the two hub bars
+    // sit on it, and each side column is centred on it too — so the ribbons fan
+    // out above and below the middle channel by about the same amount instead of
+    // all hanging downward off a top edge. PAD.t + LABEL_MARGIN is the inset that
+    // keeps the topmost band's own label on screen.
     const TOP = PAD.t + LABEL_MARGIN;
     const availH = H - TOP - PAD.b - LABEL_MARGIN;
 
@@ -330,18 +323,24 @@
     // a year that outspent its income showed a middle bar taller than the income
     // bar carrying the same amount. Now only the outflow bar reaches past the
     // channel, and the length it reaches by is the overspend.
-    const centerTop = TOP;
+    const midY = TOP + availH / 2;
     const inflowH = totalIncome * scale;
     const outflowH = totalExpense * scale;
+    // The inflow bar (and the channel it feeds) is centred on the midline; the
+    // outflow bar hangs from the channel's top edge, so it lines up with the top
+    // of the total flow and any overspend reaches past the channel's bottom.
+    const inflowTop = midY - inflowH / 2;
+    const outflowTop = inflowTop;
 
-    // Lay out a stacked side column from the shared top edge downward. Returns
-    // nodes with y/h and a colour from that side's palette, in payload order.
+    // Lay out a stacked side column centred on the midline. Returns nodes with
+    // y/h and a colour from that side's palette, in payload order.
     const layoutSide = (items, x, palette) => {
-      let y = TOP;
+      const heights = items.map((c) => Math.max(c.total * scale, MIN_BAND));
+      const extent = heights.reduce((a, h) => a + h, 0) + gaps(items.length);
+      let y = midY - extent / 2;
       return items.map((c, i) => {
-        const h = Math.max(c.total * scale, MIN_BAND);
-        const node = { ...c, x, y, h, color: palette[i % palette.length] };
-        y += h + GAP;
+        const node = { ...c, x, y, h: heights[i], color: palette[i % palette.length] };
+        y += heights[i] + GAP;
         return node;
       });
     };
@@ -414,7 +413,7 @@
     // ribbon) + leader + labels — that whole flow is the click target, so you
     // click the big wave, not the thin end bar. The bars come back separately to
     // paint on top as bare caps, outside any link. The ribbon stacks against the
-    // centre node from centerTop (income flows node→centre, expense centre→node).
+    // centre node from its top (income flows node→centre, expense centre→node).
     // dir points from the bar toward its labels, which sit on the INNER face:
     // +1 → income (labels to the right, over the ribbon), -1 → expense (labels
     // to the left).
@@ -422,7 +421,7 @@
       const labelYs = spreadLabels(sideNodes);
       let waves = '';
       let bars = '';
-      let slot = centerTop;
+      let slot = isIncome ? inflowTop : outflowTop;
       sideNodes.forEach((n, i) => {
         const cy = n.y + n.h / 2;
         const ly = labelYs[i];
@@ -478,16 +477,16 @@
     const inflowTitle = `<title>Net Inflow: ${inflowAmount}</title>`;
     const outflowTitle = `<title>Net Outflow: ${outflowAmount}</title>`;
     const channel = `<path class="sankey-link sankey-link-net"`
-                  + ` d="${ribbon(hubInX + NODE_W, centerTop, hubOutX, centerTop, inflowH)}"`
+                  + ` d="${ribbon(hubInX + NODE_W, inflowTop, hubOutX, inflowTop, inflowH)}"`
                   + ` fill="${NET_COLOR}">${inflowTitle}</path>`;
 
     const waves = channel + inc.waves + exp.waves;  // bottom layer: ribbons + labels (clickable)
     let bars = inc.bars + exp.bars;                 // top layer: bare node caps
 
-    const hubBar = (x, h, title) =>
-      `<rect class="sankey-node sankey-node-center" x="${r1(x)}" y="${r1(centerTop)}"`
+    const hubBar = (x, y, h, title) =>
+      `<rect class="sankey-node sankey-node-center" x="${r1(x)}" y="${r1(y)}"`
       + ` width="${NODE_W}" height="${r1(h)}" fill="${NET_COLOR}">${title}</rect>`;
-    bars += hubBar(hubInX, inflowH, inflowTitle) + hubBar(hubOutX, outflowH, outflowTitle);
+    bars += hubBar(hubInX, inflowTop, inflowH, inflowTitle) + hubBar(hubOutX, outflowTop, outflowH, outflowTitle);
 
     // Each hub label hangs off its bar's INNER face and floats out over the
     // channel, the same way a category's label floats over its ribbon: the
@@ -501,8 +500,8 @@
     // the outflow label steps away vertically instead — by LABEL_GAP, the same
     // clearance a stack of category labels keeps — rather than overlapping the
     // inflow label or being dropped.
-    const inflowLabelY = centerTop + inflowH / 2;
-    let outflowLabelY = centerTop + outflowH / 2;
+    const inflowLabelY = inflowTop + inflowH / 2;
+    let outflowLabelY = outflowTop + outflowH / 2;
     const sideBySide = hubLabelWidth('Net Inflow', inflowAmount)
                      + hubLabelWidth('Net Outflow', outflowAmount)
                      + LABEL_OFFSET * 2 <= run;
@@ -537,8 +536,7 @@
     const chart = document.getElementById('cashflow-chart');
     if (!el || !chart) return;
     if (show) {
-      el.innerHTML = UI.emptyState({
-        icon: 'chart',
+      el.innerHTML = Ant.empty({
         title: state.year === null
           ? 'No data yet'
           : `Nothing to chart for this ${state.month ? 'month' : 'year'}`,
@@ -546,7 +544,7 @@
         // directly under a tab also labelled "Cash Flow", so "the Cash Flow
         // page" would read as somewhere on this page rather than Statements.
         desc: 'Add income and expenses to your Cash Flow statement and the diagram will map how your money moves.',
-        action: { label: 'Open Statements', href: '/statements#cash-flow', primary: true },
+        action: { label: 'Open Statements', href: '/statements#cash-flow' },
       });
       chart.innerHTML = '';
     } else {

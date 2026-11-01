@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>Aventurine Manage | Reports</title>
     <!-- @include head -->
+    <link rel="stylesheet" href="/static/css/ant.css">
     <link rel="stylesheet" href="/static/css/forecast.css">
     <link rel="stylesheet" href="/static/css/trends.css">
     <link rel="stylesheet" href="/static/css/transfers.css">
@@ -17,23 +18,25 @@
 
         <div class="page">
 
-<div class="rep-reports">
+<!-- The reports are drawn in Ant Design (ant.css, ant.js): line Tabs over one
+     Card per report. The app chrome around them keeps its own design. -->
+<div class="rep-reports ant-scope">
 
     <!-- Report tabs. Adding another report = a .rep-tab button here + a matching
          .rep-panel below, in the same order. Controller: reports.js (data-driven,
          no JS change). Each panel owns its own controls — a report's pickers live
          in its card header (or its own toolbar row), never hoisted up here, so a
          report stays a self-contained block of markup. -->
-    <div class="rep-tabs" role="tablist" aria-label="Reports">
-        <button type="button" class="rep-tab active" id="rep-tab-cashflow" role="tab"
+    <div class="rep-tabs ant-tabs-nav" role="tablist" aria-label="Reports">
+        <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-cashflow" role="tab"
             data-tab="cashflow" aria-controls="rep-panel-cashflow" aria-selected="true">Cash Flow</button>
-        <button type="button" class="rep-tab" id="rep-tab-spending" role="tab"
+        <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-spending" role="tab"
             data-tab="spending" aria-controls="rep-panel-spending" aria-selected="false" tabindex="-1">Spending</button>
-        <button type="button" class="rep-tab" id="rep-tab-transfers" role="tab"
+        <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-transfers" role="tab"
             data-tab="transfers" aria-controls="rep-panel-transfers" aria-selected="false" tabindex="-1">Saved &amp; Invested</button>
-        <button type="button" class="rep-tab" id="rep-tab-forecast" role="tab"
+        <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-forecast" role="tab"
             data-tab="forecast" aria-controls="rep-panel-forecast" aria-selected="false" tabindex="-1">Forecast</button>
-        <button type="button" class="rep-tab" id="rep-tab-metrics" role="tab"
+        <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-metrics" role="tab"
             data-tab="metrics" aria-controls="rep-panel-metrics" aria-selected="false" tabindex="-1">Metrics</button>
     </div>
 
@@ -42,32 +45,37 @@
 
 <div class="forecast-page">
 
-    <div class="forecast-card forecast-card-main">
-        <div class="dashboard-card-header">
-            <span class="dashboard-card-title">Cash Flow<span class="fc-info" tabindex="0" role="note"
+    <section class="ant-card forecast-card forecast-card-main" aria-labelledby="cashflow-title">
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
+            <h2 class="ant-card-head-title" id="cashflow-title">Cash Flow<span class="ant-info-tip" tabindex="0" role="note"
                 aria-label="Income is shown on the left. Expenses are shown on the right. Hover a band to see total amount. Click on a band to be taken to a list of transactions."
-                data-tip="Income is shown on the left. Expenses are shown on the right. Hover a band to see total amount. Click on a band to be taken to a list of transactions.">i</span></span>
-            <div class="forecast-controls">
+                data-tip="Income is shown on the left. Expenses are shown on the right. Hover a band to see total amount. Click on a band to be taken to a list of transactions."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
+            <div class="ant-card-extra">
+                <!-- Year and month as one joined Select pair (Space.Compact). -->
                 <div class="range-selector-pair">
                     <div class="range-selector" id="cashflow-year">
-                        <button class="range-selector-btn" id="cashflow-year-btn" type="button">Year<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
+                        <button class="range-selector-btn" id="cashflow-year-btn" type="button"
+                            aria-haspopup="menu">Year<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
                         <div class="range-selector-menu" id="cashflow-year-menu" hidden></div>
                     </div>
                     <div class="range-selector" id="cashflow-month">
-                        <button class="range-selector-btn" id="cashflow-month-btn" type="button">Entire year<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
+                        <button class="range-selector-btn" id="cashflow-month-btn" type="button"
+                            aria-haspopup="menu">Entire year<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
                         <div class="range-selector-menu" id="cashflow-month-menu" hidden></div>
                     </div>
                 </div>
             </div>
-        </div>
+        </div></div>
 
-        <!-- Empty state lands here when the selected year has no data. -->
-        <div id="cashflow-empty"></div>
+        <div class="ant-card-body">
+            <!-- Empty state lands here when the selected year has no data. -->
+            <div id="cashflow-empty"></div>
 
-        <div class="chart-area">
-            <div id="cashflow-chart"></div>
+            <div class="chart-area">
+                <div id="cashflow-chart"></div>
+            </div>
         </div>
-    </div>
+    </section>
 
 </div>
 
@@ -78,73 +86,79 @@
 
 <div class="trends-page">
 
-    <div class="trends-card">
-        <div class="dashboard-card-header">
-            <span class="dashboard-card-title">Spending Trends<span class="fc-info" tabindex="0" role="note"
+    <section class="ant-card trends-card" aria-labelledby="trends-title">
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
+            <h2 class="ant-card-head-title" id="trends-title">Spending Trends<span class="ant-info-tip" tabindex="0" role="note"
                 aria-label="Each line is one expense category's spending per month over the selected window (the current, incomplete month is excluded). Toggle categories below to focus the view."
-                data-tip="Each line is one expense category's spending per month over the selected window (the current, incomplete month is excluded). Toggle categories below to focus the view.">i</span></span>
-            <div class="trends-controls" id="trends-controls">
-                <!-- Chart form. Stacked answers "what makes up my spending",
-                     lines answer "did this one category move" — two readings of
-                     one payload, so the switch costs a re-render and no request.
-                     Controller: static/js/pages/trends.js. -->
-                <div class="trends-view seg-switch" id="trends-view" role="group" aria-label="Chart form">
-                    <button type="button" class="trends-view-btn seg-switch-btn" data-view="stacked" aria-pressed="true">Stacked</button>
-                    <button type="button" class="trends-view-btn seg-switch-btn" data-view="lines" aria-pressed="false">Lines</button>
-                </div>
-                <div class="range-selector" id="trends-range">
-                    <button class="range-selector-btn" id="trends-range-btn" type="button">1 Year<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
-                    <div class="range-selector-menu" id="trends-range-menu" hidden>
-                        <button data-window="3"  type="button">3 Months</button>
-                        <button data-window="6"  type="button">6 Months</button>
-                        <button data-window="12" type="button">1 Year</button>
-                        <button data-window="24" type="button">2 Years</button>
-                        <button data-window="60" type="button">5 Years</button>
+                data-tip="Each line is one expense category's spending per month over the selected window (the current, incomplete month is excluded). Toggle categories below to focus the view."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
+            <div class="ant-card-extra">
+                <div class="trends-controls" id="trends-controls">
+                    <!-- Chart form. Stacked answers "what makes up my spending",
+                         lines answer "did this one category move" — two readings of
+                         one payload, so the switch costs a re-render and no request.
+                         Controller: static/js/pages/trends.js. -->
+                    <div class="trends-view ant-segmented" id="trends-view" role="group" aria-label="Chart form">
+                        <button type="button" class="ant-segmented-item" data-view="stacked" aria-pressed="true">Stacked</button>
+                        <button type="button" class="ant-segmented-item" data-view="lines" aria-pressed="false">Lines</button>
+                    </div>
+                    <div class="range-selector" id="trends-range">
+                        <button class="range-selector-btn" id="trends-range-btn" type="button"
+                            aria-haspopup="menu">1 Year<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
+                        <div class="range-selector-menu" id="trends-range-menu" hidden>
+                            <button data-window="3"  type="button">3 Months</button>
+                            <button data-window="6"  type="button">6 Months</button>
+                            <button data-window="12" type="button">1 Year</button>
+                            <button data-window="24" type="button">2 Years</button>
+                            <button data-window="60" type="button">5 Years</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </div></div>
 
         <!-- Chart and rail are one row: the rail is the legend AND the table
              view, so every category's window total is on screen beside the
              shape it made, rather than reachable only by hovering the chart. -->
-        <div class="trends-body">
+        <div class="ant-card-body trends-body">
             <div class="chart-area">
                 <div id="trends-chart"></div>
             </div>
             <div class="trends-rail" id="trends-rail"></div>
         </div>
-    </div>
+    </section>
 
     <!-- Top Merchants. The card above breaks spending down by category, month by
          month; this one breaks the same ledger down by merchant, totalled. Its
          window picker is its own — a report's controls live in its header, not in
          the tab bar (see the note at the top of this file). Controller:
          static/js/pages/topmerchants.js. -->
-    <div class="trends-card">
-        <div class="dashboard-card-header">
-            <span class="dashboard-card-title">Top Merchants<span class="fc-info" tabindex="0" role="note"
+    <section class="ant-card trends-card" aria-labelledby="merchants-title">
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
+            <h2 class="ant-card-head-title" id="merchants-title">Top Merchants<span class="ant-info-tip" tabindex="0" role="note"
                 aria-label="Top 20 merchants based on Expenses (excludes Income and Transfers). Click on merchant name to be taken to transaction list."
-                data-tip="Top 20 merchants based on Expenses (excludes Income and Transfers). Click on merchant name to be taken to transaction list.">i</span></span>
-            <div class="trends-controls">
-                <!-- The category chip the Trends rail sets, when one is
-                     focused. Empty markup otherwise. -->
-                <div class="tm-filter" id="merchants-filter"></div>
-                <div class="range-selector" id="merchants-range">
-                    <button class="range-selector-btn" id="merchants-range-btn" type="button">1 Year<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
-                    <div class="range-selector-menu" id="merchants-range-menu" hidden>
-                        <button data-window="3"  type="button">3 Months</button>
-                        <button data-window="6"  type="button">6 Months</button>
-                        <button data-window="12" type="button">1 Year</button>
-                        <button data-window="24" type="button">2 Years</button>
-                        <button data-window="60" type="button">5 Years</button>
+                data-tip="Top 20 merchants based on Expenses (excludes Income and Transfers). Click on merchant name to be taken to transaction list."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
+            <div class="ant-card-extra">
+                <div class="trends-controls">
+                    <!-- The category tag the Trends rail sets, when one is
+                         focused. Empty markup otherwise. -->
+                    <div class="tm-filter" id="merchants-filter"></div>
+                    <div class="range-selector" id="merchants-range">
+                        <button class="range-selector-btn" id="merchants-range-btn" type="button"
+                            aria-haspopup="menu">1 Year<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
+                        <div class="range-selector-menu" id="merchants-range-menu" hidden>
+                            <button data-window="3"  type="button">3 Months</button>
+                            <button data-window="6"  type="button">6 Months</button>
+                            <button data-window="12" type="button">1 Year</button>
+                            <button data-window="24" type="button">2 Years</button>
+                            <button data-window="60" type="button">5 Years</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </div></div>
 
-        <div id="merchants-chart"></div>
-    </div>
+        <div class="ant-card-body" id="merchants-chart"></div>
+    </section>
 
 </div>
 
@@ -173,7 +187,7 @@
     <div class="tfr-toolbar">
         <div class="range-selector" id="transfers-range">
             <button class="range-selector-btn" id="transfers-range-btn" type="button"
-                aria-haspopup="menu" title="Time frame for both charts">12 Months<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
+                aria-haspopup="menu" title="Time frame for both charts">12 Months<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
             <div class="range-selector-menu" id="transfers-range-menu" hidden>
                 <button data-window="3"  type="button">3 Months</button>
                 <button data-window="6"  type="button">6 Months</button>
@@ -185,31 +199,35 @@
 
     <div class="tfr-charts">
 
-    <div class="tfr-card">
-        <div class="dashboard-card-header">
-            <span class="dashboard-card-title">Saved &amp; Invested Over Time<span class="fc-info" tabindex="0" role="note"
+    <section class="ant-card tfr-card" aria-labelledby="transfers-title">
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
+            <h2 class="ant-card-head-title" id="transfers-title">Saved &amp; Invested Over Time<span class="ant-info-tip" tabindex="0" role="note"
                 aria-label="How much you moved into your own savings and investment accounts each month. Any category you have set to Transfer counts, so nothing needs sorting by hand. Money moved this way is never counted as spending, so this is the one place it is reported. The current, incomplete month is excluded."
-                data-tip="How much you moved into your own savings and investment accounts each month. Any category you have set to Transfer counts, so nothing needs sorting by hand. Money moved this way is never counted as spending, so this is the one place it is reported. The current, incomplete month is excluded.">i</span></span>
-            <div class="tfr-total" id="transfers-total"></div>
-        </div>
+                data-tip="How much you moved into your own savings and investment accounts each month. Any category you have set to Transfer counts, so nothing needs sorting by hand. Money moved this way is never counted as spending, so this is the one place it is reported. The current, incomplete month is excluded."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
+            <div class="ant-card-extra tfr-total" id="transfers-total"></div>
+        </div></div>
 
-        <div class="chart-area">
-            <div id="transfers-chart"></div>
+        <div class="ant-card-body">
+            <div class="chart-area">
+                <div id="transfers-chart"></div>
+            </div>
         </div>
-    </div>
+    </section>
 
-    <div class="tfr-card">
-        <div class="dashboard-card-header">
-            <span class="dashboard-card-title">Saved &amp; Invested by Account<span class="fc-info" tabindex="0" role="note"
+    <section class="ant-card tfr-card" aria-labelledby="transfers-accounts-title">
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
+            <h2 class="ant-card-head-title" id="transfers-accounts-title">Saved &amp; Invested by Account<span class="ant-info-tip" tabindex="0" role="note"
                 aria-label="The same months split by which of your accounts the money went into, taken from the Transfer rows of the Cash Flow statement. The eight biggest get their own color and everything else is grouped as Other, so the columns always add up to the trend chart. Click a name to see those transactions."
-                data-tip="The same months split by which of your accounts the money went into, taken from the Transfer rows of the Cash Flow statement. The eight biggest get their own color and everything else is grouped as Other, so the columns always add up to the trend chart. Click a name to see those transactions.">i</span></span>
-        </div>
+                data-tip="The same months split by which of your accounts the money went into, taken from the Transfer rows of the Cash Flow statement. The eight biggest get their own color and everything else is grouped as Other, so the columns always add up to the trend chart. Click a name to see those transactions."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
+        </div></div>
 
-        <div class="chart-area">
-            <div id="transfers-accounts-chart"></div>
+        <div class="ant-card-body">
+            <div class="chart-area">
+                <div id="transfers-accounts-chart"></div>
+            </div>
+            <div class="tfr-legend" id="transfers-legend"></div>
         </div>
-        <div class="tfr-legend" id="transfers-legend"></div>
-    </div>
+    </section>
 
     </div><!-- /.tfr-charts -->
 
@@ -231,63 +249,68 @@
          money moved between your own accounts counts, which account, and how
          far ahead. The ⋮ holds only the housekeeping action, and only when
          there is something for it to clear. -->
-    <div class="forecast-card forecast-card-main">
-        <div class="dashboard-card-header">
+    <section class="ant-card forecast-card forecast-card-main" aria-labelledby="forecast-title">
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
             <!-- "Balance Forecast", not "Cash Flow Forecast": what it projects is
                  one account's BALANCE, and the sibling tab is already called Cash
                  Flow. The method — and the way to pin a planned item — lives in
                  this one tooltip rather than in standing text above the chart. -->
-            <span class="dashboard-card-title">Balance Forecast<span class="fc-info" tabindex="0" role="note"
-                aria-label="Projects one account's balance forward, week by week. Each week combines your typical spending and income (averaged over recent complete months). Hover the line to pin a one-off payment or receipt to a date; hover a point for that week's balance."
-                data-tip="Projects one account's balance forward, week by week. Each week combines your typical spending and income (averaged over recent complete months). Hover the line to pin a one-off payment or receipt to a date; hover a point for that week's balance.">i</span></span>
-            <div class="forecast-controls">
-                <!-- A checkbox, not a third picker: this is a single boolean and
-                     its state has to be visible without opening a menu, because it
-                     changes every number on the card. Checked (the default)
-                     excludes transfers, since money moved between the user's own
-                     accounts is not spending. -->
-                <label class="fc-toggle" for="forecast-ignore-transfers"
-                    title="Leave money moved between your own accounts out of the projection">
-                    <input type="checkbox" id="forecast-ignore-transfers" checked>
-                    <span>Ignore transfers</span>
-                </label>
-                <!-- Account and horizon are the SAME widget (ui.css's menu-opener
-                     button) rather than a native <select> next to a styled one —
-                     two lookalike pickers side by side is exactly the drift
-                     .range-selector/.stepper were folded together to stop. -->
-                <div class="range-selector" id="forecast-account">
-                    <button class="range-selector-btn" id="forecast-account-btn" type="button"
-                        aria-haspopup="menu" title="Account to forecast">Account<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
-                </div>
-                <div class="range-selector" id="forecast-range">
-                    <button class="range-selector-btn" id="forecast-range-btn" type="button">3 Months<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
-                    <div class="range-selector-menu" id="forecast-range-menu" hidden>
-                        <button data-months="1" type="button">1 Month</button>
-                        <button data-months="3" type="button">3 Months</button>
-                        <button data-months="6" type="button">6 Months</button>
+            <h2 class="ant-card-head-title" id="forecast-title">Balance Forecast<span class="ant-info-tip" tabindex="0" role="note"
+                aria-label="Projects one account's balance forward, week by week. Each week combines your typical spending and income (averaged over recent complete months), timed by your regular bills and paychecks. The shaded band is the typical range, widening with distance as recent months varied. Hover the line to pin a one-off payment or receipt to a date; hover a point for that week's balance."
+                data-tip="Projects one account's balance forward, week by week. Each week combines your typical spending and income (averaged over recent complete months), timed by your regular bills and paychecks. The shaded band is the typical range, widening with distance as recent months varied. Hover the line to pin a one-off payment or receipt to a date; hover a point for that week's balance."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
+            <div class="ant-card-extra">
+                <div class="forecast-controls">
+                    <!-- A checkbox, not a third picker: this is a single boolean and
+                         its state has to be visible without opening a menu, because it
+                         changes every number on the card. Checked (the default)
+                         excludes transfers, since money moved between the user's own
+                         accounts is not spending. -->
+                    <label class="ant-checkbox-wrapper fc-toggle" for="forecast-ignore-transfers"
+                        title="Leave money moved between your own accounts out of the projection">
+                        <input type="checkbox" class="ant-checkbox" id="forecast-ignore-transfers" checked>
+                        <span>Ignore transfers</span>
+                    </label>
+                    <!-- Account and horizon are the SAME widget (the Select-drawn
+                         .range-selector) rather than a native <select> next to a
+                         styled one. -->
+                    <div class="range-selector" id="forecast-account">
+                        <button class="range-selector-btn" id="forecast-account-btn" type="button"
+                            aria-haspopup="menu" title="Account to forecast">Account<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
                     </div>
+                    <div class="range-selector" id="forecast-range">
+                        <button class="range-selector-btn" id="forecast-range-btn" type="button"
+                            aria-haspopup="menu">3 Months<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
+                        <div class="range-selector-menu" id="forecast-range-menu" hidden>
+                            <button data-months="1" type="button">1 Month</button>
+                            <button data-months="3" type="button">3 Months</button>
+                            <button data-months="6" type="button">6 Months</button>
+                        </div>
+                    </div>
+                    <!-- Hidden until it has something to offer: its only entry is
+                         clearing planned items that fell outside the forecast, so an
+                         always-present ⋮ would open on an empty menu. -->
+                    <button type="button" class="ant-btn ant-btn-text ant-btn-icon-only" id="forecast-kebab-btn"
+                        aria-label="Forecast options" data-tip="Forecast options" aria-haspopup="menu" hidden><span
+                        class="anticon" data-ant-icon="more" aria-hidden="true"></span></button>
                 </div>
-                <!-- Hidden until it has something to offer: its only entry is
-                     clearing planned items that fell outside the forecast, so an
-                     always-present ⋮ would open on an empty menu. -->
-                <button type="button" class="button-icon p-menu-btn" id="forecast-kebab-btn" title="Forecast options"
-                    aria-label="Forecast options" aria-haspopup="menu" hidden>⋮</button>
+            </div>
+        </div></div>
+
+        <div class="ant-card-body">
+            <!-- The result in a sentence, then a warning only when the balance goes
+                 below zero, then the caveat notes. Built by forecast.js. -->
+            <div class="forecast-summary" id="forecast-summary"></div>
+
+            <!-- The plot and its pointer overlay (the add-here guide) share this
+                 box; forecast.js sizes the overlay to the SVG it just drew. -->
+            <div class="chart-area">
+                <div class="forecast-plot" id="forecast-plot">
+                    <div id="forecast-chart"></div>
+                    <div class="fc-overlay" id="forecast-overlay" aria-hidden="true"></div>
+                </div>
             </div>
         </div>
-
-        <!-- The result in a sentence, then a warning only when the balance goes
-             below zero, then the caveat notes. Built by forecast.js. -->
-        <div class="forecast-summary" id="forecast-summary"></div>
-
-        <!-- The plot and its pointer overlay (the add-here guide) share this
-             box; forecast.js sizes the overlay to the SVG it just drew. -->
-        <div class="chart-area">
-            <div class="forecast-plot" id="forecast-plot">
-                <div id="forecast-chart"></div>
-                <div class="fc-overlay" id="forecast-overlay" aria-hidden="true"></div>
-            </div>
-        </div>
-    </div>
+    </section>
 
 </div>
 
@@ -302,55 +325,60 @@
          living here as a report instead. ONE year at a time, chosen from the
          picker: every other report on this page is read that way, and the
          ratios drawn as gauges need the width that stacking every year side by
-         side was spending. The whole report is ONE container (.met-shell): the
-         chosen year as its heading top-left, the picker top-right, and the
-         two sections below as flat sub-cards, so the year reads as the
-         title of everything under it. Controller: static/js/pages/metrics.js. -->
-    <div class="met-shell">
-    <div class="met-shell-header">
-        <h2 class="met-year" id="metrics-year-heading" aria-live="polite"></h2>
+         side was spending. The whole report is ONE card (.met-shell): the
+         chosen year as its title, the picker as its extra, and the two
+         sections below as inner cards, so the year reads as the title of
+         everything under it. Controller: static/js/pages/metrics.js. -->
+    <section class="ant-card met-shell" aria-labelledby="metrics-year-heading">
+    <div class="ant-card-head"><div class="ant-card-head-wrapper">
+        <h2 class="ant-card-head-title met-year" id="metrics-year-heading" aria-live="polite"></h2>
         <!-- The Cash Flow tab's joined year+month picker, same markup and same
              UI.wirePicker wiring: the left half picks the year, the right half
              picks how much of it to report on — "Entire year", or one month of
              it with the year still shown beside it. -->
-        <div class="range-selector-pair">
-            <div class="range-selector" id="metrics-year">
-                <button class="range-selector-btn" id="metrics-year-btn" type="button"
-                    aria-haspopup="menu" title="Year shown by every section below">Year<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
-                <div class="range-selector-menu" id="metrics-year-menu" hidden></div>
-            </div>
-            <div class="range-selector" id="metrics-month">
-                <button class="range-selector-btn" id="metrics-month-btn" type="button"
-                    aria-haspopup="menu" title="Span shown by every section below">Entire year<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
-                <div class="range-selector-menu" id="metrics-month-menu" hidden></div>
+        <div class="ant-card-extra">
+            <div class="range-selector-pair">
+                <div class="range-selector" id="metrics-year">
+                    <button class="range-selector-btn" id="metrics-year-btn" type="button"
+                        aria-haspopup="menu" title="Year shown by every section below">Year<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
+                    <div class="range-selector-menu" id="metrics-year-menu" hidden></div>
+                </div>
+                <div class="range-selector" id="metrics-month">
+                    <button class="range-selector-btn" id="metrics-month-btn" type="button"
+                        aria-haspopup="menu" title="Span shown by every section below">Entire year<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
+                    <div class="range-selector-menu" id="metrics-month-menu" hidden></div>
+                </div>
             </div>
         </div>
-    </div>
+    </div></div>
 
-    <div class="met-card">
-        <div class="dashboard-card-header">
-            <span class="dashboard-card-title">Fundamentals<span class="fc-info" tabindex="0" role="note"
+    <div class="ant-card-body met-shell-body">
+
+    <section class="ant-card ant-card-type-inner met-card" aria-labelledby="metrics-fundamentals-title">
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
+            <h3 class="ant-card-head-title" id="metrics-fundamentals-title">Fundamentals<span class="ant-info-tip" tabindex="0" role="note"
                 aria-label="The selected year's totals, the ratios behind them, and six money goals: spending under 70% of income, total debt under 25% of income, saving at least 20% of income, investing 15% to 20% of income, spending down year over year, and income up year over year. Transfers between your own accounts are never counted as income or spending."
-                data-tip="The selected year's totals, the ratios behind them, and six money goals: spending under 70% of income, total debt under 25% of income, saving at least 20% of income, investing 15% to 20% of income, spending down year over year, and income up year over year. Transfers between your own accounts are never counted as income or spending.">i</span></span>
-        </div>
+                data-tip="The selected year's totals, the ratios behind them, and six money goals: spending under 70% of income, total debt under 25% of income, saving at least 20% of income, investing 15% to 20% of income, spending down year over year, and income up year over year. Transfers between your own accounts are never counted as income or spending."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h3>
+        </div></div>
 
-        <div id="metrics-body"></div>
-    </div>
+        <div class="ant-card-body" id="metrics-body"></div>
+    </section>
 
-    <!-- Vitals is its own sub-card, not a section of the one above. Two
+    <!-- Vitals is its own inner card, not a section of the one above. Two
          questions — what the year totalled, what its ratios say — read as two
          answers, and the card border is the separator this page already uses
          everywhere else. It starts hidden: metrics.js reveals it once there is
          a year to fill it, so a database with nothing in it shows one empty
          state rather than two. -->
-    <div class="met-card" id="metrics-vitals-card" hidden>
-        <div class="dashboard-card-header">
-            <span class="dashboard-card-title">Vitals</span>
-        </div>
-        <div id="metrics-vitals"></div>
-    </div>
+    <section class="ant-card ant-card-type-inner met-card" id="metrics-vitals-card" aria-labelledby="metrics-vitals-title" hidden>
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
+            <h3 class="ant-card-head-title" id="metrics-vitals-title">Vitals</h3>
+        </div></div>
+        <div class="ant-card-body" id="metrics-vitals"></div>
+    </section>
 
-    </div><!-- /.met-shell -->
+    </div><!-- /.met-shell-body -->
+    </section><!-- /.met-shell -->
 
 </div>
 
@@ -362,6 +390,9 @@
     </div>
 
     <!-- @include scripts -->
+    <!-- Ant Design's interactive pieces (tooltips, icons, Empty, Modal,
+         message). After the shared block: its Modal is UI.dialog underneath. -->
+    <script src="/static/js/widgets/ant.js"></script>
     <!-- Merchant avatars: the generated slug→icon manifest, then the renderer
          that reads it. Page-level rather than shared chrome — see the note in
          pages/partials/scripts.html. Manifest first: avatar.js reads

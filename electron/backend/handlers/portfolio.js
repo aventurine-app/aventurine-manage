@@ -89,31 +89,13 @@ function deleteAccount(ctx, { params }) {
   return { ok: true };
 }
 
-function addEntry(ctx, { body }) {
-  const db = ctx.db();
-  if (!body) bad('invalid request');
-  const accountId = body.account_id;
-  if (typeof accountId !== 'number' || !Number.isInteger(accountId)) bad('invalid account_id');
-  if (!db.prepare('SELECT 1 FROM portfolio_accounts WHERE id = ?').get(accountId)) {
-    bad('account not found', 404);
-  }
-  // Column defaults: empty strings + zeros.
-  const info = db
-    .prepare(
-      `INSERT INTO portfolio_entries (account_id, ticker, asset_name, amount, price, market_price)
-       VALUES (?, '', '', 0, 0, 0)`
-    )
-    .run(accountId);
-  const e = db.prepare('SELECT * FROM portfolio_entries WHERE id = ?').get(info.lastInsertRowid);
-  return { ok: true, entry: serialiseEntry(e) };
-}
-
-function updateEntry(ctx, { params, body }) {
-  const db = ctx.db();
-  const e = db.prepare('SELECT * FROM portfolio_entries WHERE id = ?').get(params.entry_id);
-  if (!e) bad('not found', 404);
-  if (!body) bad('invalid request');
-
+/**
+ * Copy the editable fields a request body carries onto `e`, validating each.
+ * Shared by create (an asset added with its details) and update (one cell
+ * edited), so the two accept exactly the same values. Throws before anything
+ * is written.
+ */
+function applyEntryFields(e, body) {
   if ('ticker' in body) {
     if (typeof body.ticker !== 'string') bad('invalid ticker');
     e.ticker = body.ticker.slice(0, 20).toUpperCase();
@@ -131,6 +113,41 @@ function updateEntry(ctx, { params, body }) {
       e[field] = body[field];
     }
   }
+  return e;
+}
+
+/**
+ * Add an asset to an account (POST body: {account_id, asset_name?, ticker?,
+ * amount?, price?, market_price?}). Fields left out take the column defaults,
+ * empty strings and zeros, so a bare {account_id} is a blank row to fill in;
+ * the Add asset dialog sends every field, and the holding is created whole in
+ * one write rather than as a blank row and a follow-up edit.
+ */
+function addEntry(ctx, { body }) {
+  const db = ctx.db();
+  if (!body) bad('invalid request');
+  const accountId = body.account_id;
+  if (typeof accountId !== 'number' || !Number.isInteger(accountId)) bad('invalid account_id');
+  if (!db.prepare('SELECT 1 FROM portfolio_accounts WHERE id = ?').get(accountId)) {
+    bad('account not found', 404);
+  }
+  const fields = applyEntryFields({ ticker: '', asset_name: '', amount: 0, price: 0, market_price: 0 }, body);
+  const info = db
+    .prepare(
+      `INSERT INTO portfolio_entries (account_id, ticker, asset_name, amount, price, market_price)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(accountId, fields.ticker, fields.asset_name, fields.amount, fields.price, fields.market_price);
+  const e = db.prepare('SELECT * FROM portfolio_entries WHERE id = ?').get(info.lastInsertRowid);
+  return { ok: true, entry: serialiseEntry(e) };
+}
+
+function updateEntry(ctx, { params, body }) {
+  const db = ctx.db();
+  const e = db.prepare('SELECT * FROM portfolio_entries WHERE id = ?').get(params.entry_id);
+  if (!e) bad('not found', 404);
+  if (!body) bad('invalid request');
+  applyEntryFields(e, body);
   db.prepare(
     `UPDATE portfolio_entries
         SET ticker = ?, asset_name = ?, amount = ?, price = ?, market_price = ?

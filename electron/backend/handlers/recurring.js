@@ -574,6 +574,50 @@ function recurringBrands(ctx, { query }) {
   return { brands: suggestMerchants(query.q, MAX_BRAND_RESULTS).map((name) => ({ name })) };
 }
 
+// ── Preview ─────────────────────────────────────────────────────────────────
+
+const PREVIEW_DATES = 3;
+// No end to the window: PREVIEW_DATES bounds the walk, and a rule with an end
+// date stops at it.
+const PREVIEW_HORIZON = '9999-12-31';
+
+/**
+ * The next few dates a rule lands on, for the editor's readout (GET
+ * /api/recurring/preview?anchor=&freq=&interval=&weekday=&month_mode=&day=
+ * &pos=&until=&after_anchor=1). The rule is the editor's fields as they stand,
+ * before anything is saved.
+ *
+ * `anchor` is the date the saved schedule would be anchored on, and
+ * `after_anchor` says how to read it, exactly as the listing does
+ * (seriesNextDue): a DETECTED schedule is anchored on its last recorded charge,
+ * which has already happened, so its next date is strictly after it; a MANUAL
+ * one is anchored on the date the user entered, which counts. Running the same
+ * functions the listing and the calendar run is what keeps the readout from
+ * promising a date the calendar then draws somewhere else.
+ *
+ * Reads no table and writes nothing. An invalid rule is a 400, the same check a
+ * save would fail.
+ */
+function recurringPreview(ctx, { query }) {
+  const anchor = parseIsoDate(query.anchor);
+  if (!anchor) bad('invalid anchor');
+  if (query.until != null && !parseIsoDate(query.until)) bad('invalid until');
+  const rule = normaliseRule({
+    freq: query.freq,
+    interval: query.interval,
+    month_mode: query.month_mode,
+    day: query.day,
+    pos: query.pos,
+    weekday: query.weekday,
+    until: query.until,
+  }, anchor, bad);
+  if (!rule) bad('invalid freq');
+
+  const first = seriesNextDue(rule, anchor, localTodayIso(), { afterAnchor: query.after_anchor === '1' });
+  if (!first) return { dates: [] };
+  return { dates: occurrencesBetween(rule, anchor, first, PREVIEW_HORIZON, { limit: PREVIEW_DATES }) };
+}
+
 /**
  * Which of `keys` detection can still produce. It is the one question both
  * deletes ask, and the answer decides between un-adopting a row and dropping it,
@@ -657,6 +701,7 @@ const routes = [
   ['GET', '/api/recurring', recurringGet],
   ['GET', '/api/recurring/candidates', recurringCandidates],
   ['GET', '/api/recurring/brands', recurringBrands],
+  ['GET', '/api/recurring/preview', recurringPreview],
   ['POST', '/api/recurring/adopt', recurringAdopt],
   ['POST', '/api/recurring/override', recurringOverrideUpsert],
   ['POST', '/api/recurring/schedule', recurringScheduleCreate],

@@ -184,10 +184,7 @@
    preview is a four-bar mini chart rather than the theme swatch's three bands,
    because what changes here is what the CHARTS are painted with, not the page.
 
-   Each variant only sets --sw-1..4; the bars themselves are one rule. Aventurine
-   reads --chart-accent-* (style.css) and Gemstone and Opal read --chart-* from
-   their own data-graph-theme context (themes.css), which is why each preview
-   shows its true colours while another palette is the live one. */
+   Each variant only sets --sw-1..4; the bars themselves are one rule. */
 .settings-graph-btn {
     position: relative;
     display: flex;
@@ -256,34 +253,17 @@
     background-position: 10px bottom, 26px bottom, 42px bottom, 58px bottom;
 }
 
-/* The Aventurine ramp is mixed from the UI accent, so the live --chart-accent-*
-   tokens would recolour this preview whenever a tint or the dark surface is
-   picked. The preview is the same four mixes (style.css) taken from the neutral
-   ramp this swatch resets to, with the light theme's accent (600), text (900)
-   and page (100), so it stays one fixed picture of the palette. */
-.settings-graph-swatch[data-graph-theme=""] {
-    --sw-1: var(--color-accent-600);
-    --sw-2: color-mix(in srgb, var(--color-accent-600) 50%, var(--color-base-900));
-    --sw-3: color-mix(in srgb, var(--color-accent-600) 72%, var(--color-base-100));
-    --sw-4: color-mix(in srgb, var(--color-accent-600) 25%, var(--color-base-900));
-}
-
-.settings-graph-swatch[data-graph-theme="gemstone"],
-.settings-graph-swatch[data-graph-theme="opal"],
-.settings-graph-swatch[data-graph-theme="labradorite"] {
-    --sw-1: var(--chart-1);
-    --sw-2: var(--chart-2);
-    --sw-3: var(--chart-3);
-    --sw-4: var(--chart-4);
-}
-
-/* Lapis Lazuli previews two blues and two golds (slots 1, 2, 4, 5) rather than
-   its first four, which would show three blues to one gold. */
-.settings-graph-swatch[data-graph-theme="lapis"] {
-    --sw-1: var(--chart-1);
-    --sw-2: var(--chart-2);
-    --sw-3: var(--chart-4);
-    --sw-4: var(--chart-5);
+/* Both previews read the live --ant-chart-* names. Each swatch carries its own
+   data-graph-theme, which puts it in that palette's token context (ant.css for
+   Default, themes.css for Opal), so each shows its true colours whichever
+   palette is live. Four slots: blue, cyan, violet and orange, the first four
+   categories. */
+.settings-graph-swatch[data-graph-theme=""],
+.settings-graph-swatch[data-graph-theme="opal"] {
+    --sw-1: var(--ant-chart-1);
+    --sw-2: var(--ant-chart-2);
+    --sw-3: var(--ant-chart-3);
+    --sw-4: var(--ant-chart-4);
 }
 
 .settings-theme-label {

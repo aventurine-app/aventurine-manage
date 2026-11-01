@@ -1,15 +1,14 @@
 /* ============================================================================
-   forecast.css — Reports page (tab shell) + the Forecast report.
+   forecast.css — Reports page (tab shell) + the Cash Flow and Forecast reports.
 
-   The .rep-* shell here frames all four reports (Cash Flow, Spending,
-   Recurring, Forecast); trends.css and recurring.css load alongside this file
-   on that one page and style the two reports that came in from their own
-   pages. Only the shell + Forecast live here.
+   The page is drawn in Ant Design: the Tabs, Cards, Segmented, Checkbox,
+   Empty, Modal and the rest come from ant.css. This file holds what is the
+   Reports page's own and shared by all five reports — the shell's layout, the
+   charts' Ant palette and the pickers drawn as Ant's Select — then the Cash
+   Flow and Forecast reports. trends.css, transfers.css and metrics.css load
+   alongside it and style the other three.
 
-   Page-scoped: the shared chart-frame + range-selector chrome lives in dashboard.css
-   (loaded only on Dashboard), so the slices this page needs are re-stated here under
-   the .forecast-chart namespace. Everything draws from the theme variables so
-   it retones with the palette / light theme like the rest of the app.
+   Page-scoped: forecast.css loads only on pages/reports.html.
    ============================================================================ */
 
 /* The base .page rule (style.css) centers its child on the cross axis
@@ -22,23 +21,19 @@
 }
 
 /* ─── Reports shell: tab bar + panel wrapper ────────────────────────────────
-   The wrapper owns the page padding / max width; the report inside it (the
-   .forecast-page / .trends-page / .rec-page column) then just stacks its
-   cards — which is why none of those three restate the page padding. */
+   The wrapper owns the page padding; the report inside it (the .forecast-page
+   / .trends-page / .tfr-page / .metrics-page column) then just stacks its
+   cards. 16px from the tab bar to the panel, Ant's gap under a Tabs nav.
+
+   Grown as a flex item rather than width:100%: .page is a scroll container,
+   and a percentage width resolves against a content box that still counts the
+   vertical scrollbar's track, so a report tall enough to scroll overshot by the
+   scrollbar width and raised a horizontal scrollbar under it. */
 .rep-reports {
     display: flex;
     flex-direction: column;
-    /* Tab row → report panel: same tight 8px as Statements' toolbar → tables
-       (.stmt-page), so the segmented control sits identically on both pages. */
-    gap: var(--space-8);
+    gap: 16px;
     padding: var(--page-pad);
-    /* Fill the page so the reports use the full available width — the charts
-       scale responsively to their container, making legends easier to read.
-       Grow as a flex item rather than width:100%: .page is a scroll container,
-       and a percentage width resolves against a content box that still counts
-       the vertical scrollbar's track, so a report tall enough to scroll (the
-       Forecast one) overshot by the scrollbar width and raised a horizontal
-       scrollbar under it. */
     flex: 1;
     min-width: 0;
 }
@@ -57,46 +52,10 @@
     height: 100%;
 }
 
-/* Tab styles live in ui.css — the segmented control shared with .stmt-tab
-   (Statements). The column above stretches its children; keep the track hugging
-   its labels like the other pages' toolbars do. */
-.rep-tabs { align-self: flex-start; }
-
 .forecast-page {
     display: flex;
     flex-direction: column;
-    gap: 24px;
-}
-
-/* ─── Card (mirrors .dashboard-card) ──────────────────────────────────────────── */
-.forecast-card {
-    min-width: 0;
-    border: var(--card-border-width) solid var(--border);
-    border-radius: 12px;
-    background: var(--surface1);
-    box-shadow: var(--shadow-card);
-    padding: 24px 28px;
-    display: flex;
-    flex-direction: column;
-}
-
-.dashboard-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    min-height: 22px;
     gap: 16px;
-}
-
-.dashboard-card-title {
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-    line-height: var(--lh-tight);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
 }
 
 .chart-area {
@@ -104,211 +63,415 @@
     overflow: hidden;
 }
 
-#forecast-chart { width: 100%; }
+/* A card's title keeps its whole width; when the head is too narrow for the
+   title and the controls, the controls drop to a second line, right-aligned,
+   rather than the title being cut to "Balance F…". The block padding is
+   inside Ant's 56px (border-box), so a single-line head keeps that height and
+   a wrapped one grows from it. Inner cards keep their own shorter head. */
+.rep-reports .ant-card:not(.ant-card-type-inner) > .ant-card-head {
+    box-sizing: border-box;
+    padding-block: 12px;
+}
+.rep-reports .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    row-gap: 8px;
+}
+.rep-reports .ant-card-head-title { flex: 1 0 auto; }
 
-/* ─── Header controls: transfers + account + horizon + ⋮ ─────────────────────
-   Three knobs, because three are what the report is read through: whether your
-   own transfers count, whose balance, and how far ahead. The ⋮ is left with
-   housekeeping only, and hides itself when it has none. */
-.forecast-controls {
+/* A card's controls sit in a row in its head (Ant's Card extra). */
+.forecast-controls,
+.trends-controls {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-8);
+    justify-content: flex-end;
+    gap: 8px;
 }
 
-/* The transfers switch. A checkbox rather than a third .range-selector: it is
-   one yes/no answer, and unlike a picker it states its own state without being
-   opened — which matters, because it changes what every figure on the card
-   means. It leads the row (before the two pickers) since it defines what is
-   being counted, and the pickers only narrow it. */
-.fc-toggle {
+
+/* ─── The charts, in the Graphs palette ─────────────────────────────────────
+   The chart scripts read their colours off <html> (--chart-*, --cat-*, the
+   inflow/outflow ramps). Those are mapped onto the --ant-chart-* palette in
+   ant.css, so Reports draws in whichever Graphs palette Preferences has
+   picked, and the chrome below is the only part that is this page's own. */
+
+/* Axis chrome, as G2 draws it: 12px labels in the tertiary text colour over
+   dashed hairlines. Shared by the three chart engines on this page. */
+.rep-reports :is(.dashboard-chart, .forecast-chart) .chart-label {
+    fill: var(--ant-color-text-tertiary);
+    font-family: var(--ant-font-family);
+    font-size: var(--ant-font-size-sm);
+    font-weight: 400;
+    letter-spacing: 0;
+}
+.rep-reports :is(.dashboard-chart, .forecast-chart) .chart-grid {
+    stroke: var(--ant-color-split);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+}
+
+
+/* ─── Pickers, drawn as Ant's Select ────────────────────────────────────────
+   Every picker on the page is a .range-selector (ui.css): a button that opens
+   a list, wired by UI.wirePicker or UI.openMenu. Here it takes Select's box —
+   32px, the field border, the label left-aligned and DownOutlined at the end —
+   and its list takes Select's dropdown: an elevated panel of 32px options, the
+   current one tinted (UI.wirePicker marks it aria-current). The caret stays
+   absolutely placed (ui.css) and the right padding reserves its room, so
+   UI.lockPickerWidth still measures caption + padding. */
+.rep-reports .range-selector-btn {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-8);
-    height: var(--control-height);
-    padding: 0 var(--space-4);
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
+    min-width: 0;
+    height: var(--ant-control-height);
+    padding: 0 30px 0 11px;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius);
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text);
+    font-family: inherit;
+    font-size: var(--ant-font-size);
+    font-weight: 400;
+    line-height: var(--ant-line-height);
+    letter-spacing: 0;
+    text-transform: none;
+    text-align: start;
     white-space: nowrap;
-    cursor: pointer;
+    transition: border-color var(--ant-motion-mid), box-shadow var(--ant-motion-mid);
+}
+.rep-reports .range-selector-btn:hover {
+    border-color: var(--ant-color-primary-hover);
+    background: var(--ant-color-bg-container);
+    color: var(--ant-color-text);
+}
+/* Focused, and open: the primary border with Select's soft ring. */
+.rep-reports .range-selector-btn:focus-visible,
+.rep-reports .range-selector:has(.range-selector-menu:not([hidden])) .range-selector-btn,
+.rep-reports .range-selector:has(.p-table-dropdown) .range-selector-btn {
+    border-color: var(--ant-color-primary);
+    box-shadow: 0 0 0 2px var(--ant-control-outline);
+    outline: none;
+}
+.rep-reports .range-selector-btn:disabled {
+    border-color: var(--ant-color-border);
+    background: var(--ant-color-fill-tertiary);
+    color: var(--ant-color-text-disabled);
+    cursor: not-allowed;
+}
+
+.rep-reports .picker-caret {
+    right: 11px;
+    color: var(--ant-color-text-placeholder);
+    font-size: var(--ant-font-size-sm);
+}
+
+/* The dropdown. Right-aligned under its trigger (ui.css), where Ant's flips it
+   for a trigger at the right edge, which is where every one of these sits. A
+   picker's list is at least as wide as its Select; the ⋮ menu (a Dropdown,
+   whose parent is the whole control row) is as wide as its item. */
+.rep-reports .range-selector-menu,
+.rep-reports .p-table-dropdown {
+    box-sizing: border-box;
+    padding: 4px;
+    border: 0;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
+    animation: rep-drop-in var(--ant-motion-mid) var(--ant-ease-out-circ);
+}
+.rep-reports .range-selector > :is(.range-selector-menu, .p-table-dropdown) { min-width: 100%; }
+.rep-reports .range-selector-menu {
+    max-height: 256px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ant-color-fill) transparent;
+}
+.rep-reports .p-dropdown-scroll { max-height: 256px; }
+
+.rep-reports .range-selector-menu button,
+.rep-reports .p-dropdown-item {
+    min-height: 32px;
+    padding: 5px 12px;
+    border-radius: var(--ant-radius-sm);
+    color: var(--ant-color-text);
+    font-family: inherit;
+    font-size: var(--ant-font-size);
+    font-weight: 400;
+    line-height: var(--ant-line-height);
+    letter-spacing: 0;
+    text-transform: none;
+    transition: background-color var(--ant-motion-mid);
+}
+.rep-reports .range-selector-menu button:hover,
+.rep-reports .p-dropdown-item:hover {
+    background: var(--ant-color-fill-tertiary);
+    color: var(--ant-color-text);
+}
+.rep-reports .range-selector-menu button[aria-current="true"],
+.rep-reports .p-dropdown-item[aria-current="true"] {
+    background: var(--ant-color-primary-bg);
+    font-weight: var(--ant-font-weight-strong);
+}
+.rep-reports .range-selector-menu button:focus-visible,
+.rep-reports .p-dropdown-item:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+.rep-reports .p-dropdown-item-danger,
+.rep-reports .p-dropdown-item-danger:hover { color: var(--ant-color-error); }
+.rep-reports .p-dropdown-item-danger:hover { background: var(--ant-color-error-bg); }
+
+@keyframes rep-drop-in {
+    from { opacity: 0; transform: translateY(-4px); }
+}
+
+/* ─── Year + month as one joined control (Cash Flow, Metrics) ────────────────
+   Two Selects in a Space.Compact: they share one border on the seam, the inner
+   corners square off, and the hovered or focused half is lifted so its
+   primary border is drawn whole over the seam. The year half is the width of
+   its four digits; the month half is pinned to its longest caption by
+   UI.lockPickerWidth, so picking September does not shove the seam. */
+.range-selector-pair { display: flex; }
+
+.rep-reports .range-selector-pair > .range-selector:first-child .range-selector-btn {
+    min-width: 88px;
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+}
+
+.rep-reports .range-selector-pair > .range-selector:last-child {
+    margin-inline-start: calc(var(--ant-line-width) * -1);
+}
+.rep-reports .range-selector-pair > .range-selector:last-child .range-selector-btn {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+}
+
+.rep-reports .range-selector-pair > .range-selector:hover,
+.rep-reports .range-selector-pair > .range-selector:focus-within {
+    position: relative;
+    z-index: 2;
+}
+
+
+/* ─── Cash Flow: the Sankey gets the whole viewport ─────────────────────────
+   Every other report on this page is a card sized by its own content, but a
+   Sankey's readability is its HEIGHT: bands, labels and the gaps between them
+   all divide the vertical space, and a height derived from the width (the old
+   320/800 ratio) left the ribbons crushed on a tall window while empty page sat
+   below the card. So this one panel is stretched from .page down to .chart-area
+   — each link grows, and the box the diagram measures is what the viewport had
+   left rather than a fixed slab. min-height: 0 at each step because a flex item
+   defaults to refusing to shrink below its content. cashflow-sankey.js reads the
+   resulting height off .chart-area (via its ResizeObserver) and lays the diagram
+   out to fill it; with no definite height (a plain browser, no page chrome) it
+   falls back to the width ratio, so fixtures still render. */
+#cashflow-chart { width: 100%; }
+
+/* :not([hidden]) because an ID beats the `.rep-panel[hidden] { display: none }`
+   rule in ui.css — without it this display:flex would un-hide the panel. */
+#rep-panel-cashflow:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+#rep-panel-cashflow .forecast-page,
+#rep-panel-cashflow .forecast-card-main,
+#rep-panel-cashflow .ant-card-body,
+#rep-panel-cashflow .chart-area {
+    flex: 1;
+    min-height: 0;
+}
+#rep-panel-cashflow .forecast-card-main,
+#rep-panel-cashflow .ant-card-body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* No diagram to fill the space with: the empty state is a short message, and a
+   viewport of blank under it reads as a card that failed to load. Keyed off the
+   empty-state element (filled only by showEmpty) rather than off an empty
+   #cashflow-chart, so the FIRST paint still measures a stretched box and the
+   diagram is drawn at full height once instead of twice. */
+#rep-panel-cashflow:has(#cashflow-empty:not(:empty)) :is(.forecast-page, .forecast-card-main, .ant-card-body, .chart-area) {
+    flex: 0 0 auto;
+}
+
+/* Each category's wave (the ribbon) + its labels is one link to that category's
+   transactions; the node bar is a bare cap, not part of the link. Brighten the
+   wave on hover/keyboard-focus so the click target reads, and outline
+   the wave's own contour on focus (a box around a ribbon would be huge). */
+.cashflow-sankey .sankey-cat { cursor: pointer; }
+.cashflow-sankey .sankey-cat .sankey-link,
+.cashflow-sankey .sankey-cat .sankey-label,
+.cashflow-sankey .sankey-cat .sankey-share,
+.cashflow-sankey .sankey-cat .sankey-amount {
+    transition: fill 0.15s ease, opacity 0.15s ease, stroke 0.15s ease;
+}
+.cashflow-sankey .sankey-cat:hover .sankey-link,
+.cashflow-sankey .sankey-cat:focus-visible .sankey-link { opacity: 0.7; }
+.cashflow-sankey .sankey-cat:focus { outline: none; }
+.cashflow-sankey .sankey-cat:focus-visible .sankey-link {
+    stroke: var(--ant-color-primary);
+    stroke-width: 1.5;
+}
+
+/* G2's Sankey links sit at about a third of their colour. */
+.cashflow-sankey .sankey-link {
+    opacity: 0.4;
+    transition: opacity 0.15s ease;
+}
+
+.cashflow-sankey .sankey-link:hover { opacity: 0.7; }
+
+/* The channel between the two hub bars is a stage of the diagram, not a
+   category, so it opens nothing. It holds its opacity under the pointer:
+   brightening would offer a click there is no destination for. Its tooltip
+   still appears. */
+.cashflow-sankey .sankey-link-net:hover { opacity: 0.4; }
+
+/* Thin connector from a node to its label when the label was nudged to avoid
+   overlapping a neighbour. */
+.cashflow-sankey .sankey-leader {
+    stroke: var(--ant-color-text-tertiary);
+    stroke-width: 1;
+    opacity: 0.45;
+}
+
+/* Name over amount, in the page's type. Both in the full text colour: they
+   float on the inner face of the bar, over the ribbon, and a muted tone read
+   poorly there. The layout measures them in the app's wider face
+   (cashflow-sankey.js), so these never come out wider than the room it left. */
+.cashflow-sankey .sankey-label {
+    fill: var(--ant-color-text-secondary);
+    font-family: var(--ant-font-family);
+    font-size: var(--ant-font-size-sm);
+    font-weight: 400;
+}
+
+.cashflow-sankey .sankey-amount {
+    fill: var(--ant-color-text);
+    font-family: var(--ant-font-family);
+    font-size: 13px;
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The share rides along in the amount's run, unbolded: it qualifies the figure
+   it follows rather than competing with it. */
+.cashflow-sankey .sankey-share {
+    fill: var(--ant-color-text-tertiary);
+    font-size: 11px;
+    font-weight: 400;
+}
+
+/* Entrance: fade the whole diagram in on first paint only (.sankey-enter is
+   added by cashflow-sankey.js for the first render, dropped on redraws). Fading
+   the SVG as a whole keeps each element's own opacity (e.g. the 0.4 links). */
+.cashflow-sankey.sankey-enter {
+    opacity: 0;
+    animation: fc-fade 0.5s ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cashflow-sankey.sankey-enter { animation: none; opacity: 1; }
+}
+
+
+/* ─── Forecast: header controls ──────────────────────────────────────────────
+   Three knobs, because three are what the report is read through: whether your
+   own transfers count, whose balance, and how far ahead. The ⋮ is left with
+   housekeeping only, and hides itself when it has none.
+
+   The transfers switch is Ant's Checkbox rather than a third picker: it is one
+   yes/no answer, and unlike a picker it states its own state without being
+   opened — which matters, because it changes what every figure on the card
+   means. It leads the row since it defines what is being counted, and the
+   pickers only narrow it. */
+.fc-toggle {
+    margin-inline-end: 8px;
+    white-space: nowrap;
     user-select: none;
 }
 
-.fc-toggle:hover { color: var(--text-primary); }
+#forecast-kebab-btn[hidden] { display: none; }
 
-/* accent-color, like every other checkbox in the app — the browser default
-   blue belongs to no theme here. */
-.fc-toggle input[type="checkbox"] {
-    width: 15px;
-    height: 15px;
-    margin: 0;
-    accent-color: var(--accent-primary);
-    cursor: pointer;
-}
-
-.fc-toggle:focus-within { color: var(--text-primary); }
-
-
-/* Both pickers are .range-selector (ui.css) — no bespoke control here. The
-   account one only needs a floor narrow enough that a short name like "Cash"
-   doesn't sit in a 118px box; UI.lockPickerWidth then pins it to the widest
-   account label so switching accounts can't shove the horizon picker sideways. */
-#forecast-account { --stepper-label-min: 90px; }
-
-/* ─── Year + month as one joined control (Cash Flow, Metrics) ────────────────
-   Two .range-selector triggers abutting on a shared edge, so the pair reads as
-   one picker with a left half and a right half rather than two controls that
-   happen to sit next to each other. The year half narrows to its four digits,
-   the month half carries the longest caption ("Entire year", "September"), and
-   the inner corners drop their radius. The divider is the FIRST button's right
-   border and the second drops its left one — two borders on one seam would draw
-   a double line. The seam sits under whichever half is hovered or focused, so
-   its highlight is not cut in half by the neighbour's border.
-
-   The two floors hang off the POSITION in the pair, not off the ids of one
-   report's halves: the Cash Flow tab and the Metrics tab carry the same
-   control, and per-id floors left the Metrics pair on the 118px default, so
-   the same picker was two different widths on two tabs of one page. */
-.range-selector-pair { display: flex; }
-
-.range-selector-pair > .range-selector:first-child { --stepper-label-min: 76px; }
-.range-selector-pair > .range-selector:last-child { --stepper-label-min: 132px; }
-
-.range-selector-pair > .range-selector:first-child .range-selector-btn {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-}
-
-.range-selector-pair > .range-selector:last-child .range-selector-btn {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    border-left: none;
-}
-
-/* Both menus hang off their own half, so the year list opens under the year and
-   the month list under the month; the right-aligned default (ui.css) keeps each
-   inside the card. Sizing each menu to its own longest caption is the base
-   rule's job now, so the local min-width:0 that used to live here is gone. */
-
-.range-selector-pair .range-selector-btn:hover,
-.range-selector-pair .range-selector-btn:focus-visible {
-    position: relative;
-    z-index: 1;
-}
-
-#forecast-account .range-selector-btn:disabled {
-    color: var(--text-tertiary);
-    cursor: default;
-}
+#forecast-chart { width: 100%; }
 
 /* ─── The sentence ───────────────────────────────────────────────────────────
    This report answers one question, so it says the answer in words before it
    draws the shape — and in the ordinary case that sentence is the ONLY text
-   here. It replaces a three-stat grid (typical monthly net / projected end /
-   lowest point, each with its own info bubble) that made the reader assemble
-   the sentence themselves out of three numbers. Everything below it is
-   conditional: it renders only when something would make the number wrong to
-   read at face value.
-
-   Sentence case and a real measure throughout: the old provenance line was
-   uppercase micro-caps, which is a label treatment and unreadable as prose. */
+   here. Everything below it is conditional: it renders only when something
+   would make the number wrong to read at face value. Ant's Paragraph, its
+   figures in strong. */
 .forecast-summary {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    margin-bottom: var(--space-16);
-    max-width: 78ch;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 90ch;
+    margin-bottom: 16px;
+}
+.forecast-summary:empty { display: none; }
+/* With nothing to forecast, the summary holds the card's Empty, centred across
+   the card like every other report's. */
+.forecast-summary:has(> .ant-empty) {
+    align-items: stretch;
+    max-width: none;
 }
 
 .fc-lead {
     margin: 0;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-body);
-    font-weight: var(--weight-regular);
-    line-height: var(--lh-snug);
+    color: var(--ant-color-text);
+    font-size: 15px;
+    line-height: var(--ant-line-height);
 }
 
 /* The figures the sentence turns on — the horizon, the landing balance and its
-   date. One weight up and in the primary ink so the eye can pick the answer out
-   of the prose, but still the sentence's own face: the numeric face is for
-   money, and setting a phrase like "3 months" in it just makes the sentence
-   look broken apart. */
-.fc-lead-value {
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-weight: var(--weight-semibold);
-}
+   date — in Typography's strong, so the eye can pick the answer out of the
+   prose. */
+.fc-lead-value { font-weight: var(--ant-font-weight-strong); }
+.fc-lead-money { font-variant-numeric: tabular-nums; }
+.fc-lead-value.fc-neg { color: var(--ant-color-error); }
 
-/* Money keeps the app's numeric face + tabular figures, like every other
-   currency figure on screen. */
-.fc-lead-money {
-    font-family: var(--font-numeric);
-    font-variant-numeric: tabular-nums;
-}
-
-.fc-lead-value.fc-neg { color: var(--accent-negative); }
-
-/* Shown only when the projection runs out of money. A dip that stays above zero
-   gets no line: "tightest week" was a level the chart already draws, and on a
-   rising line the lowest point is week zero, which is no kind of warning. */
-.fc-risk {
-    margin: 0;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    line-height: var(--lh-normal);
-}
-
-.fc-risk-alarm {
-    color: var(--accent-negative);
-    font-weight: var(--weight-semibold);
-}
+/* Shown only when the projection runs out of money, as an error Alert. A dip
+   that stays above zero gets no line: on a rising line the lowest point is week
+   zero, which is no kind of warning. */
+.fc-risk { align-self: stretch; }
 
 .fc-note {
     margin: 0;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    line-height: var(--lh-normal);
+    color: var(--ant-color-text-tertiary);
+    line-height: var(--ant-line-height);
 }
 
 /* The starting balance is a Balance Sheet cell and can be months old while the
    line starts today. That gap is stated, not hidden — and the note carries the
    link to where it is fixed. */
-.fc-note-warn { color: var(--text-secondary); }
-.fc-note-warn a { color: var(--accent-primary); }
-
-/* ─── Chart frame chrome (namespaced .forecast-chart) ────────────────────── */
-.forecast-chart .chart-grid {
-    stroke: var(--border);
-    stroke-width: 1;
-    stroke-dasharray: 3 5;
+.fc-note-warn { color: var(--ant-color-text-secondary); }
+.fc-note-warn a {
+    color: var(--ant-color-primary);
+    text-decoration: none;
 }
+.fc-note-warn a:hover { color: var(--ant-color-primary-hover); }
 
+/* ─── Forecast: the chart ────────────────────────────────────────────────────
+   Axis labels and grid come from the shared block near the top. The zero line
+   is the error colour, dashed: below it the account is overdrawn. */
 .forecast-chart .chart-zero {
-    stroke: var(--accent-negative);
+    stroke: var(--ant-color-error);
     stroke-width: 1;
-    stroke-dasharray: 5 4;
-    opacity: 0.65;
-}
-
-.forecast-chart .chart-label {
-    fill: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: 11px;
-    font-weight: var(--weight-semibold);
-    letter-spacing: 0.05em;
+    stroke-dasharray: 4 4;
+    opacity: 0.6;
 }
 
 /* ── Past vs future ──────────────────────────────────────────────────────────
    Today sits dead centre: recorded balances to its left, the projection to its
-   right. The difference is drawn, not just labelled — but with ONE hue. The app
-   carries "prediction, not record" as a step back in emphasis (.rec-occ-projected
-   on the Recurring calendar does exactly this), and red/green are spoken for by
-   gain/loss everywhere else, so a second colour here would say the wrong thing.
-   What separates the halves is the dash, the lighter fill, and the divider. */
+   right. The difference is drawn, not just labelled — but with ONE hue: what
+   separates the halves is the dash, the lighter fill, and the divider. Red and
+   green are spoken for by loss and gain. */
 
 /* Actual: solid, full weight, and the half that gets the draw animation — the
    line the eye should follow first. */
@@ -333,19 +496,26 @@
     animation: fc-fade 0.5s ease 0.4s forwards;
 }
 
+/* The range around the projection. Behind the lines and fainter than either
+   area, so it reads as the line's uncertainty and never competes with it. */
+.forecast-chart .fc-band {
+    fill-opacity: 0.13;
+    opacity: 0;
+    animation: fc-fade 0.5s ease 0.5s forwards;
+}
+
 /* The divider. Stronger than a grid line (it is a boundary, not a reading aid)
    but still chrome — the lines either side are the content. */
 .forecast-chart .fc-today-rule {
-    stroke: var(--text-tertiary);
+    stroke: var(--ant-color-border);
     stroke-width: 1;
-    opacity: 0.55;
 }
 
 /* "Today" outranks the other tick labels: it is the one that explains the
    chart's structure rather than just marking a date. */
-.forecast-chart .fc-today-label {
-    fill: var(--text-secondary);
-    font-weight: var(--weight-superbold);
+.rep-reports .forecast-chart .fc-today-label {
+    fill: var(--ant-color-text);
+    font-weight: var(--ant-font-weight-strong);
 }
 
 .forecast-chart .chart-dot {
@@ -354,22 +524,23 @@
     transition: r 0.15s ease;
 }
 
-.forecast-chart .chart-dot:hover { r: 6; fill-opacity: 1; }
+.forecast-chart .chart-dot:hover { r: 5; fill-opacity: 1; }
 
 /* Projected points sit a step back from recorded ones, via fill-opacity rather
    than opacity — the entrance animation owns `opacity`, and setting it here
    would be overwritten the moment that finishes. */
 .forecast-chart .chart-dot-projected { fill-opacity: 0.5; }
 
-.forecast-chart .chart-dot-neg { fill: var(--accent-negative) !important; fill-opacity: 1; }
+.forecast-chart .chart-dot-neg { fill: var(--ant-color-error) !important; fill-opacity: 1; }
 
 /* Today — where recorded history hands over to the projection, at the balance
    before any projected flow is applied. Ringed so the handover reads as a real
    point on both lines rather than the first weekly estimate. */
 .forecast-chart .chart-dot-anchor {
-    stroke: var(--text-primary);
-    stroke-width: 1.5;
+    stroke: var(--ant-color-bg-container);
+    stroke-width: 2;
     fill-opacity: 1;
+    r: 4.5;
 }
 
 @keyframes fc-draw { to { stroke-dashoffset: 0; } }
@@ -384,6 +555,7 @@
 }
 .chart-no-anim .fc-line-projected,
 .chart-no-anim .fc-area,
+.chart-no-anim .fc-band,
 .chart-no-anim .chart-dot { animation: none; opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -394,153 +566,16 @@
     }
     .forecast-chart .fc-line-projected,
     .forecast-chart .fc-area,
+    .forecast-chart .fc-band,
     .forecast-chart .chart-dot { animation: none; opacity: 1; }
 }
 
-/* ─── Cash Flow Sankey (namespaced .cashflow-sankey) ─────────────────────────
-   Income categories → central Net Inflow → expense categories. All colours come
-   from the chart palette baked into the SVG (per-node) + theme tokens for the
-   chrome, so it retones with palette / light mode like the other charts. */
-#cashflow-chart { width: 100%; }
-
-/* ─── The Sankey gets the whole viewport ─────────────────────────────────────
-   Every other report on this page is a card sized by its own content, but a
-   Sankey's readability is its HEIGHT: bands, labels and the gaps between them
-   all divide the vertical space, and a height derived from the width (the old
-   320/800 ratio) left the ribbons crushed on a tall window while empty page sat
-   below the card. So this one panel is stretched from .page down to .chart-area
-   — each link grows, and the box the diagram measures is what the viewport had
-   left rather than a fixed slab. min-height: 0 at each step because a flex item
-   defaults to refusing to shrink below its content. cashflow-sankey.js reads the
-   resulting height off .chart-area (via its ResizeObserver) and lays the diagram
-   out to fill it; with no definite height (a plain browser, no page chrome) it
-   falls back to the width ratio, so fixtures still render. */
-/* :not([hidden]) because an ID beats the `.rep-panel[hidden] { display: none }`
-   rule in ui.css — without it this display:flex would un-hide the panel. */
-#rep-panel-cashflow:not([hidden]) {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-}
-
-#rep-panel-cashflow .forecast-page {
-    flex: 1;
-    min-height: 0;
-}
-
-#rep-panel-cashflow .forecast-card-main {
-    flex: 1;
-    min-height: 0;
-}
-
-#rep-panel-cashflow .chart-area {
-    flex: 1;
-    min-height: 0;
-}
-
-/* No diagram to fill the space with: the empty state is a short message, and a
-   viewport of blank under it reads as a card that failed to load. Keyed off the
-   empty-state element (filled only by showEmpty) rather than off an empty
-   #cashflow-chart, so the FIRST paint still measures a stretched box and the
-   diagram is drawn at full height once instead of twice. */
-#rep-panel-cashflow:has(#cashflow-empty:not(:empty)) .forecast-page,
-#rep-panel-cashflow:has(#cashflow-empty:not(:empty)) .forecast-card-main,
-#rep-panel-cashflow:has(#cashflow-empty:not(:empty)) .chart-area {
-    flex: 0 0 auto;
-}
-
-/* Each category's wave (the ribbon) + its labels is one link to that category's
-   transactions; the node bar is a bare cap, not part of the link. Brighten the
-   wave on hover/keyboard-focus so the click target reads, and outline
-   the wave's own contour on focus (a box around a ribbon would be huge). */
-.cashflow-sankey .sankey-cat { cursor: pointer; }
-.cashflow-sankey .sankey-cat .sankey-link,
-.cashflow-sankey .sankey-cat .sankey-label,
-.cashflow-sankey .sankey-cat .sankey-share,
-.cashflow-sankey .sankey-cat .sankey-amount {
-    transition: fill 0.15s ease, opacity 0.15s ease, stroke 0.15s ease;
-}
-.cashflow-sankey .sankey-cat:hover .sankey-link,
-.cashflow-sankey .sankey-cat:focus-visible .sankey-link { opacity: 0.72; }
-.cashflow-sankey .sankey-cat:focus { outline: none; }
-.cashflow-sankey .sankey-cat:focus-visible .sankey-link {
-    stroke: var(--accent-primary);
-    stroke-width: 1.5;
-}
-
-.cashflow-sankey .sankey-link {
-    opacity: 0.42;
-    transition: opacity 0.15s ease;
-}
-
-.cashflow-sankey .sankey-link:hover { opacity: 0.72; }
-
-/* The channel between the two hub bars is a stage of the diagram, not a
-   category, so it opens nothing. It holds its opacity under the pointer:
-   brightening would offer a click there is no destination for. Its tooltip
-   still appears. */
-.cashflow-sankey .sankey-link-net:hover { opacity: 0.42; }
-
-/* Thin connector from a node to its label when the label was nudged to avoid
-   overlapping a neighbour. */
-.cashflow-sankey .sankey-leader {
-    stroke: var(--text-tertiary);
-    stroke-width: 1;
-    opacity: 0.45;
-}
-
-/* Name, amount and share all carry the full text colour: they float on the
-   inner face of the bar, over the ribbon, and a muted tone read poorly there. */
-.cashflow-sankey .sankey-label {
-    fill: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: 11px;
-    font-weight: var(--weight-semibold);
-    letter-spacing: 0.03em;
-}
-
-.cashflow-sankey .sankey-amount {
-    fill: var(--text-primary);
-    font-family: var(--font-h3);   /* the label's face — the pair reads as one block */
-    font-size: 13px;               /* the figure is the line's point, so it leads the name */
-    font-weight: var(--weight-bold);
-    font-variant-numeric: tabular-nums;
-}
-
-/* The share rides along in the amount's run, unbolded: it qualifies the figure
-   it follows rather than competing with it. */
-.cashflow-sankey .sankey-share {
-    font-size: 10px;
-    font-weight: var(--weight-regular);
-}
-
-/* Entrance: fade the whole diagram in on first paint only (.sankey-enter is
-   added by cashflow-sankey.js for the first render, dropped on redraws). Fading
-   the SVG as a whole keeps each element's own opacity (e.g. the 0.42 links). */
-.cashflow-sankey.sankey-enter {
-    opacity: 0;
-    animation: fc-fade 0.5s ease forwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .cashflow-sankey.sankey-enter { animation: none; opacity: 1; }
-}
-
-/* ─── Planned items: pins on the line ────────────────────────────────────────
-   Planned items used to be a second card holding a table and an inline form.
-   They are now pins ON the projected line at the date they fall, and the pin is
-   where that item's data lives: hovering opens a card carrying the whole row
-   (label, date, amount) with its pencil and trash. That is deliberately the
-   Recurring calendar's interaction (.rec-occ chip → that schedule's own editor,
-   see recurring.css) applied to a chart instead of a grid — same reason there:
-   the thing you point at should be the thing you edit, and a list beside the
-   visual is the same data drawn twice.
-
-   The classes are restated here rather than shared because recurring.css is not
-   loaded on this page (Recurring has its own route now), and this file already
-   re-states the chart chrome it needs from dashboard.css for the same reason.
-   Values are kept in step with their .rec-* counterparts. */
+/* ─── Forecast: planned items, pins on the line ──────────────────────────────
+   Each planned item is a pin ON the projected line at the date it falls, and
+   the pin is where that item's data lives: hovering opens a Popover carrying
+   the whole row (label, date, amount) with its edit and delete buttons. The
+   thing you point at is the thing you edit, and a list beside the visual would
+   be the same data drawn twice. */
 
 /* The plot box positions the overlay over the SVG. */
 .forecast-plot {
@@ -557,41 +592,45 @@
     pointer-events: none;
 }
 
-/* A planned item, centred on its point on the line. Small and quiet at rest —
-   it is an annotation on the projection, not a second series. */
+/* A planned item, centred on its point on the line, in the colour of which way
+   the money goes. Small and quiet at rest — it is an annotation on the
+   projection, not a second series. */
 .fc-pin {
     position: absolute;
     transform: translate(-50%, -50%);
-    width: 13px;
-    height: 13px;
+    width: 12px;
+    height: 12px;
     padding: 0;
-    border: 2px solid var(--surface1);
+    border: 2px solid var(--ant-color-bg-container);
     border-radius: 50%;
-    background: var(--accent-negative);
+    background: var(--ant-color-error);
+    box-shadow: 0 0 0 1px var(--ant-color-error);
     cursor: pointer;
     pointer-events: auto;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    transition: transform var(--ant-motion-mid), box-shadow var(--ant-motion-mid);
 }
 
-.fc-pin-income { background: var(--accent-positive); }
+.fc-pin-income {
+    background: var(--ant-color-success);
+    box-shadow: 0 0 0 1px var(--ant-color-success);
+}
 
 .fc-pin:hover,
 .fc-pin-active {
-    transform: translate(-50%, -50%) scale(1.25);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+    transform: translate(-50%, -50%) scale(1.3);
+    box-shadow: 0 0 0 4px var(--ant-control-outline);
 }
 
 .fc-pin:focus-visible {
-    outline: 2px solid var(--accent-primary);
+    outline: 2px solid var(--ant-color-primary);
     outline-offset: 2px;
 }
 
 /* ─── Add-here guide ─────────────────────────────────────────────────────────
-   The chart's answer to the Recurring calendar's day-cell "+": planning an item
-   is an act about a DATE, so the affordance follows the pointer along the date
-   axis and the dialog opens with the day already answered. Hidden until the
-   plot is hovered — a permanent control drawn across the chart would out-shout
-   the line it annotates. */
+   Planning an item is an act about a DATE, so the affordance follows the
+   pointer along the date axis and the dialog opens with the day already
+   answered. Hidden until the plot is hovered — a permanent control drawn across
+   the chart would out-shout the line it annotates. */
 .fc-guide {
     position: absolute;
     top: 0;
@@ -605,97 +644,66 @@
 .fc-guide-line {
     position: absolute;
     top: 24px;
-    bottom: 30px;
+    bottom: 34px;
     left: 0;
     width: 0;
-    border-left: 1px dashed var(--text-tertiary);
-    opacity: 0.5;
+    border-left: 1px dashed var(--ant-color-border);
 }
 
-/* One pill caps the guide: the + and the date it would use. They are a single
-   control because they answer one question together ("add an item — here"), and
-   because a separate date label under the axis landed on top of the tick
-   labels it was sitting beside. */
+/* One small Button caps the guide: the + and the date it would use. They are a
+   single control because they answer one question together ("add an item —
+   here"). */
 .fc-guide-add {
     position: absolute;
     top: 0;
     left: 0;
+    gap: 4px;
     transform: translateX(-50%);
-    height: 22px;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 0 8px 0 5px;
-    border: var(--border-width) solid var(--border);
-    border-radius: 999px;
-    background: var(--surface2);
-    color: var(--text-secondary);
-    white-space: nowrap;
-    cursor: pointer;
     pointer-events: auto;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
-/* Near either end of the plot, anchor the pill to the inside edge — centred it
+/* Near either end of the plot, anchor the button to the inside edge — centred it
    would hang outside the card, which clips it. */
 .fc-guide-add-start { transform: translateX(0); }
 .fc-guide-add-end   { transform: translateX(-100%); }
 
-.fc-guide-add svg { width: 14px; height: 14px; flex-shrink: 0; }
-
-.fc-guide-date {
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-}
-
-.fc-guide-add:hover {
-    background: var(--accent-primary);
-    border-color: var(--accent-primary);
-    color: var(--button-text);
-}
-
-.fc-guide-add:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 2px;
-}
+.fc-guide-date { font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) {
-    .fc-pin, .fc-guide-add { transition: none; }
+    .fc-pin { transition: none; }
 }
 
-/* ─── The hover card ────────────────────────────────────────────────────────
-   One floating element reused for whichever pin is active. The Recurring
-   calendar drew the same card until its chips began opening the schedule
-   editor instead, which leaves this the only one in the app. Fixed-positioned by
-   forecast.js against the pin's rect so the page's scroll container can't clip
-   it; a fixed width keeps that measurement stable on the very first show. */
+/* ─── The pin's Popover ──────────────────────────────────────────────────────
+   One floating element reused for whichever pin is active, fixed-positioned by
+   forecast.js against the pin so the page's scroll container can't clip it. A
+   fixed width keeps that measurement stable on the very first show. It is
+   parked on <body>, outside the page, so it carries .ant-scope itself
+   (forecast.js). */
 .fc-pop {
     position: fixed;
+    /* Under the dialogs (1000): the delete confirm opens over a pinned card. */
     z-index: 60;
-    /* Sized by the EDIT row, which is the wider of the two states: type +
-       date + amount + ✓/✗ all on one line. */
-    width: 440px;
+    /* Sized by the EDIT row, the wider of the two states: type + date + amount
+       + ✓/✗ on one line. */
+    width: 460px;
     max-width: calc(100vw - 16px);
     box-sizing: border-box;
-    border: var(--border-width) solid var(--border);
-    border-radius: 8px;
-    background: var(--surface1);
-    /* --shadow-menu, the app's popover elevation — this card floats over the
-       chart exactly like the ⋮ menus and filter popovers do. */
-    box-shadow: var(--shadow-menu);
-    padding: 10px 12px;
+    padding: 12px;
+    border: var(--ant-line-width) solid transparent;
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-bg-elevated);
+    box-shadow: var(--ant-shadow);
 }
 
 .fc-pop[hidden] { display: none; }
 
-/* Pinned by a click: it stays open when the pointer leaves, marked by the accent
-   border. */
-.fc-pop-pinned { border-color: var(--accent-primary); }
+/* Pinned by a click: it stays open when the pointer leaves, marked by the
+   primary border. */
+.fc-pop-pinned { border-color: var(--ant-color-primary-border); }
 
-/* label · date · amount, then the actions — one flat line, no field nested
-   under another. The label is the sole flexible one, soaking up whatever is
-   left and ellipsing when it runs out. */
+/* label · date · amount, then the actions — one flat line. The label is the
+   sole flexible one, soaking up whatever is left and ellipsing when it runs
+   out. */
 .fc-pop-row {
     display: flex;
     align-items: center;
@@ -707,42 +715,35 @@
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
+    color: var(--ant-color-text);
+    font-weight: var(--ant-font-weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    font-weight: var(--weight-medium);
 }
 
 .fc-pop-date {
     flex: 0 0 auto;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
+    color: var(--ant-color-text-secondary);
     white-space: nowrap;
 }
 
 .fc-pop-amount {
     flex: 0 0 auto;
-    font-family: var(--font-numeric);
-    font-size: var(--size-small);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-/* Same polarity the rest of the app uses for direction — with no legend, this
-   pairing is what carries it. */
-.fc-amount-expense { color: var(--accent-negative); }
-.fc-amount-income  { color: var(--accent-positive); }
+/* Which way the money goes. With no legend, this pairing is what carries it,
+   alongside the sign in front of the figure. */
+.fc-amount-expense { color: var(--ant-color-error); }
+.fc-amount-income  { color: var(--ant-color-success); }
 
 /* Edit mode stacks: the description gets a full row, the three controls and the
-   ✓/✗ share the one below. Cramming all four onto the display-mode line leaves
-   the description — usually the reason the card was opened — a few dozen px. */
+   ✓/✗ share the one below. */
 .fc-pop-editing {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: 8px;
 }
 
 .fc-pop-edit-fields {
@@ -751,171 +752,36 @@
     gap: 8px;
 }
 
-/* The type dropdown takes the remaining width, but never narrower than its
-   label: a flex item with `min-width: 0` and a zero basis shrinks to just its
-   caret when the row is over budget. Everything else is sized to its content and
-   the row is sized to fit inside the card's width. */
-.fc-pop-edit-fields .fc-select { flex: 1 1 auto; min-width: 96px; }
-.fc-pop-edit-fields .fc-input-date { flex: 0 0 132px; }
-.fc-pop-edit-fields .fc-input-amount { flex: 0 0 90px; }
-/* Pushed hard right, under the display-mode buttons they replace, so ✓ lands
-   where the pencil just was. */
-.fc-pop-edit-fields .fc-action-group { margin-left: auto; }
+/* Explicit widths on the date and amount, not just a flex-basis: an <input>'s
+   intrinsic width (~180px, from the default `size`) outranks a smaller basis,
+   and the type Select collapsed to a bare arrow to pay for it. */
+.fc-pop-edit-fields .ant-select { flex: 1 1 auto; min-width: 104px; }
+.fc-pop-edit-fields .fc-input-date { flex: 0 0 140px; width: 140px; }
+.fc-pop-edit-fields .fc-input-amount {
+    flex: 0 0 96px;
+    width: 96px;
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
 
-/* ─── Card actions (pencil / trash, ✓ / ✗) ────────────────────────────────── */
+/* Pushed hard right, under the display-mode buttons they replace, so ✓ lands
+   where the edit button just was. */
 .fc-action-group {
     flex: 0 0 auto;
     display: inline-flex;
-    gap: 6px;
-    justify-content: flex-end;
+    gap: 4px;
 }
+.fc-pop-edit-fields .fc-action-group { margin-inline-start: auto; }
 
-/* The card's actions wear the square icon button (.button-icon, buttons.css),
-   at 28px to fit the card's row. */
-.fc-action-btn {
-    width: 28px;
-    height: 28px;
-}
-
-.fc-action-btn svg { width: 15px; height: 15px; }
-
-/* Neutral until hover — a trash can sitting permanently red reads as an alarm
-   rather than an action. */
-.fc-action-btn.fc-action-delete:not(:disabled):hover {
-    background-color: var(--accent-negative);
-    color: var(--danger-text);
-}
-
-/* ✓ carries the primary accent — it's the commit, and the one button in the row
-   that changes stored data. ✗ keeps the neutral base treatment. */
-.fc-action-btn.fc-action-save,
-.fc-action-btn.fc-action-save:not(:disabled):hover {
-    background-color: var(--accent-primary);
-    color: var(--button-text);
-}
-
-/* ─── Card + dialog inputs (mirrors .rec-input / .rec-select) ──────────────── */
-.fc-input-label {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    background: transparent;
-    border: none;
-    border-bottom: var(--border-width) solid transparent;
-    border-radius: 0;
-    padding: 1px 0 2px;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    font-weight: var(--weight-medium);
-}
-.fc-input-label:hover { border-bottom-color: var(--frost-dim); }
-.fc-input-label:focus { border-bottom-color: var(--frost-focus); outline: none; }
-
-.fc-select {
-    width: 100%;
-    box-sizing: border-box;
-    height: var(--control-height);
-    background: var(--frost-2);
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    padding: 4px 8px;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    cursor: pointer;
-}
-.fc-select:hover { background: var(--frost-3); }
-.fc-select:focus { border-color: var(--frost-focus); outline: none; }
-.fc-select option { background: var(--surface1); color: var(--text-primary); }
-
-/* Explicit widths on both inputs, not just a flex-basis: a flex item's
-   automatic minimum size is its INTRINSIC width, and an <input>'s intrinsic
-   width (~180px, from the default `size`) outranks a smaller basis. Left to
-   `min-width: auto` the amount field held 182px against `flex: 0 0 100px`,
-   overflowed the row, and the type dropdown collapsed to a bare caret to pay
-   for it. (Same reason .rec-input-amount carries a width.) */
-.fc-input-date {
-    width: 132px;
-    box-sizing: border-box;
-    height: var(--control-height);
-    background: var(--frost-2);
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    padding: 4px 8px;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-.fc-input-date:hover { background: var(--frost-3); }
-.fc-input-date:focus { border-color: var(--frost-focus); outline: none; }
-
-.fc-input-amount {
-    width: 90px;
-    box-sizing: border-box;
-    height: var(--control-height);
-    background: var(--frost-2);
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    padding: 4px 8px;
-    color: inherit;
-    text-align: right;
-    font-family: var(--font-numeric);
-    font-size: var(--size-small);
-    font-variant-numeric: tabular-nums;
-    caret-color: var(--frost-caret);
-}
-.fc-input-amount:hover { background: var(--frost-3); }
-.fc-input-amount:focus { border-color: var(--frost-focus); outline: none; }
-
-/* A field the ✓ (or Add) attempt rejected. Shared with the dialog's inputs. */
-.fc-input.invalid,
-.fc-dialog-input.invalid,
-.fc-select.invalid { border-color: var(--accent-negative); }
-.fc-input-label.invalid { border-bottom-color: var(--accent-negative); }
-
-/* ─── Add dialog (mirrors .rec-edit-dialog, recurring.css) ────────────────── */
-.fc-add-dialog { width: 380px; max-width: 100%; }
-.fc-add-dialog p { margin: 0 0 8px; }
-
-.fc-dialog-note {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    line-height: var(--lh-normal);
-}
-
-.fc-add-field {
+/* ─── Add dialog (Ant Modal) ─────────────────────────────────────────────── */
+.fc-add-form {
     display: flex;
-    align-items: center;
-    gap: var(--space-12);
-    margin-bottom: var(--space-8);
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 8px;
 }
-
-.fc-add-label {
-    flex: 0 0 110px;
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wider);
-    text-transform: uppercase;
+.fc-add-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
 }
-
-.fc-dialog-input {
-    flex: 1 1 auto;
-    min-width: 0;
-    box-sizing: border-box;
-    height: var(--control-height);
-    background: var(--frost-2);
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    padding: 4px 8px;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-.fc-dialog-input:hover { background: var(--frost-3); }
-.fc-dialog-input:focus { border-color: var(--frost-focus); outline: none; }
-
-.fc-add-field .fc-select { flex: 1 1 auto; }

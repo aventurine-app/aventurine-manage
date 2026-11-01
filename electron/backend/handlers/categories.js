@@ -20,10 +20,45 @@ function getCat(db, id) {
   return db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
 }
 
-function list(ctx) {
+/** How many ledger rows each category holds, by category id. An uncategorized
+ *  row counts toward the system bucket the statement sums it into (its
+ *  direction picks the bucket, as in services/statement.js); an uncategorized
+ *  transfer feeds no bucket, so it counts toward none. */
+function transactionCounts(db, cats) {
+  const counts = new Map(
+    db
+      .prepare(
+        'SELECT category_id AS id, COUNT(*) AS n FROM transactions WHERE category_id IS NOT NULL GROUP BY category_id'
+      )
+      .all()
+      .map((r) => [r.id, r.n])
+  );
+  let uncatIncome = 0;
+  let uncatExpense = 0;
+  for (const r of db
+    .prepare('SELECT tx_type, COUNT(*) AS n FROM transactions WHERE category_id IS NULL GROUP BY tx_type')
+    .all()) {
+    if (r.tx_type === 'income') uncatIncome += r.n;
+    else if (r.tx_type !== 'transfer') uncatExpense += r.n;
+  }
+  for (const c of cats) {
+    if (c.key === 'uncat_income') counts.set(c.id, uncatIncome);
+    if (c.key === 'uncat_expense') counts.set(c.id, uncatExpense);
+  }
+  return counts;
+}
+
+/** Every category in display order. ?counts=true adds `transactions`, the
+ *  number of ledger rows in each, for the editor that shows them (Statements →
+ *  Manage Columns); other callers skip the two aggregate queries. */
+function list(ctx, { query } = {}) {
   const db = ctx.db();
   const cats = db.prepare('SELECT * FROM categories ORDER BY position').all();
-  return { categories: cats.map(serialiseCategory) };
+  if (query?.counts !== 'true') return { categories: cats.map(serialiseCategory) };
+  const counts = transactionCounts(db, cats);
+  return {
+    categories: cats.map((c) => ({ ...serialiseCategory(c), transactions: counts.get(c.id) || 0 })),
+  };
 }
 
 function create(ctx, { body }) {

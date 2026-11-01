@@ -22,11 +22,19 @@ const {
   recordMatch,
   forgetMatch,
   applyAutoMatch,
+  autoMatchEnabled,
+  normalise,
   sequenceRatio,
+  AUTO_FUZZY_THRESHOLD,
   FUZZY_THRESHOLD_MIN,
   FUZZY_THRESHOLD_MAX,
 } = require('../services/matchRules');
-const { applyBuiltinCategorize, applyDisplayNames } = require('../services/categorize');
+const {
+  AUTO_APPLY_CONFIDENCE,
+  categorize,
+  applyBuiltinCategorize,
+  applyDisplayNames,
+} = require('../services/categorize');
 const { adoptAccount } = require('../services/accounts');
 
 // The most rows a bounded read may ask for. A slice is for a summary card, not a
@@ -218,34 +226,84 @@ function similar(ctx, { query }) {
   );
 
   const needle = rawDesc.toLowerCase();
-  let rows;
+  // Each hit carries its score, the similarity the slider was compared with
+  // (1 for an exact match), so the wizard can show how close every row is.
+  let hits;
   if (threshold < 1) {
     // Pull the candidate rows and filter in JS — the similarity measure
     // pass; the candidate set is small at personal-ledger scale.
-    rows = db
+    hits = db
       .prepare(
         `SELECT * FROM transactions WHERE 1=1${catFilter} ORDER BY date DESC, id DESC`
       )
       .all()
-      .filter(
-        (t) => sequenceRatio(needle, (t.description || '').toLowerCase()) >= threshold
-      );
+      .map((t) => ({ t, score: sequenceRatio(needle, (t.description || '').toLowerCase()) }))
+      .filter((h) => h.score >= threshold);
   } else {
-    rows = db
+    hits = db
       .prepare(
         `SELECT * FROM transactions
           WHERE lower(description) = ?${catFilter}
           ORDER BY date DESC, id DESC`
       )
-      .all(needle);
+      .all(needle)
+      .map((t) => ({ t, score: 1 }));
   }
-  rows = rows.filter((t) => !exclude.has(t.id));
+  hits = hits.filter((h) => !exclude.has(h.t.id));
   // Derive direction from the category, same as list() — the widened pool can
   // return categorized rows whose stored tx_type predates a category re-type.
   const catTypes = new Map(
     db.prepare('SELECT id, cat_type FROM categories').all().map((c) => [c.id, c.cat_type])
   );
-  return { transactions: rows.map((t) => serialiseTx(t, catTypes)) };
+  return {
+    transactions: hits.map(({ t, score }) => ({
+      ...serialiseTx(t, catTypes),
+      score: Math.round(score * 1000) / 1000,
+    })),
+  };
+}
+
+/**
+ * The category a new transaction's description points to, for the Add
+ * transaction dialog to pre-fill: a rule the user taught (exact, then the same
+ * near-identical 0.92 bar an import uses, which must be unambiguous), else the
+ * built-in lexicon at the confidence an import auto-applies. Only categories on
+ * the row's side of the ledger are offered — money in takes income categories,
+ * money out takes expense and transfer ones — so a suggestion never flips the
+ * direction the user chose. `how` says which source answered.
+ *
+ * Read-only, and off when auto-matching is: the same switch that stops an
+ * import categorizing stops this suggesting.
+ */
+function suggest(ctx, { query }) {
+  const db = ctx.db();
+  const description = (query.description || '').trim();
+  const flow = query.flow === 'in' ? 'in' : 'out';
+  if (!description || !autoMatchEnabled(db)) return { suggestion: null };
+
+  const cats = db.prepare('SELECT id, "key" AS key, cat_type FROM categories').all();
+  const fits = (cat) => !!cat && (cat.cat_type === 'income') === (flow === 'in');
+  const byId = new Map(cats.map((c) => [c.id, c]));
+
+  const rules = db.prepare('SELECT pattern, category_id FROM match_rules').all();
+  const pattern = normalise(description);
+  const exact = rules.find((r) => r.pattern === pattern);
+  if (exact && fits(byId.get(exact.category_id))) {
+    return { suggestion: { category_id: exact.category_id, how: 'rule' } };
+  }
+  const near = new Set(
+    rules
+      .filter((r) => fits(byId.get(r.category_id)) && sequenceRatio(pattern, r.pattern) >= AUTO_FUZZY_THRESHOLD)
+      .map((r) => r.category_id)
+  );
+  if (near.size === 1) return { suggestion: { category_id: [...near][0], how: 'rule' } };
+
+  const hit = categorize(description);
+  if (hit && hit.confidence >= AUTO_APPLY_CONFIDENCE) {
+    const cat = cats.find((c) => c.key === hit.categoryKey);
+    if (fits(cat)) return { suggestion: { category_id: cat.id, how: 'builtin' } };
+  }
+  return { suggestion: null };
 }
 
 function categorizeSimilar(ctx, { body }) {
@@ -402,6 +460,10 @@ function importRows(ctx, { body }) {
 
   const inserted = [];
   const skipped = [];
+  // Which request row each inserted one came from, and the rows whose category
+  // the user chose in the import's review (a category_id key, null included).
+  const rowOf = new Map();
+  const chosen = new Set();
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -417,6 +479,8 @@ function importRows(ctx, { body }) {
     }
     t.account_key = accountKey;
     inserted.push(t);
+    rowOf.set(t, i);
+    if (Object.hasOwn(row, 'category_id')) chosen.add(t);
   }
 
   // Imported rows arrive uncategorized. Two batch passes categorize the
@@ -425,8 +489,14 @@ function importRows(ctx, { body }) {
   // in still-uncategorized rows. Both skip already-categorized rows, so the
   // second never overwrites the first. Neither pass writes to the DB (they read
   // match_rules/categories only), so both are safe to run for a dry run.
-  const autoCategorized =
-    applyAutoMatch(db, inserted) + applyBuiltinCategorize(db, inserted);
+  //
+  // A row whose category the user chose is left out of both: a category they
+  // picked is theirs, and one they cleared stays clear rather than being filled
+  // straight back in.
+  const automatic = inserted.filter((t) => !chosen.has(t));
+  const byRule = applyAutoMatch(db, automatic);
+  const learned = new Set(automatic.filter((t) => t.category_id != null));
+  const autoCategorized = byRule + applyBuiltinCategorize(db, automatic);
   // Third pass: clean display names for rows the merchant lexicon matches
   // (dictionary lookup only — the raw description is stored unchanged and the
   // ledger keeps it one click away). Hand-entered rows get no display name.
@@ -442,6 +512,11 @@ function importRows(ctx, { body }) {
       if (accountKey) accountAdopted = adoptAccount(db, accountKey);
 
       for (const t of inserted) insertTx(db, t);
+      // A category the user picked is an assignment like one made in the
+      // ledger, so it is remembered for the next import the same way.
+      for (const t of chosen) {
+        if (t.category_id != null) recordMatch(db, t.description, t.category_id);
+      }
 
       // Write each imported month-end balance into the Balance Sheet as
       // ordinary, hand-editable data (a balance_entries cell), not a separate
@@ -479,7 +554,7 @@ function importRows(ctx, { body }) {
     })();
   }
 
-  return {
+  const out = {
     ok: true,
     dry_run: dryRun,
     inserted: dryRun ? 0 : inserted.length,
@@ -490,6 +565,21 @@ function importRows(ctx, { body }) {
     account_adopted: accountAdopted,
     found: summariseImport(db, inserted),
   };
+  // A dry run also says, row by row, what the import would do with each one,
+  // so its review can show every row's category before anything is written:
+  // { row (its index in the request), category_id, how: 'rule' | 'builtin' |
+  // 'chosen' | null, display_name }.
+  if (dryRun) {
+    out.rows = inserted.map((t) => ({
+      row: rowOf.get(t),
+      category_id: t.category_id,
+      how: chosen.has(t) ? 'chosen'
+        : t.category_id == null ? null
+          : learned.has(t) ? 'rule' : 'builtin',
+      display_name: t.display_name,
+    }));
+  }
+  return out;
 }
 
 /**
@@ -574,6 +664,13 @@ function exportFilterSql(filters) {
   if (typeof filters !== 'object' || Array.isArray(filters)) bad('filters must be an object');
   const conds = [];
   const args = [];
+  if (filters.ids != null) {
+    // The rows ticked in the ledger, for exporting a selection. The other
+    // filters still apply on top, though the ledger never sends both.
+    const ids = parseIds(filters.ids);
+    conds.push(inClause('t.id', ids));
+    args.push(...ids);
+  }
   if (filters.date_from != null) {
     const d = parseIsoDate(filters.date_from);
     if (!d) bad('filters.date_from must be an ISO date (YYYY-MM-DD)');
@@ -590,12 +687,14 @@ function exportFilterSql(filters) {
     if (typeof filters.description !== 'string') bad('filters.description must be a string');
     const needle = filters.description.trim().toLowerCase();
     if (needle) {
-      // Match the raw description OR the clean display name — the table's
-      // Name filter searches both, and the export must save what it shows.
+      // Match the raw description, the clean display name OR the notes — the
+      // ledger's search box looks in all three, and the export must save what
+      // it shows.
       conds.push(
-        "(instr(lower(t.description), ?) > 0 OR instr(lower(COALESCE(t.display_name, '')), ?) > 0)"
+        "(instr(lower(t.description), ?) > 0 OR instr(lower(COALESCE(t.display_name, '')), ?) > 0"
+          + " OR instr(lower(COALESCE(t.notes, '')), ?) > 0)"
       );
-      args.push(needle, needle);
+      args.push(needle, needle, needle);
     }
   }
   if (filters.amount_min != null) {
@@ -757,6 +856,7 @@ const routes = [
   ['POST', '/api/transactions/bulk-update', bulkUpdate],
   ['POST', '/api/transactions/bulk-delete', bulkDelete],
   ['GET', '/api/transactions/similar', similar],
+  ['GET', '/api/transactions/suggest', suggest],
   ['POST', '/api/transactions/categorize-similar', categorizeSimilar],
   ['GET', '/api/transactions/hashes', hashes],
   ['GET', '/api/transactions/years', yearCounts],

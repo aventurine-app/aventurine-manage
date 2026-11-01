@@ -4,12 +4,7 @@
     <meta charset="utf-8">
     <title>Aventurine Manage | Statements</title>
     <!-- @include head -->
-    <link rel="stylesheet" href="/static/css/tables.css">
-    <!-- Categories editor styles — the shared .cat-* modal shell, rows and
-         controls behind both toolbar modals (Manage Years, and the two panels
-         of Manage Columns). Loads BEFORE statements.css, which overrides some
-         of those rules for the year rows. -->
-    <link rel="stylesheet" href="/static/css/categories.css">
+    <link rel="stylesheet" href="/static/css/ant.css">
     <link rel="stylesheet" href="/static/css/statements.css">
 </head>
 <body>
@@ -20,53 +15,66 @@
 
         <div class="page">
 
-<div class="db-page stmt-page">
-    <!-- Single toolbar row: tabs (the page's identity — there is no title) on
-         the left; year stepper dead-center on the row; the page's two actions
-         on the right. Manage Years opens the add/renumber/remove modal;
-         Manage Columns opens the categories and balance-sheet accounts
-         editors as two panels of one modal, on the panel for the current tab.
-         Controller: statements.js. -->
-    <section class="stmt-sheet" id="stmt-sheet" aria-label="Statement">
-        <div class="stmt-toolbar">
-            <div class="stmt-tabs" role="tablist" aria-label="Statements">
-                <button type="button" class="stmt-tab active" id="stmt-tab-cashflow" role="tab"
-                    data-tab="cashflow" aria-controls="stmt-panel-cashflow" aria-selected="true">Cash Flow</button>
-                <button type="button" class="stmt-tab" id="stmt-tab-balance" role="tab"
-                    data-tab="balance" aria-controls="stmt-panel-balance" aria-selected="false" tabindex="-1">Balance Sheet</button>
-            </div>
-            <div class="stepper stepper-joined stmt-year-stepper" aria-label="Statement year">
-                <button type="button" class="stepper-btn button-primary" id="stmt-year-prev" aria-label="Previous year" disabled><svg class="stepper-btn-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"></path></svg></button>
-                <button type="button" class="stepper-label" id="stmt-year-label" aria-live="polite"
-                    aria-haspopup="menu" title="Choose year">&nbsp;<svg class="picker-caret" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"></path></svg></button>
-                <button type="button" class="stepper-btn button-primary" id="stmt-year-next" aria-label="Next year" disabled><svg class="stepper-btn-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"></path></svg></button>
-            </div>
-            <div class="stmt-toolbar-right">
-                <button type="button" class="button-secondary" id="stmt-years-btn">Manage Years</button>
-                <button type="button" class="button-secondary" id="stmt-columns-btn">Manage Columns</button>
-            </div>
-        </div>
+<!-- The workspace is drawn in Ant Design (ant.css, ant.js), like Recurring,
+     Portfolio, Reports and Budgets: line Tabs with the year and the two
+     managers beside them, then the selected year's statement. The app chrome
+     around it keeps its own design. -->
+<div class="stmt-page ant-scope">
 
-        <div class="stmt-panel" id="stmt-panel-cashflow" role="tabpanel"
-            data-panel="cashflow" aria-labelledby="stmt-tab-cashflow">
-            <div class="db-tables-container" id="stmt-tables-cashflow"></div>
-            <p class="stmt-empty" id="stmt-empty-cashflow" hidden></p>
+    <!-- Ant's Tabs with tabBarExtraContent: the two statements hard left, the
+         year control and the two managers hard right on the same hairline.
+         When the row is too narrow the right-hand group wraps ABOVE the tabs,
+         so the hairline stays under them. No page heading: the sidebar's
+         active link already names the page, as on every other page.
+         Controller: statements.js; the managers: stmtmanagers.js. -->
+    <div class="ant-tabs-nav stmt-bar">
+        <div class="stmt-tablist" role="tablist" aria-label="Statements">
+            <button type="button" class="ant-tabs-tab" id="stmt-tab-cashflow" role="tab" data-tab="cashflow"
+                aria-controls="stmt-panel-cashflow" aria-selected="true">Cash Flow</button>
+            <button type="button" class="ant-tabs-tab" id="stmt-tab-balance" role="tab" data-tab="balance"
+                aria-controls="stmt-panel-balance" aria-selected="false" tabindex="-1">Balance Sheet</button>
         </div>
+        <div class="stmt-extra">
+            <div class="ant-space-compact" role="group" aria-label="Statement year">
+                <button type="button" class="ant-btn ant-btn-default ant-btn-icon-only" id="stmt-year-prev"
+                    aria-label="Previous year" data-tip="Previous year" disabled><span class="anticon" data-ant-icon="left" aria-hidden="true"></span></button>
+                <span class="ant-select stmt-year-select">
+                    <select class="ant-select-selector" id="stmt-year-select" aria-label="Statement year" disabled></select>
+                    <span class="ant-select-arrow"><span class="anticon" data-ant-icon="down" aria-hidden="true"></span></span>
+                </span>
+                <button type="button" class="ant-btn ant-btn-default ant-btn-icon-only" id="stmt-year-next"
+                    aria-label="Next year" data-tip="Next year" disabled><span class="anticon" data-ant-icon="right" aria-hidden="true"></span></button>
+            </div>
+            <button type="button" class="ant-btn ant-btn-default" id="stmt-years-btn"><span class="anticon" data-ant-icon="calendar" aria-hidden="true"></span><span>Manage Years</span></button>
+            <button type="button" class="ant-btn ant-btn-default" id="stmt-columns-btn"><span class="anticon" data-ant-icon="insert-row-right" aria-hidden="true"></span><span>Manage Columns</span></button>
+        </div>
+    </div>
 
-        <div class="stmt-panel" id="stmt-panel-balance" role="tabpanel"
-            data-panel="balance" aria-labelledby="stmt-tab-balance" hidden>
-            <div class="db-tables-container" id="stmt-tables-balance"></div>
-            <p class="stmt-empty" id="stmt-empty-balance" hidden></p>
-        </div>
-    </section>
+    <!-- One card per statement year goes in each container (widgets/tables.js);
+         the page shows the selected one. The empty slot stands in when that
+         year has no table here, or the statement has nothing to draw. -->
+    <div class="stmt-panel" id="stmt-panel-cashflow" role="tabpanel" aria-labelledby="stmt-tab-cashflow">
+        <div class="stmt-years stmt-sheet-cashflow" id="stmt-tables-cashflow"></div>
+        <section class="ant-card stmt-empty" id="stmt-empty-cashflow" hidden></section>
+    </div>
+    <div class="stmt-panel" id="stmt-panel-balance" role="tabpanel" aria-labelledby="stmt-tab-balance" hidden>
+        <div class="stmt-years stmt-sheet-balance" id="stmt-tables-balance"></div>
+        <section class="ant-card stmt-empty" id="stmt-empty-balance" hidden></section>
+    </div>
+
 </div>
 
         </div>
     </div>
 
     <!-- @include scripts -->
+    <!-- Ant Design's interactive pieces come after the shared block: its Modal
+         is UI.dialog underneath. The grid (tables.js) draws Ant icons and range
+         selection (cellselect.js), so both load before it. -->
+    <script src="/static/js/widgets/ant.js"></script>
     <script src="/static/js/widgets/cellselect.js"></script>
     <script src="/static/js/widgets/tables.js"></script>
+    <script src="/static/js/pages/stmtmanagers.js"></script>
     <script src="/static/js/pages/statements.js"></script>
 </body>
 </html>

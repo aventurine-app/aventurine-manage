@@ -8,14 +8,15 @@
 // in this file knows about the grid, edit mode or saving.
 //
 // A CARD DEFINITION (DashCards.TYPES[type]):
-//   name, group, info      label, widget-list group, the header's "i" tip
+//   name, group, info      label, widget-list group, the header's info tip
 //   periods, period        the presets it offers (widgets/dashperiod.js) and
 //                          the spec a new card starts with
 //   sizes, min             S/M/L/XL presets and the minimum, as [columns, rows]
-//   defaults, fields       its settings, and the segmented choices for them
-//                          that the header gear offers
+//   defaults, fields       its settings, and the controls for them: a field
+//                          with `inline` is a Segmented in the card's header,
+//                          the rest sit in the header's gear
 //   gear                   a checkbox list in the header gear (Account
-//                          Breakdown only), once its data has entries:
+//                          Balances only), once its data has entries:
 //                          { title, label, heading, options(ctx),
 //                            toggle(ctx, key) → settings patch, available(ctx) }
 //   chip(ctx, key)         → the settings patch for a click on one of its chips
@@ -30,6 +31,11 @@
 // paint is an entrance, and the data hub (dashboard.js), whose store(name) and
 // json(url) a card's load() reads through. load() gets { card, period, hub }.
 // The widget list's schematic of each type is THUMBS, below.
+//
+// DRAWN IN ANT DESIGN (ant.css): a figure in Statistic's voice, series chips as
+// CheckableTags, Progress bars, Tags, Alert, Empty. The charts are the app's
+// own engines (widgets/chart.js, donut.js and the two below), in Ant's palette:
+// see Colours.
 //
 // EVERY CARD IS DRAWN FOR A BOX, NOT FOR A PAGE. A card is as large as the user
 // sized it on the grid, so each renderer reads ctx.w and ctx.h and decides what
@@ -49,24 +55,9 @@
 
     // CURRENCY_SYMBOL and the number format are read at call time inside
     // formatCurrency (currency.js), so a change in Settings shows on the next
-    // draw without a reload.
+    // draw without a reload. A whole amount drops its ".00", as Ant's
+    // dashboards print them.
     const fmtValue = (n) => (n === null || n === undefined ? '—' : formatCurrency(n, true));
-
-    function readRamp(prefix, fallbacks) {
-        const cs = getComputedStyle(document.documentElement);
-        return fallbacks.map((fb, i) => cs.getPropertyValue(`${prefix}${i + 1}`).trim() || fb);
-    }
-    const readToken = (name, fallback) =>
-        getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-
-    // The BALANCE ramp: eight grey steps (style.css). The Breakdown donut takes
-    // three of them and the Account Balances chart walks all eight, one per
-    // account, so a line in that chart is the same family of colour as its slice
-    // in the donut. Grey is what an account BALANCE is in this app: money held
-    // still, as against green arriving and gold leaving. Read at use time so a
-    // theme or palette swap retones both; the array is a first-paint fallback.
-    const BALANCE_FALLBACK = ['#4e5153', '#5c5f61', '#6a6d70', '#787b7e', '#878a8d', '#989b9e', '#a9acaf', '#bcbfc2'];
-    const INFLOW_FALLBACK = ['#0a5b47', '#10744c', '#1a8b52', '#2ba25b', '#48b76b', '#72c983'];
 
     /** Every month in a period as { year, monthIdx }, first to last. */
     const slotsOf = (period) => period.slots || [];
@@ -83,12 +74,13 @@
 
     /**
      * Deep link into the Transactions ledger for the card's period, optionally
-     * narrowed to one category or merchant. A single month keeps Cash Flow's
-     * year+month shorthand (the Sankey's link, cashflow-sankey.js); a span of
-     * months sends the from/to pair the ledger writes itself. `cat` is the stable
-     * category key, so the link survives a rename.
+     * narrowed to one category, one merchant or one type of money. A single
+     * month keeps Cash Flow's year+month shorthand (the Sankey's link,
+     * cashflow-sankey.js); a span of months sends the from/to pair the ledger
+     * writes itself. `cat` is the stable category key, so the link survives a
+     * rename.
      */
-    function ledgerHref(period, { cat, name } = {}) {
+    function ledgerHref(period, { cat, name, type } = {}) {
         const q = new URLSearchParams();
         if (period.slots.length === 1) {
             q.set('year', String(period.first.year));
@@ -100,6 +92,7 @@
         }
         if (cat) q.set('cat', cat);
         if (name) q.set('name', name);
+        if (type) q.set('type', type);
         return `/transactions?${q}`;
     }
 
@@ -123,7 +116,7 @@
 
     /**
      * A period's statement, sliced the way the month cards read it: per-type
-     * totals, each type's categories (positive cells only, in column order) and
+     * totals, each type's categories (positive cells only, biggest first) and
      * the expense categories alone.
      */
     function sliceStatement(data, slots) {
@@ -132,36 +125,16 @@
         const segments = { income: [], expense: [], transfer: [] };
         const categories = [];
         for (const col of data.columns || []) {
-            const raw = byKey.get(col.key);
-            if (typeof raw !== 'number') continue;
-            const val = raw;
+            const val = byKey.get(col.key);
+            if (typeof val !== 'number') continue;
             if (col.type in totals) {
                 totals[col.type] += val;
                 if (val > 0) segments[col.type].push({ key: col.key, name: col.label, value: val });
             }
             if (col.type === 'expense' && val > 0) categories.push({ key: col.key, name: col.label, total: val });
         }
+        for (const list of Object.values(segments)) list.sort((a, b) => b.value - a.value);
         return { totals, segments, categories };
-    }
-
-    /**
-     * Category key → colour, for one period's flow segments. Expenses take the
-     * gold ramp and income the green one, both assigned by AMOUNT rank rather
-     * than by statement order: the rule the Sankey's bands follow, and what the
-     * outflow ramp was stepped for, since it grades magnitude. Transfers get no
-     * entry; their bar is drawn in --chart-transfer with the shade fade below.
-     * More categories than steps wraps the ramp, and the bars are labelled and
-     * carry a tooltip, so colour is never the only thing separating them.
-     */
-    function buildFlowColorMap(segments) {
-        const map = new Map();
-        const assign = (list, ramp) => {
-            [...(list || [])].sort((a, b) => b.value - a.value)
-                .forEach((seg, i) => map.set(seg.key, ramp[i % ramp.length]));
-        };
-        assign(segments && segments.expense, ChartRamp.outflow());
-        assign(segments && segments.income, readRamp('--chart-inflow-', INFLOW_FALLBACK));
-        return map;
     }
 
     /**
@@ -234,14 +207,58 @@
         return { delta: last - first, pct: ((last - first) / Math.abs(first)) * 100 };
     }
 
-    // ─── Selector chips ──────────────────────────────────────────────────────
-    // The Income & Expenses and Account Balances chips wear their series colour:
-    // a border in it whether the series is on or off, the same colour as the fill
-    // once it is on. --pill-ink is the ink that reads on that fill, picked from
-    // its luminance, since the ramp runs dark to light.
+    // ─── Colours ─────────────────────────────────────────────────────────────
+    // The Graphs palette, as the Reports cards draw it: the primary for a
+    // measure over time, the income colour for money arriving, the expense one
+    // for money leaving, the transfer one for money put away, and the
+    // categorical hues for categories (Ant.categoryHue, the same hue a
+    // category's tag wears in the ledger) and for accounts. All of it is
+    // var() text over the --ant-chart-* tokens (ant.css), which Preferences
+    // re-points; paint() reads the colour it resolves to, because a chart bakes
+    // its colours into SVG attributes, where var() is not read.
+    const COLOR = {
+        primary: 'var(--ant-chart-primary)',
+        income: 'var(--ant-chart-income)',
+        expense: 'var(--ant-chart-expense)',
+        transfer: 'var(--ant-chart-transfer)',
+        neutral: 'var(--ant-chart-neutral)',
+    };
+    // Accounts in column order: the primary first, then the categorical hues.
+    const ACCOUNT_HUES = [COLOR.primary, ...[1, 3, 2, 4, 6, 7, 8].map((n) => `var(--ant-chart-${n})`)];
+    // The Breakdown ring's slices, fixed BY TYPE so a type keeps its colour
+    // across months; debt is the expense colour, so it never reads as one more
+    // asset.
+    const TYPE_HUES = {
+        cash: 'var(--ant-chart-1)', investment: 'var(--ant-chart-3)', retirement: 'var(--ant-chart-2)',
+        debt: COLOR.expense,
+    };
+
+    let probe = null;
+    /** The colour `color` paints as: var() text is put on a probe element and
+     *  read back; anything else is already a colour. */
+    function paint(color) {
+        if (!String(color).includes('var(')) return color;
+        if (!probe) {
+            probe = document.createElement('span');
+            probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none';
+            document.body.appendChild(probe);
+        }
+        probe.style.color = '';
+        probe.style.color = color;
+        return getComputedStyle(probe).color || color;
+    }
+    const catColor = (key) => paint(Ant.categoryHue(key));
+
+    /** Account key → colour, walking ACCOUNT_HUES in COLUMN order and wrapping
+     *  past the eighth. Column order rather than size rank: an account is an
+     *  identity, and a line that changed colour whenever another account grew
+     *  past it would be unreadable across a period change. */
+    function accountColors(columns) {
+        return new Map((columns || []).map((c, i) => [c.key, paint(ACCOUNT_HUES[i % ACCOUNT_HUES.length])]));
+    }
 
     /** [r, g, b] from a #hex, rgb() or color(srgb) colour, else null. */
-    function pillRgb(color) {
+    function rgbOf(color) {
         const text = String(color || '').trim();
         const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text);
         if (hex) {
@@ -254,179 +271,73 @@
             const parts = rgb[1].split(/[\s,/]+/).filter(Boolean).slice(0, 3).map(Number);
             if (parts.length === 3 && parts.every(Number.isFinite)) return parts;
         }
-        // A token built with color-mix() computes to color(srgb r g b), 0-1 channels.
-        const srgb = /^color\(\s*srgb\s+([^)]+)\)$/i.exec(text);
+        // A colour-mix() result comes back as color(srgb r g b) with channels in 0-1,
+        // which is what the Opal palette's primary is (themes.css).
+        const srgb = /^color\(srgb\s+([^)]+)\)$/i.exec(text);
         if (srgb) {
-            const parts = srgb[1].split(/[\s/]+/).filter(Boolean).slice(0, 3).map(Number);
-            if (parts.length === 3 && parts.every(Number.isFinite)) return parts.map((v) => v * 255);
+            const parts = srgb[1].split(/[\s/]+/).filter(Boolean).slice(0, 3).map((n) => Math.round(Number(n) * 255));
+            if (parts.length === 3 && parts.every(Number.isFinite)) return parts;
         }
         return null;
     }
 
-    /** The colour a value paints as: tokens like --chart-income are var() text,
-     *  not colours, so the value is put on a probe element and read back. */
-    let pillProbe = null;
-    function pillResolve(color) {
-        if (!pillProbe) {
-            pillProbe = document.createElement('span');
-            pillProbe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none';
-            document.body.appendChild(pillProbe);
-        }
-        pillProbe.style.color = '';
-        pillProbe.style.color = color;
-        return getComputedStyle(pillProbe).color || color;
+    /** The ink that reads on a fill of `color`: white, or Ant's near-black on
+     *  a light hue (the cyan, the light green), picked from its luminance. */
+    function inkOn(color) {
+        const rgb = rgbOf(color);
+        if (!rgb) return '#fff';
+        const lin = rgb.map((v) => {
+            const c = v / 255;
+            return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        });
+        const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+        return L > 0.4 ? 'rgba(0, 0, 0, 0.88)' : '#fff';
     }
 
-    function pillStyle(color) {
-        if (!color) return '';
-        const rgb = pillRgb(pillResolve(color));
-        let ink = '';
-        if (rgb) {
-            const lin = rgb.map((v) => {
-                const c = v / 255;
-                return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-            });
-            const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-            ink = `--pill-ink:${L > 0.4 ? 'var(--text-primary)' : '#fff'};`;
-        }
-        return escapeHtml(`--pill-color:${color};${ink}`);
-    }
-
-    const chipsHtml = (chips) => `<div class="account-selector">${chips.map((c) =>
-        `<button type="button" class="account-toggle${c.on ? ' active' : ''}" data-chip="${escapeHtml(c.key)}"
-            aria-pressed="${c.on}" style="${pillStyle(c.color)}">${escapeHtml(c.label)}</button>`).join('')}</div>`;
+    // ─── Chips ───────────────────────────────────────────────────────────────
+    // The Income & Expenses and Account Balances series switches: CheckableTags
+    // in their series colour, outlined when off and filled when on.
+    const chipsHtml = (chips) => `<div class="dash-chips">${chips.map((c) => {
+        const color = paint(c.color);
+        return `<button type="button" class="ant-tag ant-tag-checkable" data-chip="${escapeHtml(c.key)}" aria-pressed="${c.on}"
+            style="${escapeHtml(`--ant-tag-color:${color};--ant-tag-ink:${inkOn(color)}`)}"><span class="ant-tag-checkable-dot" aria-hidden="true"></span>${escapeHtml(c.label)}</button>`;
+    }).join('')}</div>`;
 
     // ─── Chart frame ─────────────────────────────────────────────────────────
     // The line charts are FinanceChart.buildLine (widgets/chart.js), the
     // renderer every line chart in the app shares; `fit` makes one take its
-    // card's height exactly. The bar charts below share its frame (pad, dashed
-    // grid, nice-tick axis, label type) so a card of each reads as one family.
+    // card's height exactly. The column chart below shares its frame (pad,
+    // dashed grid, nice-tick axis, label type) so a card of each reads as one
+    // family; dashboard.css gives all of them G2's axis chrome.
     const CHART_PAD = { l: 56, r: 20, t: 18, b: 30 };
 
     const lineChart = (series, slots, W, H, animate) =>
         FinanceChart.buildLine({ series, slots, W, boxH: H, fit: true, animate, centred: true, hover: true });
 
-    /** Wrap one bar in a link to its category's transactions for the period.
-     *  A bare bar (the transfer fallback row) has no key and stays inert. */
-    function linkShape(period, key, label, value, markup) {
-        if (!key) return markup;
-        const aria = `${label}: ${fmtValue(value)} — view transactions for ${period.label}`;
-        return `<a class="chart-link" href="${escapeHtml(ledgerHref(period, { cat: key }))}"`
-             + ` tabindex="0" role="link" aria-label="${escapeHtml(aria)}">${markup}</a>`;
-    }
-
-    /**
-     * Share `total` px out between `values` in proportion, but never let a
-     * segment fall below `minW`: a category worth 0.3% of a month is otherwise a
-     * two-pixel sliver nobody can hover. Slivers are raised to the floor and the
-     * surplus is taken back from the segments with room above it, so the bar's
-     * total length still lands exactly on its value. When the bar is too short to
-     * give everyone the floor it splits evenly: at that size it is a total, not
-     * a breakdown.
-     */
-    function allocateSegmentWidths(values, total, minW) {
-        const n = values.length;
-        if (n === 0) return [];
-        if (n * minW >= total) return values.map(() => total / n);
-        const sum = values.reduce((a, b) => a + b, 0) || 1;
-        const widths = values.map((v) => (v / sum) * total);
-        let deficit = 0;
-        const raised = widths.map((w) => {
-            if (w >= minW) return false;
-            deficit += minW - w;
-            return true;
-        });
-        if (deficit === 0) return widths;
-        let room = 0;
-        widths.forEach((w, i) => { if (!raised[i]) room += w - minW; });
-        const scale = room > 0 ? (room - deficit) / room : 0;
-        return widths.map((w, i) => (raised[i] ? minW : minW + (w - minW) * scale));
-    }
-
-    /** The j-th of n segments in one bar: the base colour nearest the axis,
-     *  fading toward the page outward. Only the transfer row reaches this, since
-     *  income and expense segments paint from the flow ramps instead. */
-    function segmentShade(base, j, n) {
-        if (n <= 1) return base;
-        const pct = Math.round(100 - (j / (n - 1)) * 45);
-        return `color-mix(in srgb, ${base} ${pct}%, var(--background))`;
-    }
-
-    /**
-     * Horizontal bars, one row per flow type, each split into its categories:
-     *   rows: [{ label, color, value, segments: [{ key, name, value, color? }] }]
-     * Height is the box's: the bands share it out, and bar thickness follows
-     * only part of the way, so a tall card gets an airy chart, not three slabs.
-     */
-    function buildHBarChartSVG({ rows, W, avail, animate, period }) {
-        if (rows.length === 0) return null;
-        const PL = 96, PR = 96, PT = 8, PB = 30;
-        const BAND = Math.max(28, Math.round((avail - PT - PB) / rows.length));
-        const BAR = Math.round(Math.min(34, BAND * 0.36));
-        const H = PT + rows.length * BAND + PB;
-        const CW = W - PL - PR;
-        const f2 = (n) => Math.round(n * 100) / 100;
-        const peak = Math.max(...rows.map((r) => r.value));
-        const xTicks = ChartMath.niceTicks(0, peak, 4);
-        const maxVal = xTicks[xTicks.length - 1] || 1;
-        const xScale = (v) => PL + (v / maxVal) * CW;
-        const plotBottom = PT + rows.length * BAND;
-
-        let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" class="dashboard-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">`;
-        const fmtAxis = axisFormatter(xTicks);
-        for (const v of xTicks) {
-            const x = xScale(v);
-            svg += `<line class="chart-grid" x1="${f2(x)}" y1="${PT}" x2="${f2(x)}" y2="${plotBottom}"/>`;
-            svg += `<text class="chart-label" x="${f2(x)}" y="${plotBottom + 18}" text-anchor="middle">${escapeHtml(fmtAxis(v))}</text>`;
-        }
-        // Rounded right end only: the bar sits flat on the axis.
-        const RR = Math.min(BAR / 4, 6);
-        rows.forEach((r, i) => {
-            const yMid = PT + BAND * (i + 0.5);
-            const y = yMid - BAR / 2;
-            svg += `<text class="chart-label" x="${PL - 10}" y="${f2(yMid)}" text-anchor="end" dominant-baseline="middle">${escapeHtml(r.label)}</text>`;
-            const len = xScale(r.value) - PL;
-            const segs = (r.segments && r.segments.length) ? r.segments
-                : (r.value > 0 ? [{ name: r.label, value: r.value }] : []);
-            if (len > 0) {
-                const widths = allocateSegmentWidths(segs.map((sg) => sg.value), len, 8);
-                let x0 = PL;
-                segs.forEach((seg, j) => {
-                    const xe = x0 + widths[j];
-                    const w = xe - x0;
-                    const last = j === segs.length - 1;
-                    // Every segment but the last runs half a pixel long and the
-                    // next paints over it, so the antialiased seam is solid.
-                    const xd = last ? xe : xe + 0.5;
-                    if (w >= 0.5) {
-                        const fill = seg.color || segmentShade(r.color, j, segs.length);
-                        const d = (last && w > RR)
-                            ? `M ${f2(x0)} ${f2(y)} L ${f2(xd - RR)} ${f2(y)} Q ${f2(xd)} ${f2(y)} ${f2(xd)} ${f2(y + RR)}`
-                              + ` L ${f2(xd)} ${f2(y + BAR - RR)} Q ${f2(xd)} ${f2(y + BAR)} ${f2(xd - RR)} ${f2(y + BAR)} L ${f2(x0)} ${f2(y + BAR)} Z`
-                            : `M ${f2(x0)} ${f2(y)} L ${f2(xd)} ${f2(y)} L ${f2(xd)} ${f2(y + BAR)} L ${f2(x0)} ${f2(y + BAR)} Z`;
-                        svg += linkShape(period, seg.key, seg.name, seg.value,
-                            `<path class="chart-hbar" d="${d}" fill="${fill}" style="animation-delay:${i * 80 + j * 40}ms">
-                <title>${escapeHtml(seg.name)}: ${fmtValue(seg.value)}</title></path>`);
-                    }
-                    x0 = xe;
-                });
-            }
-            const end = Math.max(len, 0);
-            svg += `<text class="chart-bar-value" x="${f2(PL + end + 8)}" y="${f2(yMid)}" dominant-baseline="middle" style="animation-delay:${i * 80 + 350}ms">${fmtValue(r.value)}</text>`;
-        });
-        return `${svg}</svg>`;
-    }
-
-    /** An empty state sized for a card (UI.emptyState, no glyph tile: across a
-     *  grid of cards, a row of icons reads as clutter rather than illustration). */
-    const empty = (title, action = null) => UI.emptyState({ icon: null, compact: true, title, action });
+    /** A card's empty state: Ant's Empty, compact, with the action that fills
+     *  it where there is one. */
+    const empty = (title, action = null) => Ant.empty({ title, compact: true, action });
 
     /** Lay a chart body out and hand back its plot box: `head` markup above, a
-     *  plot below taking the rest of the height, `foot` markup under the plot. */
-    function chartBody(host, { head = '', foot = '' } = {}) {
-        host.innerHTML = `${head}<div class="dash-plot" data-plot></div>${foot}`;
+     *  plot below taking the rest of the height. */
+    function chartBody(host, { head = '' } = {}) {
+        host.innerHTML = `${head}<div class="dash-plot" data-plot></div>`;
         const plot = host.querySelector('[data-plot]');
         return { plot, W: plot.clientWidth, H: plot.clientHeight };
+    }
+
+    /** A card's headline figure over a muted line, in Statistic's voice. Both
+     *  arguments are markup: the caller escapes anything user-controlled. */
+    const figureHtml = (value, sub = '', tone = '') => `<div class="dash-figure">
+        <div class="dash-figure-value${tone ? ` is-${tone}` : ''}">${value}</div>${sub ? `<div class="dash-figure-sub">${sub}</div>` : ''}</div>`;
+
+    /** "▲ $34,760.07 (29.2%)": a change in green when it rose, red when it fell. */
+    function changeHtml(change) {
+        if (!change) return '<span class="dash-change">—</span>';
+        const up = change.delta >= 0;
+        const tone = Math.abs(change.pct) < 0.05 ? 'flat' : up ? 'up' : 'down';
+        return `<span class="dash-change is-${tone}">${Ant.icon(up ? 'caret-up' : 'caret-down')}<span class="ant-visually-hidden">${up ? 'Up' : 'Down'} </span>`
+            + `${escapeHtml(fmtValue(Math.abs(change.delta)))} (${Math.abs(change.pct).toFixed(1)}%)</span>`;
     }
 
     // ─── Period offers ───────────────────────────────────────────────────────
@@ -440,18 +351,9 @@
     const THIS_MONTH = { preset: 'month', month: null };
     const YEAR_TO_DATE = { preset: 'ytd', month: null };
 
-    const ADD_BALANCES = { label: 'Add balances', href: '/statements#balance-sheet', primary: true };
-    const OPEN_STATEMENTS = { label: 'Open Statements', href: '/statements#cash-flow', primary: true };
-    const ADD_TRANSACTIONS = { label: 'Add transactions', href: '/transactions', primary: true };
-
-    /** Account key → colour, walking the balance ramp in COLUMN order and
-     *  wrapping past the eighth. Column order rather than size rank: an account
-     *  is an identity, and a line that changed colour whenever another account
-     *  grew past it would be unreadable across a period change. */
-    function accountColors(columns) {
-        const palette = readRamp('--chart-balance-', BALANCE_FALLBACK);
-        return new Map((columns || []).map((c, i) => [c.key, palette[i % palette.length]]));
-    }
+    const ADD_BALANCES = { label: 'Add balances', href: '/statements#balance-sheet' };
+    const OPEN_STATEMENTS = { label: 'Open Statements', href: '/statements#cash-flow' };
+    const ADD_TRANSACTIONS = { label: 'Add transactions', href: '/transactions' };
 
     /** Points for one balance column, oldest first. */
     function columnPoints(data, key) {
@@ -494,56 +396,101 @@
             }
         }
         const byDate = (a, b) => a.year - b.year || a.monthIdx - b.monthIdx;
-        // The two NAMED chart tokens: one step of the green income ramp and one
-        // of the gold spending ramp, the split the Sankey and the Cash Flow bars
-        // are drawn on. A slot number would pin both to one hue.
         return [
-            { label: 'Income', color: readToken('--chart-income', '#10744c'), points: income.sort(byDate) },
-            { label: 'Expenses', color: readToken('--chart-expense', '#b28a06'), points: expenses.sort(byDate) },
+            { label: 'Income', color: paint(COLOR.income), points: income.sort(byDate) },
+            { label: 'Expenses', color: paint(COLOR.expense), points: expenses.sort(byDate) },
         ];
     }
 
     /** A toggle in a stored list: present → removed, absent → added. */
     const toggled = (list, key) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]);
 
-    // Monthly Cash Flow rows, in display order, on the three named chart tokens:
-    // green in, gold out, blue for money that only moved between the user's own
-    // accounts (style.css carries the reasoning for the trio).
+    // ─── Monthly Cash Flow ───────────────────────────────────────────────────
+    // A row per kind of money: its name (a link to the ledger filtered to it),
+    // a bar as long as its total against the largest, split into its
+    // categories biggest first, and the total. Under them, what was left over.
+    // Income opens on the success green and each further income category takes
+    // its own hue; expenses are their categories' hues; transfers are all the
+    // info blue, money put away. Every segment links to its category's rows
+    // and names itself in a tooltip.
     const MCF_ROWS = [
-        { key: 'income',   label: 'Income',    token: '--chart-income',   fallback: '#10744c' },
-        { key: 'expense',  label: 'Expenses',  token: '--chart-expense',  fallback: '#b28a06' },
-        { key: 'transfer', label: 'Transfers', token: '--chart-transfer', fallback: '#1d4ed8' },
+        { key: 'income', label: 'Income' },
+        { key: 'expense', label: 'Expenses' },
+        { key: 'transfer', label: 'Transfers' },
     ];
 
-    // The donut's slices are Balance Sheet totals per account type, so its
+    function segmentColor(type, key, i) {
+        if (type === 'transfer') return paint(COLOR.transfer);
+        if (type === 'income' && i === 0) return paint(COLOR.income);
+        return catColor(key);
+    }
+
+    function cashflowHtml(month, period) {
+        const rows = MCF_ROWS.map((r) => ({ ...r, value: month.totals[r.key] || 0, segments: month.segments[r.key] || [] }));
+        const max = Math.max(...rows.map((r) => r.value), 1);
+        const rowHtml = (r) => {
+            const segs = r.segments.map((s, i) => {
+                const tip = `${s.name}: ${fmtValue(s.value)}`;
+                const style = `flex-grow:${s.value};background:${segmentColor(r.key, s.key, i)}`;
+                return `<a class="dash-seg" href="${escapeHtml(ledgerHref(period, { cat: s.key }))}" style="${escapeHtml(style)}"
+                    data-tip="${escapeHtml(tip)}" aria-label="${escapeHtml(`${tip}, view transactions`)}"></a>`;
+            }).join('');
+            const width = r.value > 0 ? Math.max(2, (100 * r.value) / max) : 0;
+            return `<div class="dash-cf-row">
+                <a class="dash-cf-label" href="${escapeHtml(ledgerHref(period, { type: r.key }))}">${r.label}</a>
+                <div class="dash-cf-track"><div class="dash-cf-bar" style="width:${width.toFixed(2)}%">${segs}</div></div>
+                <span class="dash-cf-amount">${escapeHtml(fmtValue(r.value))}</span>
+            </div>`;
+        };
+        const left = month.totals.income - month.totals.expense - month.totals.transfer;
+        return `<div class="dash-cf">${rows.map(rowHtml).join('')}
+            <div class="dash-cf-net">
+                <span class="dash-cf-net-label">${left >= 0 ? 'Left over' : 'Overspent'}</span>
+                <span class="dash-cf-net-value is-${left >= 0 ? 'up' : 'down'}">${left >= 0 ? '+' : '-'}${escapeHtml(fmtValue(Math.abs(left)))}</span>
+            </div></div>`;
+    }
+
+    // ─── Rings: Breakdown and Monthly Spending ───────────────────────────────
+    // The ring over its legend, or beside it once the card is wide enough. A
+    // legend line is the slice's colour, its name, its amount and its share,
+    // and opens where the slice's figure comes from. The ring goes when the box
+    // has no room left for one: the figures are the reading, and the ring is
+    // their picture.
+    const RING_MIN = 96;
+
+    /** rows: [{ label, color, valueText, share (0-1), href }] */
+    const legendHtml = (rows) => `<div class="dash-legend">${rows.map((r) => `<a class="dash-legend-row" href="${escapeHtml(r.href)}">
+            <span class="dash-dot" style="background:${r.color}" aria-hidden="true"></span>
+            <span class="dash-legend-name">${escapeHtml(r.label)}</span>
+            <span class="dash-legend-value">${escapeHtml(r.valueText)}</span>
+            <span class="dash-legend-share">${(r.share * 100).toFixed(0)}%</span></a>`).join('')}</div>`;
+
+    function renderRing(host, ctx, { slices, centerLabel, centerValue, linkHint }) {
+        const total = slices.reduce((s, x) => s + x.value, 0);
+        const side = ctx.w >= 380;
+        const legend = legendHtml(slices.map((s) => ({
+            label: s.label, color: s.color, valueText: s.valueText, share: s.value / total, href: s.href,
+        })));
+        host.innerHTML = `<div class="dash-donut${side ? ' is-side' : ''}">${legend}<div class="dash-donut-ring"></div></div>`;
+        const ring = host.querySelector('.dash-donut-ring');
+        if (Math.min(ring.clientWidth, ring.clientHeight) < RING_MIN) {
+            ring.remove();
+            return;
+        }
+        DonutChart.render(ring, { slices, centerLabel, centerValue, linkHint, animate: Boolean(ctx.animate) });
+        // The figure in the hole, as large as fits it (donut.js draws a 280
+        // unit ring whose hole is about 200 across).
+        const value = ring.querySelector('.donut-center-value');
+        if (value) value.style.fontSize = `${Math.round(Math.min(30, 170 / (Math.max(centerValue.length, 4) * 0.6)))}px`;
+    }
+
+    // The ring's slices are Balance Sheet totals per account type, so its
     // destination is the Balance Sheet, where those numbers are entered.
     const BALANCE_SHEET_HREF = '/statements#balance-sheet';
 
-    /** The four slice colours: steps 1, 4 and 7 of the grey balance ramp for the
-     *  assets (the three furthest apart it offers), and --chart-debt, the expense
-     *  gold, for debt, so a liability never reads as one more shade of savings.
-     *  Fixed BY TYPE, not by slice size, so a type keeps its colour across months. */
-    function donutColors() {
-        return {
-            cash:       readToken('--chart-balance-1', '#4e5153'),
-            investment: readToken('--chart-balance-4', '#787b7e'),
-            retirement: readToken('--chart-balance-7', '#a9acaf'),
-            debt:       readToken('--chart-debt', '#b28a06'),
-        };
-    }
-
-    /** The legend beside a ring, one line per slice: name, amount, share.
-     *  rows: [{ label, color, valueText, share (0-1), href }] */
-    const donutLegendHtml = (rows) => `<div class="spend-legend">${rows.map((r) => `<a class="spend-legend-item" href="${escapeHtml(r.href)}">
-            <span class="accounts-legend-dot" style="background:${r.color}"></span>
-            <span class="spend-legend-label">${escapeHtml(r.label)}</span>
-            <span class="spend-legend-value">${r.valueText}</span>
-            <span class="spend-legend-pct">${(r.share * 100).toFixed(0)}%</span></a>`).join('')}</div>`;
-
-    function renderDonut(host, ctx) {
+    function renderBreakdown(host, ctx) {
         const data = ctx.data;
-        const cutoff = ctx.period.last;
-        const curr = latestValueByColumn(data.entries, cutoff);
+        const curr = latestValueByColumn(data.entries, ctx.period.last);
         if (Object.keys(curr).length === 0) {
             // A truly empty balance sheet, or a month from before the first entry.
             host.innerHTML = Object.keys(latestValueByColumn(data.entries)).length
@@ -553,62 +500,71 @@
         }
         const columns = data.columns || [];
         const sumType = (type) => columns.filter((c) => c.type === type).reduce((s, c) => s + (curr[c.key] ?? 0), 0);
-        const colors = donutColors();
         const raw = [
-            { label: 'Investments', signed: sumType('investment'), color: colors.investment },
-            { label: 'Cash',        signed: sumType('cash'),       color: colors.cash },
-            { label: 'Retirement',  signed: sumType('retirement'), color: colors.retirement },
-            { label: 'Debt',        signed: sumType('debt'),       color: colors.debt },
+            { label: 'Investments', type: 'investment', signed: sumType('investment') },
+            { label: 'Cash',        type: 'cash',       signed: sumType('cash') },
+            { label: 'Retirement',  type: 'retirement', signed: sumType('retirement') },
+            { label: 'Debt',        type: 'debt',       signed: -sumType('debt') },
         ];
         // Magnitudes: a debt of 12k carries the same weight as 12k of assets.
-        const slices = raw.map((s) => ({ ...s, value: Math.abs(s.signed) })).filter((s) => s.value > 0);
-        const total = slices.reduce((s, x) => s + x.value, 0);
-        if (total === 0) {
-            host.innerHTML = empty('All balances are zero', { label: 'Edit balances', href: BALANCE_SHEET_HREF, primary: true });
+        const slices = raw.map((s) => ({
+            label: s.label,
+            color: paint(TYPE_HUES[s.type]),
+            value: Math.abs(s.signed),
+            valueText: fmtValue(s.signed),
+            href: BALANCE_SHEET_HREF,
+        })).filter((s) => s.value > 0);
+        if (slices.length === 0) {
+            host.innerHTML = empty('All balances are zero', { label: 'Edit balances', href: BALANCE_SHEET_HREF });
             return;
         }
-
         // Assets minus debt at the shown month: Net Worth's sign convention.
-        const net = raw.reduce((t, s) => t + (s.label === 'Debt' ? -s.signed : s.signed), 0);
-        const legend = donutLegendHtml(slices.map((s) => ({
-            label: s.label, color: s.color, valueText: fmtValue(s.signed), share: s.value / total, href: BALANCE_SHEET_HREF,
-        })));
-        // A card too narrow for the ring beside the legend keeps the legend: the
-        // figures are the reading, and the ring is their picture.
-        const showRing = ctx.w >= 300;
-        host.innerHTML = `<div class="accounts-body spend-body">${legend}${showRing ? '<div class="accounts-pie"></div>' : ''}</div>`;
-        if (!showRing) return;
-        DonutChart.render(host.querySelector('.accounts-pie'), {
-            slices: slices.map((s) => ({
-                label: s.label,
-                color: s.color,
-                value: s.value,
-                valueText: fmtValue(s.signed),
-                href: BALANCE_SHEET_HREF,
-            })),
-            centerLabel: 'Net',
-            centerValue: fmtValue(net),
-            linkHint: 'open the Balance Sheet',
-            animate: Boolean(ctx.animate),   // a resize redraw skips the sweep
-        });
+        const net = raw.reduce((t, s) => t + s.signed, 0);
+        renderRing(host, ctx, { slices, centerLabel: 'Net', centerValue: fmtValue(net), linkHint: 'open the Balance Sheet' });
+    }
+
+    // The ring keeps its biggest categories and folds the rest into one slice,
+    // so a month with a dozen categories still reads as a ring and a legend.
+    const DONUT_CATEGORIES = 6;
+
+    function renderMonthlySpending(host, ctx) {
+        const { period } = ctx;
+        const slice = sliceStatement(ctx.data, slotsOf(period));
+        if (slice.categories.length === 0) {
+            host.innerHTML = period.isCurrentMonth
+                ? empty('No spending this month yet', ADD_TRANSACTIONS)
+                : empty(`Nothing in ${period.label}`);
+            return;
+        }
+        const ranked = [...slice.categories].sort((a, b) => b.total - a.total);
+        const shown = ranked.length > DONUT_CATEGORIES + 1 ? ranked.slice(0, DONUT_CATEGORIES) : ranked;
+        const slices = shown.map((c) => ({
+            label: c.name, value: c.total, color: catColor(c.key), href: ledgerHref(period, { cat: c.key }),
+        }));
+        const rest = ranked.slice(shown.length);
+        if (rest.length) {
+            slices.push({
+                label: 'Other', value: rest.reduce((s, c) => s + c.total, 0),
+                color: paint(COLOR.neutral), href: ledgerHref(period, { type: 'expense' }),
+            });
+        }
+        for (const s of slices) s.valueText = fmtValue(s.value);
+        const total = slices.reduce((s, x) => s + x.value, 0);
+        renderRing(host, ctx, { slices, centerLabel: 'Spent', centerValue: fmtValue(total), linkHint: 'view transactions' });
     }
 
     // ─── Spending ────────────────────────────────────────────────────────────
     /** One series per expense category, biggest first so the largest band is the
-     *  bottom of every column. Colours come from the period's amount-rank map, the
-     *  one the Monthly Cash Flow card uses, so a category keeps its colour across
-     *  the cards. */
+     *  bottom of every column, each in its category's hue. */
     function spendingSeries(data, slots) {
         const slice = sliceStatement(data, slots);
-        const colors = buildFlowColorMap(slice.segments);
-        const ramp = ChartRamp.outflow();
-        return [...slice.categories].sort((a, b) => b.total - a.total).map((c, i) => {
+        return [...slice.categories].sort((a, b) => b.total - a.total).map((c) => {
             const points = [];
             for (const s of slots) {
                 const cells = ((data.entries || {})[String(s.year)] || {})[MONTHS[s.monthIdx]] || {};
                 if (typeof cells[c.key] === 'number' && cells[c.key] > 0) points.push({ year: s.year, monthIdx: s.monthIdx, value: cells[c.key] });
             }
-            return { label: c.name, color: colors.get(c.key) || ramp[i % ramp.length], points };
+            return { label: c.name, color: catColor(c.key), points };
         });
     }
 
@@ -624,54 +580,11 @@
         plot.innerHTML = FinanceChart.buildStacked({ series, slots, W, boxH: H, fit: true, animate: ctx.animate }) || '';
     }
 
-    // The donut keeps its biggest categories and folds the rest into one slice,
-    // so a month with a dozen categories still reads as a ring and a legend.
-    const DONUT_CATEGORIES = 6;
-
-    function renderMonthlySpending(host, ctx) {
-        const { period } = ctx;
-        const slice = sliceStatement(ctx.data, slotsOf(period));
-        if (slice.categories.length === 0) {
-            host.innerHTML = period.isCurrentMonth
-                ? empty('No spending this month yet', ADD_TRANSACTIONS)
-                : empty(`Nothing in ${period.label}`);
-            return;
-        }
-        const colors = buildFlowColorMap(slice.segments);
-        const ranked = [...slice.categories].sort((a, b) => b.total - a.total);
-        const shown = ranked.length > DONUT_CATEGORIES + 1 ? ranked.slice(0, DONUT_CATEGORIES) : ranked;
-        const slices = shown.map((c) => ({
-            label: c.name, value: c.total, color: colors.get(c.key), href: ledgerHref(period, { cat: c.key }),
-        }));
-        const rest = ranked.slice(shown.length);
-        if (rest.length) {
-            slices.push({
-                label: 'Other', value: rest.reduce((s, c) => s + c.total, 0),
-                color: readToken('--chart-balance-4', '#787b7e'), href: ledgerHref(period),
-            });
-        }
-        const total = slices.reduce((s, x) => s + x.value, 0);
-        const legend = donutLegendHtml(slices.map((s) => ({
-            label: s.label, color: s.color, valueText: fmtValue(s.value), share: s.value / total, href: s.href,
-        })));
-        const showRing = ctx.w >= 300;
-        host.innerHTML = `<div class="accounts-body spend-body">${legend}${showRing ? '<div class="accounts-pie"></div>' : ''}</div>`;
-        if (!showRing) return;
-        DonutChart.render(host.querySelector('.accounts-pie'), {
-            slices: slices.map((s) => ({ ...s, valueText: fmtValue(s.value) })),
-            centerLabel: 'Spent',
-            centerValue: fmtValue(total),
-            linkHint: 'view transactions',
-            animate: Boolean(ctx.animate),
-        });
-    }
-
     // ─── Lists ───────────────────────────────────────────────────────────────
     // The list cards (Budgets, Top Merchants, Recent Transactions, Upcoming
-    // Bills) show as many rows as their box has room for. A row is ROW_H tall,
-    // the touch-target height; when the items outnumber the rows, the last row
-    // becomes a link to the page that lists every one of them.
-    const ROW_H = 44;
+    // Bills) show as many rows as their box has room for, each list at its own
+    // row height; when the items outnumber the rows, the last row becomes a
+    // link to the page that lists every one of them.
 
     // Recent Transactions asks for this many rows, under the server's cap
     // (handlers/transactions.js MAX_LIST_LIMIT). A card at its tallest fits about
@@ -679,12 +592,12 @@
     // for a filter to thin out.
     const TX_LIMIT = 50;
 
-    /** Lay a list body out: `head` above, the list taking the rest. Returns the
-     *  list element and how many rows fit in it. */
-    function listBody(host, { head = '', foot = '' } = {}) {
-        host.innerHTML = `${head}<div class="dash-list" data-list></div>${foot}`;
+    /** Lay a list body out: `head` above, the list taking the rest, its rows
+     *  `rowH` tall. Returns the list element and how many rows fit in it. */
+    function listBody(host, { head = '', rowH = 44, after = '' } = {}) {
+        host.innerHTML = `${head}<div class="dash-list" style="--dash-row-h:${rowH}px" data-list></div>${after}`;
         const list = host.querySelector('[data-list]');
-        return { list, fits: Math.max(1, Math.floor(list.clientHeight / ROW_H)) };
+        return { list, fits: Math.max(1, Math.floor(list.clientHeight / rowH)) };
     }
 
     /** Fill `list` with rows for `items`, at most `fits` of them. Past that the
@@ -695,29 +608,31 @@
         const shown = overflow ? items.slice(0, Math.max(1, fits - 1)) : items;
         const moreLabel = more.label || `${items.length - shown.length} more`;
         list.innerHTML = shown.map(rowHtml).join('')
-            + (overflow ? `<a class="dash-more" href="${escapeHtml(more.href)}">${escapeHtml(moreLabel)}</a>` : '');
+            + (overflow ? `<a class="dash-more" href="${escapeHtml(more.href)}">${escapeHtml(moreLabel)}${Ant.icon('right')}</a>` : '');
     }
 
-    /** A card's headline figure over a muted line. Both arguments are markup:
-     *  the caller escapes anything user-controlled in them. */
-    const statHtml = (value, sub = '', cls = '') => `<div class="dash-stat">
-        <div class="dash-stat-value${cls ? ` ${cls}` : ''}">${value}</div>${sub ? `<div class="dash-stat-sub">${sub}</div>` : ''}</div>`;
-
     const clamp01 = (v) => Math.max(0, Math.min(1, v));
-    const pctWidth = (v) => `${(clamp01(v) * 100).toFixed(2)}%`;
 
-    /** A horizontal track filled to `share` (0-1). Colours are token references,
-     *  never user text. */
-    const trackHtml = (share, color) => `<span class="dash-track" aria-hidden="true">
-        <span class="dash-track-fill" style="width:${pctWidth(share)};background:${color}"></span></span>`;
+    /** Ant's line Progress without its figure, filled to `share` (0-1) in
+     *  `color`. `thin` is the 4px bar the merchant rows carry. */
+    const progressHtml = (share, color, thin = false) => `<span class="ant-progress dash-progress${thin ? ' is-thin' : ''}" aria-hidden="true">
+        <span class="ant-progress-outer"><span class="ant-progress-inner">
+            <span class="ant-progress-bg dash-progress-bg" style="width:${(clamp01(share) * 100).toFixed(2)}%;background:${color}"></span>
+        </span></span></span>`;
 
     /** The money a ledger row moved, signed and coloured the way the ledger
-     *  prints it (transactions.js TX_TYPE_META): + for income, − otherwise. */
-    const TX_SIGN = { income: '+ ', expense: '- ', transfer: '- ' };
+     *  prints it (tximport.css .tx-amount-*): + for income, − otherwise. */
+    const TX_TYPES = new Set(['income', 'expense', 'transfer']);
     const txAmountHtml = (type, amount) => {
-        const kind = TX_SIGN[type] ? type : 'expense';
-        return `<span class="dash-row-amt dash-amt-${kind}">${TX_SIGN[kind]}${escapeHtml(formatCurrency(amount))}</span>`;
+        const kind = TX_TYPES.has(type) ? type : 'expense';
+        return `<span class="dash-row-amt tx-amount tx-amount-${kind}">${kind === 'income' ? '+' : '-'} ${escapeHtml(formatCurrency(Math.abs(amount)))}</span>`;
     };
+
+    /** A ledger row's category as its Tag, in the hue it wears in the ledger;
+     *  none (or a locked Uncategorized bucket) is the warning tag. */
+    const categoryTagHtml = (cat) => (!cat || cat.locked
+        ? '<span class="ant-tag ant-tag-warning dash-tag">Uncategorized</span>'
+        : `<span class="ant-tag ant-tag-hue dash-tag" style="--ant-tag-hue:${Ant.categoryHue(cat.key)}">${escapeHtml(cat.name)}</span>`);
 
     /** 'YYYY-MM-DD' as a whole-day count, for day arithmetic without time zones. */
     const isoDay = (iso) => {
@@ -762,19 +677,21 @@
         });
     }
 
-    /** One column per month, the goal as a dashed rule across them. A month with
-     *  no income has no rate and draws no column. */
+    /** One column per month, the goal as a dashed rule across them, labelled
+     *  at its right end. A month that met the goal is the info blue; one that
+     *  fell short is the same blue at half strength. A month with no income has
+     *  no rate and draws no column. */
     function buildRateChartSVG({ months, W, H, animate, goal }) {
         const { l: PL, r: PR, t: PT, b: PB } = CHART_PAD;
         const f2 = (n) => Math.round(n * 100) / 100;
         const rates = months.filter((m) => m.rate !== null).map((m) => m.rate);
-        const ticks = ChartMath.niceTicks(Math.min(0, ...rates), Math.max(goal, ...rates), 4);
+        const ticks = ChartMath.niceTicks(Math.min(0, ...rates), Math.max(goal * 1.25, ...rates), 4);
         const lo = ticks[0], hi = ticks[ticks.length - 1];
         const CH = Math.max(20, H - PT - PB);
         const y = (v) => PT + CH - ((v - lo) / ((hi - lo) || 1)) * CH;
         const slotW = (W - PL - PR) / months.length;
         const barW = Math.min(slotW * 0.6, 40);
-        const color = readToken('--chart-transfer', '#1d4ed8');
+        const color = paint(COLOR.transfer);
         const y0 = y(0);
 
         let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" class="dashboard-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">`;
@@ -790,18 +707,20 @@
             const cx = PL + slotW * (i + 0.5);
             if (m.rate !== null) {
                 const top = Math.min(y(m.rate), y0), h = Math.abs(y0 - y(m.rate));
-                const r = m.rate > 0 ? Math.min(4, barW / 2, h) : 0;
+                const r = m.rate > 0 ? Math.min(3, barW / 2, h) : 0;
                 const x = cx - barW / 2;
                 const d = `M ${f2(x)} ${f2(top + h)} L ${f2(x)} ${f2(top + r)} Q ${f2(x)} ${f2(top)} ${f2(x + r)} ${f2(top)}`
                         + ` L ${f2(x + barW - r)} ${f2(top)} Q ${f2(x + barW)} ${f2(top)} ${f2(x + barW)} ${f2(top + r)} L ${f2(x + barW)} ${f2(top + h)} Z`;
-                const tip = `${MONTHS[m.slot.monthIdx]} ${m.slot.year}: ${pctText(m.rate)}, ${fmtValue(m.transfers)} of ${fmtValue(m.income)}`;
-                svg += `<path class="chart-bar" d="${d}" fill="${color}" style="animation-delay:${i * 50}ms"><title>${escapeHtml(tip)}</title></path>`;
+                const met = m.rate >= goal;
+                const tip = `${MONTHS[m.slot.monthIdx]} ${m.slot.year}: ${pctText(m.rate)}, ${fmtValue(m.transfers)} of ${fmtValue(m.income)}${met ? '' : ', under the goal'}`;
+                svg += `<path class="chart-bar" d="${d}" fill="${color}"${met ? '' : ' fill-opacity="0.5"'} style="animation-delay:${i * 50}ms"><title>${escapeHtml(tip)}</title></path>`;
             }
             if ((last - i) % every === 0) {
                 svg += `<text class="chart-label" x="${f2(cx)}" y="${H - PB + 18}" text-anchor="middle">${MONTHS_ABBR[m.slot.monthIdx]}</text>`;
             }
         });
         svg += `<line class="chart-goal" x1="${PL}" y1="${f2(y(goal))}" x2="${W - PR}" y2="${f2(y(goal))}"><title>Goal: ${goalText(goal)}</title></line>`;
+        svg += `<text class="chart-goal-label" x="${W - PR}" y="${f2(y(goal) - 6)}" text-anchor="end">Goal ${goalText(goal)}</text>`;
         return `${svg}</svg>`;
     }
 
@@ -835,16 +754,17 @@
         const x = (iso) => PL + ((isoDay(iso) - day0) / days) * CW;
         const y = (v) => PT + CH - ((v - minV) / ((maxV - minV) || 1)) * CH;
         const baseY = PT + CH;
-        const color = readToken('--chart-1', '#8fb088');
+        const color = paint(COLOR.primary);
+        const negColor = paint(COLOR.expense);
         const id = `dash-fc-${++forecastSeq}`;
 
         let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" class="dashboard-chart dash-forecast-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">
             <defs>
                 <linearGradient id="${id}-past" gradientUnits="userSpaceOnUse" x1="0" y1="${PT}" x2="0" y2="${baseY}">
-                    <stop offset="0%" stop-color="${color}" stop-opacity="0.28"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+                    <stop offset="0%" stop-color="${color}" stop-opacity="0.24"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
                 </linearGradient>
                 <linearGradient id="${id}-next" gradientUnits="userSpaceOnUse" x1="0" y1="${PT}" x2="0" y2="${baseY}">
-                    <stop offset="0%" stop-color="${color}" stop-opacity="0.11"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+                    <stop offset="0%" stop-color="${color}" stop-opacity="0.12"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
                 </linearGradient>
             </defs>`;
         const fmtAxis = axisFormatter(ticks);
@@ -868,7 +788,7 @@
             const area = `${line} L ${f2(xy[xy.length - 1].x)} ${baseY} L ${f2(xy[0].x)} ${baseY} Z`;
             return `<path class="dash-fc-area" d="${area}" fill="url(#${id}-${projected ? 'next' : 'past'})"/>
                 <path class="${projected ? 'dash-fc-projected' : 'dash-fc-actual'}" d="${line}"${projected ? '' : ' pathLength="1"'}
-                    fill="none" stroke="${color}" stroke-width="${projected ? 2 : 2.25}" stroke-linejoin="round" stroke-linecap="round"/>`;
+                    fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
         };
         svg += half(past, false) + half(future, true);
 
@@ -877,31 +797,39 @@
             const tip = p.anchor ? `Today: ${fmtValue(p.balance)}`
                 : `${p.projected ? 'Projected week' : 'Week'} of ${p.label}: ${fmtValue(p.balance)}`;
             const cls = `chart-dot dash-fc-dot${p.anchor ? ' is-anchor' : ''}${p.projected ? ' is-projected' : ''}${p.balance < 0 ? ' is-neg' : ''}`;
-            return `<circle class="${cls}" cx="${f2(x(p.date))}" cy="${f2(y(p.balance))}" r="3" fill="${color}"><title>${escapeHtml(tip)}</title></circle>`;
+            return `<circle class="${cls}" cx="${f2(x(p.date))}" cy="${f2(y(p.balance))}" r="3" fill="${p.balance < 0 ? negColor : color}"><title>${escapeHtml(tip)}</title></circle>`;
         };
         svg += [...past, ...future.slice(1)].map(dot).join('');
         return `${svg}</svg>`;
     }
 
     // ─── Upcoming Bills ──────────────────────────────────────────────────────
-    const DAY_NAMES = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
     /** "Today", "Tomorrow" or "In 9 days", counted from `today`. */
     const relativeDay = (iso, today) => {
         const n = isoDay(iso) - isoDay(today);
         return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : `In ${n} days`;
     };
 
-    /** A month grid with the days a bill falls on marked: the month the period
-     *  starts in, drawn beside the list when the card is wide enough. */
+    /** Monday or Sunday, as Settings has it (the ledger's date panel reads it
+     *  the same way). */
+    const weekStartsMonday = () => {
+        try { return localStorage.getItem('week_start') === 'monday'; } catch { return false; }
+    };
+
+    /** A month grid with the days a bill falls on marked in the error tint and
+     *  today ringed: the month the period starts in, drawn beside the list
+     *  when the card is wide enough. */
     function billCalendarHtml(bills, start) {
         const y = start.getFullYear(), m = start.getMonth();
-        const lead = new Date(y, m, 1).getDay();
+        const monday = weekStartsMonday();
+        const first = new Date(y, m, 1).getDay();
+        const lead = monday ? (first + 6) % 7 : first;
         const length = new Date(y, m + 1, 0).getDate();
         const prefix = `${y}-${pad2(m + 1)}-`;
         const due = new Set(bills.filter((b) => b.date.startsWith(prefix)).map((b) => Number(b.date.slice(8))));
-        let cells = DAY_NAMES.map((d) => `<span class="dash-cal-dow">${d}</span>`).join('');
-        cells += '<span class="dash-cal-day is-out"></span>'.repeat(lead);
+        const names = monday ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+        let cells = names.map((d) => `<span class="dash-cal-dow">${d}</span>`).join('');
+        cells += '<span></span>'.repeat(lead);
         for (let d = 1; d <= length; d++) {
             const cls = `${due.has(d) ? ' is-due' : ''}${d === start.getDate() ? ' is-today' : ''}`;
             cells += `<span class="dash-cal-day${cls}">${d}</span>`;
@@ -909,7 +837,7 @@
         return `<div class="dash-cal" aria-hidden="true"><div class="dash-cal-title">${MONTHS[m]} ${y}</div><div class="dash-cal-grid">${cells}</div></div>`;
     }
 
-    // ─── The six cards the Dashboard has always had ──────────────────────────
+    // ─── The cards ───────────────────────────────────────────────────────────
     const TYPES = {
         networth: {
             name: 'Net Worth', group: 'Overview',
@@ -928,22 +856,18 @@
                 const points = inSlots(all, slotsOf(ctx.period));
                 // The figure is the most recent net worth there is, whatever the
                 // period; the change is the period's, first month to last.
-                const change = rangeChange(points);
-                const changeHtml = change === null
-                    ? '<div class="networth-change stat-change-neutral">—</div>'
-                    : `<div class="networth-change ${change.delta >= 0 ? 'stat-change-up' : 'stat-change-down'}">${change.delta >= 0 ? '+' : '-'} ${fmtValue(Math.abs(change.delta))} (${Math.abs(change.pct).toFixed(2)} %)</div>`;
-                const head = `<div class="networth-summary"><div class="networth-value">${fmtValue(all[all.length - 1].value)}</div>${changeHtml}</div>`;
+                const head = figureHtml(escapeHtml(fmtValue(all[all.length - 1].value)), changeHtml(rangeChange(points)));
                 // A card sized down to a tile is the figure alone.
                 if (ctx.h < 150) { host.innerHTML = head; return; }
                 if (points.length === 0) { host.innerHTML = head + empty('Nothing in this range'); return; }
                 const { plot, W, H } = chartBody(host, { head });
-                const color = readToken('--chart-networth', '#1a8b52');
-                plot.innerHTML = lineChart([{ label: 'Net Worth', color, points }], slotsOf(ctx.period), W, H, ctx.animate) || '';
+                plot.innerHTML = lineChart([{ label: 'Net Worth', color: paint(COLOR.primary), points }], slotsOf(ctx.period), W, H, ctx.animate) || '';
             },
         },
 
         accounts: {
             name: 'Account Balances', group: 'Overview',
+            info: 'Month-end balances from the Balance Sheet. Choose which accounts to chart with the chips; the gear hides accounts from the chips.',
             periods: TREND, period: YEAR_TO_DATE,
             sizes: { S: [3, 5], M: [4, 6], L: [6, 6], XL: [8, 7] }, min: [3, 4],
             // hidden: accounts left out of the chips (the gear). plotted: the
@@ -1000,6 +924,7 @@
 
         incomeExpenses: {
             name: 'Income & Expenses', group: 'Cash flow',
+            info: 'Monthly totals from the Cash Flow statement. Transfers between your own accounts are never counted as either.',
             periods: TREND, period: YEAR_TO_DATE,
             sizes: { S: [3, 5], M: [4, 6], L: [6, 6], XL: [12, 6] }, min: [3, 4],
             // hidden: the series switched off on the card's chips.
@@ -1026,7 +951,7 @@
 
         cashflow: {
             name: 'Monthly Cash Flow', group: 'Cash flow',
-            info: 'Where the shown month’s money went: total income, expenses, and transfers from your transactions ledger. Transfers are money moved to your own savings or brokerage accounts — neither income nor spending.',
+            info: 'Where the shown month’s money went: income, expenses and transfers from your transactions ledger. Transfers are money moved to your own savings or brokerage accounts, neither income nor spending.',
             periods: ['month'], period: THIS_MONTH,
             sizes: { S: [3, 5], M: [4, 6], L: [6, 5], XL: [8, 6] }, min: [3, 4],
             defaults: {}, fields: [],
@@ -1035,27 +960,18 @@
             render(host, ctx) {
                 const { period } = ctx;
                 const month = sliceStatement(ctx.data, slotsOf(period));
-                // One colour map for both month cards: a category is the same
-                // colour as a segment here and as a bar in Spending.
-                const colors = buildFlowColorMap(month.segments);
-                const rows = MCF_ROWS.map((r) => ({
-                    label: r.label,
-                    color: readToken(r.token, r.fallback),
-                    value: month.totals[r.key] || 0,
-                    segments: (month.segments[r.key] || []).map((seg) => ({ ...seg, color: colors.get(seg.key) })),
-                }));
-                if (!rows.some((r) => r.value > 0)) {
+                if (!Object.values(month.totals).some((v) => v > 0)) {
                     host.innerHTML = empty(period.isCurrentMonth ? 'No activity this month yet' : `Nothing in ${period.label}`, OPEN_STATEMENTS);
                     return;
                 }
-                const { plot, W, H } = chartBody(host);
-                plot.innerHTML = buildHBarChartSVG({ rows, W, avail: H, animate: ctx.animate, period }) || '';
+                host.innerHTML = cashflowHtml(month, period);
+                if (ctx.animate) host.querySelector('.dash-cf').classList.add('is-entering');
             },
         },
 
         balances: {
             name: 'Breakdown', group: 'Overview',
-            info: 'How your Balance Sheet splits across account types in the shown month — cash, investment, retirement, and debt. Each account contributes its most recent balance from that month or earlier, carried forward until you record a newer one.',
+            info: 'How your Balance Sheet splits across account types in the shown month: cash, investment, retirement and debt. Each account contributes its most recent balance from that month or earlier, carried forward until you record a newer one.',
             // A snapshot: one month, as of its end.
             periods: ['month'], period: THIS_MONTH,
             sizes: { S: [3, 5], M: [4, 6], L: [6, 6] }, min: [3, 4],
@@ -1063,7 +979,7 @@
             skeleton: 'rows',
             uses: ['balance'],
             load: (ctx) => ctx.hub.store('balance'),
-            render: renderDonut,
+            render: renderBreakdown,
         },
 
         spending: {
@@ -1092,8 +1008,9 @@
         // ─── Cards new with the customizable Dashboard ───────────────────────
         budgets: {
             name: 'Budgets', group: 'Spending',
+            info: 'Each budgeted category against its target for the period: a month’s target, times the months shown. Money put away is drawn in blue and never graded.',
             periods: SPAN, period: THIS_MONTH,
-            sizes: { S: [3, 5], M: [4, 6], L: [6, 7] }, min: [3, 4],
+            sizes: { S: [3, 5], M: [4, 7], L: [6, 7] }, min: [3, 4],
             defaults: {}, fields: [],
             skeleton: 'rows',
             uses: ['ie'],
@@ -1118,24 +1035,26 @@
                         return { key: c.key, label: c.label, target, actual, away, used: actual / target, over: !away && actual > target };
                     });
                 if (rows.length === 0) {
-                    host.innerHTML = empty('No budgets set', { label: 'Open Budgets', href: '/budgets', primary: true });
+                    host.innerHTML = empty('No budgets set', { label: 'Open Budgets', href: '/budgets' });
                     return;
                 }
                 rows.sort((a, b) => b.used - a.used || a.label.localeCompare(b.label));
                 const spending = rows.filter((r) => !r.away);
-                const head = ctx.h >= 230 && spending.length
-                    ? statHtml(escapeHtml(fmtValue(spending.reduce((s, r) => s + r.actual, 0))),
-                        `of ${escapeHtml(fmtValue(spending.reduce((s, r) => s + r.target, 0)))}`)
+                const head = ctx.h >= 200 && spending.length
+                    ? figureHtml(escapeHtml(fmtValue(spending.reduce((s, r) => s + r.actual, 0))),
+                        `of ${escapeHtml(fmtValue(spending.reduce((s, r) => s + r.target, 0)))} budgeted`)
                     : '';
-                const { list, fits } = listBody(host, { head });
+                const { list, fits } = listBody(host, { head, rowH: 48 });
                 fillList(list, rows, fits, (r) => {
-                    const color = r.away ? 'var(--accent-secondary)' : r.over ? 'var(--accent-negative)' : 'var(--accent-primary)';
+                    const color = r.away ? COLOR.transfer : r.over ? COLOR.expense : COLOR.primary;
                     const of = `${formatCurrency(r.actual)} of ${formatCurrency(r.target)}`;
                     const tip = r.away ? `${r.label}: ${of} put away` : r.over ? `${r.label}: ${of}, over budget` : `${r.label}: ${of}`;
-                    return `<a class="dash-row dash-row-bar" href="${escapeHtml(ledgerHref(ctx.period, { cat: r.key }))}" title="${escapeHtml(tip)}">
-                        <span class="dash-row-title">${escapeHtml(r.label)}</span>
-                        <span class="dash-row-amt${r.over ? ' is-over' : ''}">${escapeHtml(fmtValue(r.actual))}<span class="dash-row-of"> / ${escapeHtml(fmtValue(r.target))}</span></span>
-                        ${trackHtml(r.used, color)}</a>`;
+                    return `<a class="dash-row dash-row-budget" href="${escapeHtml(ledgerHref(ctx.period, { cat: r.key }))}" aria-label="${escapeHtml(tip)}">
+                        <span class="dash-row-line">
+                            <span class="dash-row-title">${escapeHtml(r.label)}</span>
+                            <span class="dash-row-amt"><span class="${r.over ? 'is-over' : ''}">${escapeHtml(fmtValue(r.actual))}</span><span class="dash-row-of"> / ${escapeHtml(fmtValue(r.target))}</span></span>
+                        </span>
+                        ${progressHtml(r.used, color)}</a>`;
                 }, { href: '/budgets' });
             },
         },
@@ -1146,7 +1065,7 @@
             periods: ['month', 'm3', 'm6', 'ytd', 'y1'], period: YEAR_TO_DATE,
             sizes: { S: [3, 3], M: [4, 5], L: [6, 5], XL: [8, 6] }, min: [3, 3],
             defaults: { goal: SAVINGS_GOAL_DEFAULT },
-            fields: [{ key: 'goal', label: 'Goal', type: 'percent', min: SAVINGS_GOAL_MIN, max: SAVINGS_GOAL_MAX }],
+            fields: [{ key: 'goal', label: 'Savings goal', type: 'percent', min: SAVINGS_GOAL_MIN, max: SAVINGS_GOAL_MAX }],
             uses: ['ie'],
             load: (ctx) => ctx.hub.store('ie'),
             render(host, ctx) {
@@ -1160,7 +1079,8 @@
                     return;
                 }
                 const goal = savingsGoal(ctx.card.settings.goal);
-                const head = statHtml(escapeHtml(pctText(transfers / income)), `Goal ${goalText(goal)}`);
+                const head = figureHtml(escapeHtml(pctText(transfers / income)),
+                    `Goal ${escapeHtml(goalText(goal))} · ${escapeHtml(fmtValue(transfers))} put away`);
                 // A single month, or a card sized down to a tile, is the figure alone.
                 if (months.length === 1 || ctx.h < 150) { host.innerHTML = head; return; }
                 const { plot, W, H } = chartBody(host, { head });
@@ -1170,6 +1090,7 @@
 
         merchants: {
             name: 'Top Merchants', group: 'Spending',
+            info: 'Where the period’s spending went, by merchant, each bar in its main category’s colour. Click one to see its transactions.',
             periods: SPAN, period: THIS_MONTH,
             sizes: { S: [3, 5], M: [4, 6], L: [6, 6] }, min: [3, 4],
             defaults: {}, fields: [],
@@ -1192,16 +1113,18 @@
                 }
                 const spent = ctx.data.total || 0;
                 const max = merchants[0].total || 1;
-                const color = 'var(--accent-primary)';
-                const { list, fits } = listBody(host);
+                const { list, fits } = listBody(host, { rowH: 44 });
                 fillList(list, merchants, fits, (m) => {
                     const share = spent > 0 ? `, ${pctText(m.total / spent)} of spending` : '';
                     const tip = `${m.name}: ${m.count} transaction${m.count === 1 ? '' : 's'}${share}`;
-                    const inner = `${merchantAvatarHtml(m.name)}<span class="dash-row-title">${escapeHtml(m.name)}</span>
-                        <span class="dash-row-amt">${escapeHtml(fmtValue(m.total))}</span>${trackHtml(m.total / max, color)}`;
+                    const inner = `${merchantAvatarHtml(m.name)}<span class="dash-row-main">
+                        <span class="dash-row-line"><span class="dash-row-title">${escapeHtml(m.name)}</span>
+                        <span class="dash-row-amt">${escapeHtml(fmtValue(m.total))}</span></span>
+                        ${progressHtml(m.total / max, m.category ? Ant.categoryHue(m.category) : COLOR.primary, true)}</span>`;
+                    const attrs = `class="dash-row dash-row-merchant" data-tip="${escapeHtml(tip)}" data-tip-placement="left"`;
                     return m.search
-                        ? `<a class="dash-row dash-row-bar has-avatar" href="${escapeHtml(ledgerHref(period, { name: m.search }))}" title="${escapeHtml(tip)}">${inner}</a>`
-                        : `<div class="dash-row dash-row-bar has-avatar" title="${escapeHtml(tip)}">${inner}</div>`;
+                        ? `<a ${attrs} href="${escapeHtml(ledgerHref(period, { name: m.search }))}" aria-label="${escapeHtml(tip)}">${inner}</a>`
+                        : `<div ${attrs}>${inner}</div>`;
                 }, { href: ledgerHref(period) });
             },
         },
@@ -1213,7 +1136,11 @@
             periods: SPAN, period: { preset: 'm3', month: null },
             sizes: { S: [4, 5], M: [6, 6], L: [8, 7], XL: [12, 7] }, min: [4, 4],
             defaults: { show: 'all' },
-            fields: [{ key: 'show', label: 'Show', options: [['all', 'All'], ['expense', 'Expenses'], ['income', 'Income']] }],
+            // In the header, as Ant's Segmented: [value, label, what it shows].
+            fields: [{
+                key: 'show', label: 'Show', inline: true,
+                options: [['all', 'All', 'All transactions'], ['expense', 'Out', 'Expenses only'], ['income', 'In', 'Income only']],
+            }],
             skeleton: 'rows',
             uses: [],
             load(ctx) {
@@ -1224,25 +1151,24 @@
                 const all = ctx.data.transactions || [];
                 const rows = all.filter((t) => show === 'all' || t.tx_type === show);
                 if (rows.length === 0) {
-                    host.innerHTML = empty('No transactions yet', ADD_TRANSACTIONS);
+                    host.innerHTML = all.length
+                        ? empty(show === 'income' ? 'No recent income' : 'No recent expenses')
+                        : empty('No transactions yet', ADD_TRANSACTIONS);
                     return;
                 }
                 const cats = new Map((ctx.data.categories || []).map((c) => [c.id, c]));
                 const wide = ctx.w >= 560;
-                const { list, fits } = listBody(host);
+                const { list, fits } = listBody(host, { rowH: 44 });
                 fillList(list, rows, fits, (t) => {
                     const label = t.display_name || t.description || '';
                     const cat = cats.get(t.category_id);
                     const date = escapeHtml(fmtShortDate(t.date));
-                    const catHtml = cat
-                        ? `<span class="tx-category-pill tx-category-${escapeHtml(cat.cat_type)}">${escapeHtml(cat.name)}</span>`
-                        : '<span class="tx-category-pill tx-category-empty">Uncategorized</span>';
                     return wide
                         ? `<div class="dash-row dash-row-tx is-wide"><span class="dash-row-date">${date}</span>${merchantAvatarHtml(label)}
-                            <span class="dash-row-title" title="${escapeHtml(label)}">${escapeHtml(label)}</span>${catHtml}${txAmountHtml(t.tx_type, t.amount)}</div>`
+                            <span class="dash-row-title" title="${escapeHtml(label)}">${escapeHtml(label)}</span>${categoryTagHtml(cat)}${txAmountHtml(t.tx_type, t.amount)}</div>`
                         : `<div class="dash-row dash-row-tx">${merchantAvatarHtml(label)}<span class="dash-row-main">
                             <span class="dash-row-title" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-                            <span class="dash-row-sub">${date} · ${escapeHtml(cat ? cat.name : 'Uncategorized')}</span></span>${txAmountHtml(t.tx_type, t.amount)}</div>`;
+                            <span class="dash-row-sub">${date} · ${escapeHtml(cat && !cat.locked ? cat.name : 'Uncategorized')}</span></span>${txAmountHtml(t.tx_type, t.amount)}</div>`;
                 // The response stops at TX_LIMIT rows, so past that the count of
                 // what was left out is not known and the link just opens them.
                 }, { href: '/transactions', label: all.length >= TX_LIMIT ? 'View all' : '' });
@@ -1251,6 +1177,7 @@
 
         upcoming: {
             name: 'Upcoming Bills', group: 'Planning',
+            info: 'Expenses your recurring schedules expect in the coming days.',
             noLink: true,
             periods: ['d14', 'd30', 'd60'], period: { preset: 'd30', month: null },
             sizes: { S: [3, 5], M: [4, 6], L: [8, 6] }, min: [3, 4],
@@ -1285,34 +1212,34 @@
                     const schedules = ctx.data.some((page) => (page.series || []).length > 0);
                     host.innerHTML = schedules
                         ? empty(`Nothing due in the ${period.short.toLowerCase()}`)
-                        : empty('No recurring bills yet', { label: 'Open Recurring', href: '/recurring', primary: true });
+                        : empty('No recurring bills yet', { label: 'Open Recurring', href: '/recurring' });
                     return;
                 }
                 bills.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.amount - a.amount));
                 const total = bills.reduce((s, b) => s + b.amount, 0);
                 const head = ctx.h >= 170
-                    ? statHtml(escapeHtml(fmtValue(total)), `${bills.length} bill${bills.length === 1 ? '' : 's'}`) : '';
+                    ? figureHtml(escapeHtml(fmtValue(total)), `${bills.length} bill${bills.length === 1 ? '' : 's'} due`) : '';
                 const tight = ctx.w < 340;
                 const calendar = ctx.w >= 540 && ctx.h >= 250 ? billCalendarHtml(bills, period.start) : '';
-                host.innerHTML = `${head}<div class="dash-bills">${calendar}<div class="dash-list" data-list></div></div>`;
+                host.innerHTML = `${head}<div class="dash-bills">${calendar}<div class="dash-list" style="--dash-row-h:52px" data-list></div></div>`;
                 const list = host.querySelector('[data-list]');
-                const fits = Math.max(1, Math.floor(list.clientHeight / ROW_H));
+                const fits = Math.max(1, Math.floor(list.clientHeight / 52));
                 fillList(list, bills, fits, (b) => {
                     const name = names.get(b.key) || b.key;
                     const [, m, d] = b.date.split('-').map(Number);
-                    return `<div class="dash-row dash-row-bill${tight ? ' is-tight' : ''}" title="${escapeHtml(`${name}: ${formatCurrency(b.amount, true)}`)}">
-                        <span class="dash-datechip${b.date === from ? ' is-today' : ''}"><span>${MONTHS_ABBR[m - 1]}</span><b>${d}</b></span>
+                    return `<a class="dash-row dash-row-bill${tight ? ' is-tight' : ''}" href="/recurring" aria-label="${escapeHtml(`${name}: ${formatCurrency(b.amount, true)}, ${relativeDay(b.date, from)}`)}">
+                        <span class="dash-datechip${b.date === from ? ' is-today' : ''}" aria-hidden="true"><span>${MONTHS_ABBR[m - 1]}</span><b>${d}</b></span>
                         ${tight ? '' : merchantAvatarHtml(name)}
                         <span class="dash-row-main"><span class="dash-row-title">${escapeHtml(name)}</span>
                             <span class="dash-row-sub">${relativeDay(b.date, from)}</span></span>
-                        <span class="dash-row-amt">${escapeHtml(formatCurrency(b.amount))}</span></div>`;
+                        <span class="dash-row-amt">${escapeHtml(fmtValue(b.amount))}</span></a>`;
                 }, { href: '/recurring' });
             },
         },
 
         forecast: {
             name: 'Balance Forecast', group: 'Planning',
-            info: 'Projects one account\'s balance forward, week by week. Each week combines your typical spending and income (averaged over recent complete months).',
+            info: 'Projects one account’s balance forward, week by week, from your typical income and spending over recent complete months.',
             periods: ['f1', 'f3', 'f6'], period: { preset: 'f3', month: null },
             sizes: { S: [3, 4], M: [6, 5], L: [8, 6], XL: [12, 6] }, min: [3, 3],
             defaults: {}, fields: [],
@@ -1330,9 +1257,12 @@
                 const { summary } = d;
                 const account = (d.accounts || []).find((a) => a.key === d.start_account);
                 const sub = `${account ? `${escapeHtml(account.label)} · ` : ''}${escapeHtml(fmtShortDate(summary.endDate))}`;
-                let head = statHtml(escapeHtml(fmtValue(summary.endBalance)), sub, summary.endBalance < 0 ? 'is-neg' : '');
+                let head = figureHtml(escapeHtml(fmtValue(summary.endBalance)), sub, summary.endBalance < 0 ? 'neg' : '');
                 if (summary.belowZero && summary.lowest) {
-                    head += `<div class="dash-card-alert">Runs out of money the week of ${escapeHtml(summary.lowest.label)}, down to ${escapeHtml(fmtValue(summary.lowest.balance))}.</div>`;
+                    head += `<div class="ant-alert ant-alert-error dash-alert" role="status">
+                        <span class="ant-alert-icon">${Ant.icon('close-circle')}</span>
+                        <div class="ant-alert-content"><div class="ant-alert-message">Runs out of money the week of ${escapeHtml(summary.lowest.label)}, down to ${escapeHtml(fmtValue(summary.lowest.balance))}.</div></div>
+                    </div>`;
                 }
                 if (ctx.h < 150) { host.innerHTML = head; return; }
                 const { plot, W, H } = chartBody(host, { head });
@@ -1342,21 +1272,21 @@
     };
 
     // ─── Widget list ─────────────────────────────────────────────────────────
-    // Each widget's picture in the Customize panel: a schematic of its shape in
-    // three inks (dashboard.css .dash-thumb), not its data, so the panel opens
+    // Each widget's picture in the widget Drawer: a schematic of its shape in
+    // Ant's inks (dashboard.css .dash-thumb), not its data, so the Drawer opens
     // without loading anything.
     const THUMBS = {
         networth: '<rect class="t-ink" x="8" y="8" width="40" height="8" rx="2"/><rect class="t-mute" x="8" y="20" width="26" height="4" rx="2"/>'
             + '<path class="t-line t-a" d="M8 60 C24 56 32 46 48 48 S78 36 92 32 108 26 112 24"/>',
         accounts: '<rect class="t-chip t-a" x="8" y="8" width="22" height="7" rx="3.5"/><rect class="t-chip t-mute" x="34" y="8" width="22" height="7" rx="3.5"/>'
             + '<path class="t-line t-a" d="M8 58 C30 54 40 44 60 46 S96 34 112 30"/><path class="t-line t-c" d="M8 40 C30 42 48 36 66 38 S98 46 112 44"/>',
-        incomeExpenses: '<rect class="t-chip t-a" x="8" y="8" width="22" height="7" rx="3.5"/><rect class="t-chip t-b" x="34" y="8" width="22" height="7" rx="3.5"/>'
-            + '<path class="t-line t-a" d="M8 36 C28 30 44 38 62 32 S96 26 112 28"/><path class="t-line t-b" d="M8 56 C28 50 44 58 62 50 S96 52 112 46"/>',
-        cashflow: '<rect class="t-fill t-a" x="30" y="14" width="74" height="10" rx="2"/><rect class="t-fill t-b" x="30" y="32" width="56" height="10" rx="2"/>'
+        incomeExpenses: '<rect class="t-chip t-pos" x="8" y="8" width="22" height="7" rx="3.5"/><rect class="t-chip t-neg" x="34" y="8" width="22" height="7" rx="3.5"/>'
+            + '<path class="t-line t-pos" d="M8 36 C28 30 44 38 62 32 S96 26 112 28"/><path class="t-line t-neg" d="M8 56 C28 50 44 58 62 50 S96 52 112 46"/>',
+        cashflow: '<rect class="t-fill t-pos" x="30" y="14" width="74" height="10" rx="2"/><rect class="t-fill t-b" x="30" y="32" width="56" height="10" rx="2"/>'
             + '<rect class="t-fill t-c" x="30" y="50" width="22" height="10" rx="2"/><rect class="t-mute" x="8" y="16" width="16" height="5" rx="2"/>'
             + '<rect class="t-mute" x="8" y="34" width="16" height="5" rx="2"/><rect class="t-mute" x="8" y="52" width="16" height="5" rx="2"/>',
         balances: '<circle class="t-ring t-mute" cx="84" cy="36" r="20"/><path class="t-ring t-a" d="M84 16 A20 20 0 0 1 103 42"/>'
-            + '<path class="t-ring t-b" d="M103 42 A20 20 0 0 1 72 52"/><rect class="t-ink" x="8" y="18" width="34" height="6" rx="2"/>'
+            + '<path class="t-ring t-c" d="M103 42 A20 20 0 0 1 72 52"/><rect class="t-ink" x="8" y="18" width="34" height="6" rx="2"/>'
             + '<rect class="t-mute" x="8" y="30" width="26" height="5" rx="2"/><rect class="t-ink" x="8" y="44" width="30" height="6" rx="2"/>',
         spending: '<rect class="t-fill t-b" x="12" y="30" width="12" height="32" rx="2"/><rect class="t-fill t-mute" x="12" y="18" width="12" height="10" rx="2"/>'
             + '<rect class="t-fill t-b" x="36" y="22" width="12" height="40" rx="2"/><rect class="t-fill t-mute" x="36" y="12" width="12" height="8" rx="2"/>'
@@ -1387,7 +1317,7 @@
 
     const thumbHtml = (type) => `<svg class="dash-thumb" viewBox="0 0 120 72" aria-hidden="true">${THUMBS[type] || ''}</svg>`;
 
-    // The Customize panel's groups, in the order they list.
+    // The widget Drawer's groups, in the order they list.
     const GROUPS = ['Overview', 'Cash flow', 'Spending', 'Planning'].map((name) => ({
         name,
         types: Object.keys(TYPES).filter((type) => TYPES[type].group === name),

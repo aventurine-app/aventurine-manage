@@ -1,15 +1,11 @@
 /* ─── onboarding.css ──────────────────────────────────────────────────────────
-   First-run setup (widgets/onboarding.js) plus the pieces it SHARES with an
-   ordinary import, both rendered by widgets/txfileimport.js:
-     .acct-*      the account question — asked once, before the file dialog, in
-                  identical words and shape in first-run and in a normal import
-     .tx-found-*  the "Here Is Your Import" headline + uncategorized callout
-   Both pages that can import (Dashboard during first run, Transactions) load this.
+   First-run setup (widgets/onboarding.js), on the Dashboard: its dialog and
+   the account question in it (.acct-*, drawn by widgets/txfileimport.js's
+   accountChoicesHtml). The file it hands on goes through the ordinary import
+   wizard, drawn in Ant Design (tximport.css).
 
    Deliberately quiet: this is the first thing a new user sees, so it reads as an
-   invitation with one obvious next step rather than a form to fill in. Overlay
-   and dialog mirror the .tx-import-* shell in transactions.css so first-run
-   doesn't look like a different application.
+   invitation with one obvious next step rather than a form to fill in.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* Positioning/centering come from the shared overlay rule in style.css §8. */
@@ -215,27 +211,3 @@
 }
 
 .onb-skip:hover { color: var(--text-primary); text-decoration: underline; }
-
-/* ── "Here Is Your Import" headline + callout (shared with an ordinary import,
-   rendered by txfileimport.js's showImportModal / uncategorizedNoteHtml) ──── */
-
-.tx-found-headline {
-    color: var(--text-primary);
-    font-family: var(--font-h2);
-    font-size: var(--size-h3);
-    font-weight: var(--weight-semibold);
-}
-
-/* Abstention, stated plainly. Leaving a category blank is the designed
-   behaviour — a wrong guess costs more trust than an empty cell — so this
-   explains it rather than apologising for it. */
-.tx-found-note {
-    margin-top: 16px;
-    padding: 11px 13px;
-    border-radius: 8px;
-    background: var(--frost-2);
-    color: var(--text-secondary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    line-height: var(--lh-relaxed);
-}

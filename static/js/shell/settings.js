@@ -90,9 +90,10 @@
     // ── Graph palette ─────────────────────────────────────────────────────────
     // The second appearance axis: the theme above sets the page colours, this
     // sets the chart colours, and the two combine (see themes.css). '' is the
-    // accent-derived ramp, and the reason it stores an empty string rather than
-    // the word 'accent': an absent attribute uses the --chart-*
-    // definitions in style.css, with no override block to keep in sync.
+    // default, Ant Design's chart palette, and the reason it stores an empty
+    // string rather than the word 'default': an absent attribute uses the
+    // --ant-chart-* definitions in ant.css, with no override block to keep in
+    // sync. 'opal' is the one alternative, a desaturated copy of it.
     //
     // Switching it is the same token swap the theme does, so it reuses the same
     // 'themechange' event to make the drawn charts repaint from the state they

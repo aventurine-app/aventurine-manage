@@ -27,51 +27,6 @@ html[data-theme="dark"],
        SVG file, not a data: URI (blocked by the img-src 'self' CSP). */
     --calendar-icon: url('/static/icons/calendar-dark-theme.svg');
 
-    /* The income ramp, re-picked against the dark surface (style.css carries the
-       light set and the reasoning). Going lighter is the only direction with
-       room here, so every step clears 3:1 — 3.7:1 up to 12.4:1, with adjacent
-       pairs at 1.21-1.33 — where the light set's palest two could not. */
-    --chart-inflow-1: #147a5a;
-    --chart-inflow-2: #1a9163;
-    --chart-inflow-3: #23a86c;
-    --chart-inflow-4: #3fbe7c;
-    --chart-inflow-5: #64d194;
-    --chart-inflow-6: #8ee0b0;
-
-    /* The gold spending ramp, re-picked against the dark surface (style.css
-       carries the light set, the near-zero blue channel and the rest of the
-       reasoning). A SELECTED set, not a lightened copy: the whole ramp sits
-       higher here than the light one, because a dark surface has the room and a
-       gold only reads as gold above a certain lightness. Every step clears 3:1
-       (4.4:1 up to 15.5:1) and adjacent pairs land at 1.15-1.23. Step 4 stays far
-       enough above the income ramp's step 2 for the named pair to separate by
-       lightness, 1.6:1 here against the light theme's 1.8:1. */
-    --chart-outflow-1: #957400;
-    --chart-outflow-2: #a68201;
-    --chart-outflow-3: #b79106;
-    --chart-outflow-4: #c8a110;
-    --chart-outflow-5: #d7b227;
-    --chart-outflow-6: #e4c449;
-    --chart-outflow-7: #efd777;
-    --chart-outflow-8: #f7e6a8;
-
-    /* The balance greys, re-picked against the dark surface (style.css carries
-       the light set, the eight-step reasoning and which three the donut takes).
-       A SELECTED set, not a lightened copy: going lighter is the only direction
-       with room here, so every step clears 3:1 where the light set's top three
-       could not. Adjacent pairs land at 1.20-1.24 — an even perceptual walk,
-       since a grey ramp has only lightness to step in. --chart-debt is an alias
-       of the gold ramp above and --chart-net an alias of step 1, so both follow
-       with nothing to restate. */
-    --chart-balance-1: #5f6265;   /* donut: cash */
-    --chart-balance-2: #6c6f72;
-    --chart-balance-3: #7a7d80;
-    --chart-balance-4: #8a8d90;   /* donut: investments */
-    --chart-balance-5: #9a9da0;
-    --chart-balance-6: #acafb2;
-    --chart-balance-7: #bfc2c5;   /* donut: retirement */
-    --chart-balance-8: #d4d7da;
-
     /* Background + surfaces.
        background  — the deepest layer (body / page bg).
        surface1-4  — opaque layers stacked from subtle to prominent, one
@@ -454,535 +409,76 @@ html[data-tint="pink"],
 /* ─── Graph palettes ─────────────────────────────────────────────────────────
    A SECOND, independent axis from the surface theme above: the surface theme
    picks the page (light / dark / colorful nav), the graph palette picks what the
-   charts are painted with. They compose — every graph palette has to work on
-   every surface — which is why this lives in its own attribute (data-graph-theme
-   on <html>, from settings.js / theme-init.js) instead of becoming four more
-   surface themes.
+   charts are painted with. They compose — every palette works on every surface —
+   which is why this lives in its own attribute (data-graph-theme on <html>, from
+   settings.js / theme-init.js).
 
-   'accent' is the default and needs no block at all: the --chart-* ramp in
-   style.css already derives every stop from --accent-primary, so leaving the
-   attribute off IS the accent palette. Only an alternative needs tokens here. */
-
-
-/* ─── Gemstone graphs ─────────────────────────────────────────────────────────
-   Eight distinct hues instead of eight steps of one. The accent ramp asks the
-   eye to tell series apart by lightness, which works for two or three lines of
-   the same measure and stops working past that; here hue does the work.
-
-   Deep, slightly desaturated stones rather than the bright primaries this
-   palette shipped with as "Colorful": mean lightness drops (0.57 → 0.54 on the
-   light surface) and the top of the chroma range comes in hard (0.26 → 0.19),
-   which is what turns a set of vivid hues into a set of jewel tones.
-
-     1 Lapis      2 Tourmaline   3 Tiger's Eye  4 Garnet
-     5 Tanzanite  6 Amber        7 Rhodolite    8 Emerald
-
-   Fixed hex, not accent mixes, for the same reason --spectrum-* is fixed: the
-   whole job is to be eight DIFFERENT colours, which no mix of a single accent
-   can be. That means this ramp does NOT follow the accent — picking Gemstone is
-   picking a palette of its own, and the UI accent still colours the chrome.
-
-   The stops were chosen with the dataviz validator (OKLab ΔE, Machado CVD
-   simulation) rather than by eye, and both sets pass all five checks against
-   their own surface: lightness band, chroma floor, adjacent-pair separation
-   under protanopia/deuteranopia, the normal-vision floor, and 3:1 contrast.
-   Two consequences worth keeping if these are ever edited:
-
-     • The ORDER is load-bearing. The checks run on ADJACENT pairs, and slots
-       1-4 are additionally drawn together in one frame (the Dashboard's
-       Balances pie takes --chart-1..4), so those four are checked ALL-PAIRS as
-       a group. That group check is what chose this order out of the ones the
-       stones allow: it is also what the bright set failed, at ΔE 3.6 between
-       its green and its orange, which is why the pie's slices used to be hard
-       to tell apart for a red-green colourblind reader.
-     • Dark is a SELECTED set, not a lightened copy. The two surfaces have
-       different lightness bands (0.43–0.77 vs 0.48–0.67), so each stop was
-       re-picked against the surface it actually sits on. Muting costs
-       separation, so this is where the retone had the least room: the dark set
-       keeps the stones' hues and their relative order but spends more of the
-       band than the light set does.
-
-   Note there is no green in slots 1-4. Emerald and garnet cannot both sit in
-   the pie's four and still clear the group check while muted — under simulated
-   deuteranopia a muted green and a muted red converge — and the named income
-   series has the stronger claim on the green, so the pie gives up its green
-   slice instead. */
-html[data-graph-theme="gemstone"],
-.settings-graph-swatch[data-graph-theme="gemstone"] {   /* the Preferences preview,
-                                                        in this palette's context
-                                                        whether or not it is live */
-    --chart-1: #1a49ae;   /* lapis */
-    /* Ink on a lapis fill. White in BOTH themes — this block matches whatever
-       data-theme is set, and the dark set's lapis (#3365cc) is still a midtone
-       blue, so the per-theme --button-text would flip to dark ink on it. */
-    --chart-1-ink: #fff;
-    --chart-2: #0086a5;   /* tourmaline */
-    --chart-3: #bd771d;   /* tiger's eye */
-    --chart-4: #b00d14;   /* garnet */
-    --chart-5: #623faf;   /* tanzanite */
-    --chart-6: #c55f18;   /* amber */
-    --chart-7: #9645a0;   /* rhodolite */
-    --chart-8: #099e71;   /* emerald */
-
-    /* The three named series are NOT re-pointed here any more. They used to be
-       emerald / garnet / lapis — green in, red out, blue moved — which put this
-       palette's green on income at the same time as the app was giving green to
-       balances. That collision goes away by letting the :root aliases stand:
-       --chart-income and --chart-expense point at --chart-inflow-3 and
-       --chart-outflow-2, which this block re-picks below, so the trio follows
-       this palette with nothing to restate — and --chart-transfer follows
-       --accent-info, the app-wide transfer blue, which the dark block above
-       re-points for the dark surface and this palette leaves alone.
-
-       The emerald is still on the ramp as --chart-8 / --cat-8, and it is what
-       the income ramp below is built from.
-
-       What this palette DOES re-point is which SLOT each of the two takes. The
-       :root pair is tuned for Aventurine's ramps, where the golds start at a mid
-       lightness and the pair has to be pulled apart as a deep green against a mid
-       gold. This palette's outflow ramp is a crimson walk that starts deep, so
-       its deepest steps already sit well clear of its emeralds and the pair reads
-       best at step 3 and step 2 — where it has always been. The slot is a palette
-       decision the same way the values are.
-
-       Kept from the old note, because it still governs the two flow ramps:
-       green-vs-red is the worst pair in existence for the ~8% of men with
-       red-green colour blindness, so the inflow and outflow sets are separated
-       by LIGHTNESS as well as hue, and both charts label every series in the
-       legend so colour is never the only thing carrying the meaning. */
-
-    /* The income ramp, six steps of this palette's own emerald so the greens
-       belong to the stones rather than being the default set dropped in. The
-       Sankey's income bands and the Dashboard's income segments both read it,
-       deepest first, matching the size order those bands are laid out in.
-
-       The Sankey's HUB leaves this ramp entirely and takes the balance family's
-       deepest step below: Net Inflow is where all the arriving money has landed
-       as a single amount, which makes it something held rather than something
-       flowing, and it also stops the hub being read as one more green source. */
-    --chart-income:   var(--chart-inflow-3);
-    --chart-expense:  var(--chart-outflow-2);
-
-    --chart-inflow-1: #045540;
-    --chart-inflow-2: #06724f;
-    --chart-inflow-3: #099e71;   /* the ramp's own emerald */
-    --chart-inflow-4: #1fa87d;
-    --chart-inflow-5: #3cb994;
-    --chart-inflow-6: #5cc7a2;
-    --chart-net:      var(--chart-balance-1);
-
-    /* Money LEAVING is warm here, opposite the green arriving: the same pairing
-       --chart-income / --chart-expense already states, spread over the eight
-       bands the outflow side needs. It runs from a garnet-adjacent crimson out
-       to a tiger's-eye gold, so it is built from this palette's own warm end
-       rather than from the accent ramp's, and it carries more chroma than the
-       accent set's does — which is the difference between the two palettes on
-       this side. Deepest first, since the bands are ordered by amount. */
-    --chart-outflow-1: #9c0034;
-    --chart-outflow-2: #b1031a;
-    --chart-outflow-3: #b73400;
-    --chart-outflow-4: #b85200;
-    --chart-outflow-5: #bc6800;
-    --chart-outflow-6: #bf7b00;
-    --chart-outflow-7: #c28e00;
-    --chart-outflow-8: #c3a200;
-
-    /* The balance family, walking this palette's lapis up through its tourmaline
-       so the blues belong to the stones rather than being the default set
-       dropped in. Eight steps, deepest first, with the donut taking 1, 4 and 7
-       for cash / investments / retirement and step 1 doubling as the Sankey's
-       hub (style.css carries the full reasoning). --chart-debt is an alias of
-       --chart-outflow-1 above, so debt takes this palette's crimson with nothing
-       to restate. */
-    --chart-balance-1: #13307f;   /* donut: cash */
-    --chart-balance-2: #16409c;
-    --chart-balance-3: #1355b2;
-    --chart-balance-4: #0f6cb6;   /* donut: investments */
-    --chart-balance-5: #0d82b8;
-    --chart-balance-6: #1096bd;
-    --chart-balance-7: #3fadcd;   /* donut: retirement */
-    --chart-balance-8: #6ec5da;
-
-    /* The categorical ramp — the Spending report's per-category lines, the
-       Sankey's outflow bands, the Saved & Invested stack. The SAME eight stones
-       as above, just dealt in a different order, so the two orders are
-       separately checked for adjacent-pair separation and neither has to
-       compromise for the other.
-
-       Emerald is deliberately LAST. Categories are assigned in size order, so
-       slot 8 is only reached by a household with eight-plus spending categories
-       — which keeps green off the big outflow bands and lets it go on meaning
-       income, the one thing this palette says out loud. (Garnet is not treated
-       the same way: on this ramp it is one merchant category among eight and
-       reads as a label, not as a verdict, whereas green would be sitting
-       directly opposite a green inflow in the same diagram.)
-
-       Aliases rather than a second copy of the hexes: --chart-* is already
-       re-picked per theme, so these follow to the dark set for free. */
-    --cat-1: var(--chart-1);   /* lapis */
-    --cat-2: var(--chart-6);   /* amber */
-    --cat-3: var(--chart-2);   /* tourmaline */
-    --cat-4: var(--chart-4);   /* garnet */
-    --cat-5: var(--chart-7);   /* rhodolite */
-    --cat-6: var(--chart-3);   /* tiger's eye */
-    --cat-7: var(--chart-5);   /* tanzanite */
-    --cat-8: var(--chart-8);   /* emerald */
-}
-
-/* Same eight stones re-picked for the dark surface. Two attributes deep, so it
-   outweighs the light block above whichever order they land in. The named trio
-   and the --cat-* deal are aliases, so they follow these values with nothing to
-   restate here. */
-html[data-graph-theme="gemstone"][data-theme="dark"],
-html[data-theme="dark"] .settings-graph-swatch[data-graph-theme="gemstone"] {
-    --chart-1: #3365cc;   /* lapis */
-    --chart-2: #169dbf;   /* tourmaline */
-    --chart-3: #c07d2c;   /* tiger's eye */
-    --chart-4: #be342f;   /* garnet */
-    --chart-5: #775ac5;   /* tanzanite */
-    --chart-6: #c55f19;   /* amber */
-    --chart-7: #a051aa;   /* rhodolite */
-    --chart-8: #00a475;   /* emerald */
-
-    /* Both flow ramps, re-stepped inside the dark surface's band. */
-    --chart-inflow-1: #00674a;
-    --chart-inflow-2: #008560;
-    --chart-inflow-3: #00a475;   /* the ramp's own emerald */
-    --chart-inflow-4: #2bbb90;
-    --chart-inflow-5: #57cfa8;
-    --chart-inflow-6: #83e2c2;
-
-    --chart-outflow-1: #b20d3e;
-    --chart-outflow-2: #ba2529;
-    --chart-outflow-3: #c03803;
-    --chart-outflow-4: #bb5300;
-    --chart-outflow-5: #b76500;
-    --chart-outflow-6: #b57500;
-    --chart-outflow-7: #b38300;
-    --chart-outflow-8: #af9100;
-
-    /* The balance blues re-picked against the dark surface, from this palette's
-       dark lapis and tourmaline. Step 1 is the Sankey's hub here too. */
-    --chart-balance-1: #2a4fae;   /* donut: cash */
-    --chart-balance-2: #3365cc;
-    --chart-balance-3: #2b7ed2;
-    --chart-balance-4: #2094ca;   /* donut: investments */
-    --chart-balance-5: #16a8c4;
-    --chart-balance-6: #45bcd4;
-    --chart-balance-7: #74cee0;   /* donut: retirement */
-    --chart-balance-8: #a0dfec;
-}
+   'default' is Ant Design's chart palette and needs no block at all: ant.css
+   defines the --ant-chart-* tokens, and leaving the attribute off IS the default.
+   Everything that draws a chart reads those tokens (ant.js categoryHue, the
+   Dashboard and Portfolio cards, the Reports engines through the --chart-* map
+   in ant.css), so a palette is only a re-pointing of the same names. */
 
 
 /* ─── Opal graphs ─────────────────────────────────────────────────────────────
-   Opalescent: soft, milky stones with a pearly flash instead of Gemstone's deep
-   jewel tones. Eight distinct hues like Gemstone, but lower in chroma and lifted
-   in lightness, so a chart reads as pastel iridescence rather than saturated ink.
+   The default palette with its colour turned down: every hue is kept (the same
+   blue, cyan, violet, orange, green, lilac, teal, gold, pink and mint, in the
+   same slots) but at 55% of Ant's chroma, with lightness eased a little toward
+   the middle so the very bright hues (the limes, the pink) and the deep ones
+   (the Sankey's blues, the purple) sit together. Mean chroma drops from 0.169 to
+   0.093 in OKLCH; neighbouring slots stay 13-22 apart in OKLab (ΔE x100), where
+   the default is 23-40, so the palette is quieter and every pair is still
+   readable. Generated, not hand-picked: re-run the same chroma scale rather than
+   nudging single values, or the family stops being one set.
 
-     1 Periwinkle   2 Orchid    3 Aqua      4 Peach
-     5 Lilac        6 Seafoam   7 Coral     8 Sky
-
-   Fixed hex, not accent mixes, for the same reason Gemstone is: the job is to be
-   eight DIFFERENT colours. Picking Opal does not follow the UI accent.
-
-   The three flow/balance families keep the app-wide meaning and only change
-   stones. Money arriving is a seafoam green, money leaving walks orchid-rose out
-   to peach, and balances walk lavender to sky. Each ramp reuses the lightness
-   steps of the Aventurine ramp it replaces (style.css), so the contrast and
-   adjacent-pair spacing that were checked there carry over. The named trio
-   (--chart-income, --chart-expense, --chart-transfer), --chart-net, --chart-debt
-   and --chart-networth are aliases of those ramps, so they follow with nothing to
-   restate and keep the Aventurine slots (income step 2, expense step 4).
-
-   Ink on a --chart-1 fill is not set here: the default (--button-text) is already
-   near-white on the light set's periwinkle and dark on the dark set's.
-
-   The categorical deal (--cat-*) puts seafoam last, so green stays with income
-   on the big outflow bands, the same call Gemstone makes with emerald. Dark is a
-   SELECTED set re-picked against the dark surface, not a lightened copy. */
+   Fixed hex for everything but the primary, which is the UI accent and so is
+   desaturated by mixing it toward a grey instead. Like Ant's own palette this
+   is one set for light and dark; only the second income green steps darker on
+   dark, the way the default's does (ant.css). The swatch selector puts the
+   Preferences preview in this palette's context whether or not it is live. */
 html[data-graph-theme="opal"],
-.settings-graph-swatch[data-graph-theme="opal"] {   /* the Preferences preview */
-    --chart-1: #4e65a8;   /* periwinkle */
-    --chart-2: #b16389;   /* orchid */
-    --chart-3: #339797;   /* aqua */
-    --chart-4: #cc8463;   /* peach */
-    --chart-5: #8e70b0;   /* lilac */
-    --chart-6: #4ea683;   /* seafoam */
-    --chart-7: #a75a61;   /* coral */
-    --chart-8: #4d9cc7;   /* sky */
+.settings-graph-swatch[data-graph-theme="opal"] {
+    --ant-chart-1: #5c8dcf;
+    --ant-chart-2: #77bebd;
+    --ant-chart-3: #7e7cce;
+    --ant-chart-4: #d2997b;
+    --ant-chart-5: #86b972;
+    --ant-chart-6: #c396da;
+    --ant-chart-7: #6191a3;
+    --ant-chart-8: #af9667;
+    --ant-chart-9: #df99bf;
+    --ant-chart-10: #74ba8b;
 
-    --chart-inflow-1: #015c44;
-    --chart-inflow-2: #0a7355;
-    --chart-inflow-3: #2f8865;
-    --chart-inflow-4: #499c77;
-    --chart-inflow-5: #61b188;
-    --chart-inflow-6: #78c69a;
+    --ant-chart-extra-1: #abb56f;
+    --ant-chart-extra-2: #b091d5;
+    --ant-chart-extra-3: #5881a4;
+    --ant-chart-extra-4: #85d299;
+    --ant-chart-extra-5: #b98e69;
+    --ant-chart-extra-6: #df98d7;
+    --ant-chart-extra-7: #6571af;
+    --ant-chart-extra-8: #b8d782;
 
-    --chart-outflow-1: #994a6f;
-    --chart-outflow-2: #a75675;
-    --chart-outflow-3: #b6657d;
-    --chart-outflow-4: #c57585;
-    --chart-outflow-5: #d6868f;
-    --chart-outflow-6: #e6979a;
-    --chart-outflow-7: #f6a9a6;
-    --chart-outflow-8: #ffc1b9;
+    --ant-chart-primary: color-mix(in srgb, var(--ant-color-primary) 55%, #8e9391);
+    --ant-chart-income: #659f6e;
+    --ant-chart-expense: #ac6664;
+    --ant-chart-transfer: #6486ce;
 
-    --chart-balance-1: #564771;   /* donut: cash */
-    --chart-balance-2: #5e5882;
-    --chart-balance-3: #656992;
-    --chart-balance-4: #6c79a0;   /* donut: investments */
-    --chart-balance-5: #758bad;
-    --chart-balance-6: #819ebc;
-    --chart-balance-7: #8eb1ca;   /* donut: retirement */
-    --chart-balance-8: #9fc5d9;
+    --ant-chart-income-2: #a9d192;
 
-    --cat-1: var(--chart-1);   /* periwinkle */
-    --cat-2: var(--chart-2);   /* orchid */
-    --cat-3: var(--chart-3);   /* aqua */
-    --cat-4: var(--chart-4);   /* peach */
-    --cat-5: var(--chart-5);   /* lilac */
-    --cat-6: var(--chart-7);   /* coral */
-    --cat-7: var(--chart-8);   /* sky */
-    --cat-8: var(--chart-6);   /* seafoam */
+    --ant-chart-purple: #7158aa;
+    --ant-chart-volcano: #d47c63;
+    --ant-chart-green: #80b96e;
+
+    --ant-chart-inflow-1: #456baf;
+    --ant-chart-inflow-2: #5785cd;
+    --ant-chart-inflow-3: #6f9bd4;
+    --ant-chart-inflow-4: #8ab0db;
+    --ant-chart-inflow-5: #a6c5e2;
+    --ant-chart-inflow-6: #c3d8e9;
 }
 
-/* The same stones re-picked for the dark surface. Two attributes deep, so it
-   outweighs the light block above whichever order they land in. */
-html[data-graph-theme="opal"][data-theme="dark"],
-html[data-theme="dark"] .settings-graph-swatch[data-graph-theme="opal"] {
-    --chart-1: #6f89cf;   /* periwinkle */
-    --chart-2: #d281a8;   /* orchid */
-    --chart-3: #57b6b6;   /* aqua */
-    --chart-4: #e79d7b;   /* peach */
-    --chart-5: #ad8ed1;   /* lilac */
-    --chart-6: #68bf9b;   /* seafoam */
-    --chart-7: #c8787e;   /* coral */
-    --chart-8: #67b5e1;   /* sky */
-
-    --chart-inflow-1: #027b5c;
-    --chart-inflow-2: #23906c;
-    --chart-inflow-3: #41a47d;
-    --chart-inflow-4: #5bb98e;
-    --chart-inflow-5: #73cd9f;
-    --chart-inflow-6: #8ae1af;
-
-    --chart-outflow-1: #a65f7f;
-    --chart-outflow-2: #b76d88;
-    --chart-outflow-3: #c97b91;
-    --chart-outflow-4: #dc8b9b;
-    --chart-outflow-5: #ed9ba5;
-    --chart-outflow-6: #feadb0;
-    --chart-outflow-7: #ffc8c5;
-    --chart-outflow-8: #ffddd8;
-
-    --chart-balance-1: #685884;   /* donut: cash */
-    --chart-balance-2: #6e6893;
-    --chart-balance-3: #7579a3;
-    --chart-balance-4: #7e8bb3;   /* donut: investments */
-    --chart-balance-5: #889ec1;
-    --chart-balance-6: #95b2d1;
-    --chart-balance-7: #a4c7e0;   /* donut: retirement */
-    --chart-balance-8: #b7def1;
-}
-
-
-/* ─── Lapis Lazuli graphs ─────────────────────────────────────────────────────
-   Two hues, royal blue and gold, the stone and its pyrite flecks. Unlike Gemstone
-   and Opal this is not eight different hues: the eight slots alternate between
-   the two families and are told apart by lightness, so a chart reads blue and
-   yellow however many series it draws.
-
-     1 Royal blue   2 Gold        3 Navy      4 Cornflower
-     5 Amber        6 Ochre       7 Steel     8 Olive gold
-
-   Fixed hex, not accent mixes, for the same reason Gemstone is. Picking Lapis
-   Lazuli does not follow the UI accent. The order is load-bearing: slots 1-4 are
-   drawn together in one frame (the Dashboard's Balances pie takes --chart-1..4),
-   so they alternate blue, gold, navy, cornflower, which keeps every pair in that
-   frame at least 15 apart in OKLab, and adjacent pairs 18 or more.
-
-   Money arriving is a royal-blue ramp, money leaving keeps the app-wide gold ramp
-   (style.css), so it is not restated here, and balances walk a slate blue-grey.
-   Each ramp runs the same lightness steps as the Aventurine ramp it replaces, so
-   the adjacent-pair spacing checked there carries over. The named trio
-   (--chart-income, --chart-expense, --chart-transfer), --chart-net, --chart-debt
-   and --chart-networth are aliases of those ramps and follow with nothing to
-   restate. The light set's amber and cornflower sit at 2.7-3.4:1 against the
-   page, the same floor the Aventurine and Gemstone sets accept for their palest
-   steps. Dark is a SELECTED set re-picked against the dark surface, not a
-   lightened copy. */
-html[data-graph-theme="lapis"],
-.settings-graph-swatch[data-graph-theme="lapis"] {
-    --chart-1: #2b50c0;   /* royal blue */
-    --chart-2: #ab8100;   /* gold */
-    --chart-3: #1a2f73;   /* navy */
-    --chart-4: #5a80dd;   /* cornflower */
-    --chart-5: #bd8300;   /* amber */
-    --chart-6: #7d5f00;   /* ochre */
-    --chart-7: #4d6fa3;   /* steel */
-    --chart-8: #8a7d00;   /* olive gold */
-
-    --chart-inflow-1: #033fb2;
-    --chart-inflow-2: #2056c0;
-    --chart-inflow-3: #396cce;
-    --chart-inflow-4: #5181dc;
-    --chart-inflow-5: #6995e9;
-    --chart-inflow-6: #81aaf7;
-
-    --chart-balance-1: #394863;   /* donut: cash */
-    --chart-balance-2: #485873;
-    --chart-balance-3: #596883;
-    --chart-balance-4: #697893;   /* donut: investments */
-    --chart-balance-5: #7a89a4;
-    --chart-balance-6: #8c9bb5;
-    --chart-balance-7: #9eacc7;   /* donut: retirement */
-    --chart-balance-8: #b0bed8;
-
-    --cat-1: var(--chart-1);
-    --cat-2: var(--chart-2);
-    --cat-3: var(--chart-3);
-    --cat-4: var(--chart-4);
-    --cat-5: var(--chart-5);
-    --cat-6: var(--chart-6);
-    --cat-7: var(--chart-7);
-    --cat-8: var(--chart-8);
-}
-
-/* The same hues re-picked for the dark surface. Two attributes deep, so it
-   outweighs the light block above whichever order they land in. */
-html[data-graph-theme="lapis"][data-theme="dark"],
-html[data-theme="dark"] .settings-graph-swatch[data-graph-theme="lapis"] {
-    --chart-1: #5b82e6;   /* royal blue */
-    --chart-2: #d4a514;   /* gold */
-    --chart-3: #3d5fc4;   /* navy */
-    --chart-4: #8aaaf0;   /* cornflower */
-    --chart-5: #f0c23a;   /* amber */
-    --chart-6: #a98318;   /* ochre */
-    --chart-7: #7f9fd0;   /* steel */
-    --chart-8: #c2b030;   /* olive gold */
-
-    --chart-inflow-1: #1e59cd;
-    --chart-inflow-2: #386ed8;
-    --chart-inflow-3: #5183e2;
-    --chart-inflow-4: #6997ec;
-    --chart-inflow-5: #82aaf5;
-    --chart-inflow-6: #9bbeff;
-
-    --chart-balance-1: #596986;   /* donut: cash */
-    --chart-balance-2: #687793;
-    --chart-balance-3: #7786a1;
-    --chart-balance-4: #8695ae;   /* donut: investments */
-    --chart-balance-5: #96a3bc;
-    --chart-balance-6: #a6b3c9;
-    --chart-balance-7: #b6c2d7;   /* donut: retirement */
-    --chart-balance-8: #c6d2e5;
-
-    --cat-1: var(--chart-1);
-    --cat-2: var(--chart-2);
-    --cat-3: var(--chart-3);
-    --cat-4: var(--chart-4);
-    --cat-5: var(--chart-5);
-    --cat-6: var(--chart-6);
-    --cat-7: var(--chart-7);
-    --cat-8: var(--chart-8);
-}
-
-
-/* ─── Labradorite graphs ──────────────────────────────────────────────────────
-   Five colours, the stone's grey body and its flashes: blue-grey, green-grey,
-   bright green, bright blue and a desaturated yellow. The eight slots are those
-   five plus a deeper blue, a pale blue and a khaki, so a chart stays inside the
-   family however many series it draws.
-
-     1 Bright blue   2 Yellow       3 Bright green   4 Blue-grey
-     5 Navy          6 Green-grey   7 Khaki          8 Sky
-
-   Fixed hex, not accent mixes, for the same reason Gemstone is. Picking
-   Labradorite does not follow the UI accent. The order is load-bearing: slots 1-4
-   are drawn together in one frame (the Dashboard's Balances pie takes
-   --chart-1..4), so they alternate the saturated colours with the grey, which
-   keeps every pair in that frame at least 12 apart in OKLab. The two greys are
-   kept apart in the order, since they are the closest pair in the set.
-
-   Money arriving is a bright-green ramp, money leaving is a desaturated yellow
-   ramp, and balances walk a blue-grey. Each ramp runs the same lightness steps as
-   the Aventurine ramp it replaces (style.css), so the adjacent-pair spacing
-   checked there carries over. The named trio (--chart-income, --chart-expense,
-   --chart-transfer), --chart-net, --chart-debt and --chart-networth are aliases
-   of those ramps and follow with nothing to restate. Dark is a SELECTED set
-   re-picked against the dark surface, not a lightened copy. */
-html[data-graph-theme="labradorite"],
-.settings-graph-swatch[data-graph-theme="labradorite"] {
-    --chart-1: #1c68dc;   /* bright blue */
-    --chart-2: #a69a30;   /* yellow */
-    --chart-3: #18a044;   /* bright green */
-    --chart-4: #5a7890;   /* blue-grey */
-    --chart-5: #243f78;   /* navy */
-    --chart-6: #5a9585;   /* green-grey */
-    --chart-7: #7a6e3a;   /* khaki */
-    --chart-8: #58a6ee;   /* sky */
-
-    --chart-inflow-1: #005e21;
-    --chart-inflow-2: #00732b;
-    --chart-inflow-3: #038935;
-    --chart-inflow-4: #069f3f;
-    --chart-inflow-5: #16b54b;
-    --chart-inflow-6: #3aca60;
-
-    --chart-outflow-1: #746a2a;
-    --chart-outflow-2: #807636;
-    --chart-outflow-3: #8e8344;
-    --chart-outflow-4: #9c9252;
-    --chart-outflow-5: #aca162;
-    --chart-outflow-6: #bcb271;
-    --chart-outflow-7: #cdc282;
-    --chart-outflow-8: #dfd493;
-
-    --chart-balance-1: #374b57;   /* donut: cash */
-    --chart-balance-2: #465b67;
-    --chart-balance-3: #566b78;
-    --chart-balance-4: #667b88;   /* donut: investments */
-    --chart-balance-5: #768c99;
-    --chart-balance-6: #889eac;
-    --chart-balance-7: #99afbd;   /* donut: retirement */
-    --chart-balance-8: #aac1cf;
-
-    --cat-1: var(--chart-1);
-    --cat-2: var(--chart-2);
-    --cat-3: var(--chart-3);
-    --cat-4: var(--chart-4);
-    --cat-5: var(--chart-5);
-    --cat-6: var(--chart-6);
-    --cat-7: var(--chart-7);
-    --cat-8: var(--chart-8);
-}
-
-/* The same colours re-picked for the dark surface. Two attributes deep, so it
-   outweighs the light block above whichever order they land in. */
-html[data-graph-theme="labradorite"][data-theme="dark"],
-html[data-theme="dark"] .settings-graph-swatch[data-graph-theme="labradorite"] {
-    --chart-1: #4c92f5;   /* bright blue */
-    --chart-2: #c8ba48;   /* yellow */
-    --chart-3: #3ccb68;   /* bright green */
-    --chart-4: #8aa2b8;   /* blue-grey */
-    --chart-5: #3f68b0;   /* navy */
-    --chart-6: #7fbaa6;   /* green-grey */
-    --chart-7: #a39a58;   /* khaki */
-    --chart-8: #86c0f8;   /* sky */
-
-    --chart-inflow-1: #02782e;
-    --chart-inflow-2: #008d36;
-    --chart-inflow-3: #00a240;
-    --chart-inflow-4: #1ab64d;
-    --chart-inflow-5: #3aca60;
-    --chart-inflow-6: #53de73;
-
-    --chart-balance-1: #576c79;   /* donut: cash */
-    --chart-balance-2: #657a87;
-    --chart-balance-3: #738996;
-    --chart-balance-4: #8298a5;   /* donut: investments */
-    --chart-balance-5: #90a6b4;
-    --chart-balance-6: #9fb6c4;
-    --chart-balance-7: #aec5d3;   /* donut: retirement */
-    --chart-balance-8: #bed5e3;
+/* Two attributes deep, so it outweighs ant.css's dark block (one attribute and
+   an element) whichever order they land in. */
+html[data-graph-theme="opal"][data-theme="dark"] {
+    --ant-chart-income-2: #96bf8f;
 }

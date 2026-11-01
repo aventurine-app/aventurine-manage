@@ -32,9 +32,13 @@
 // reveals a guide at the date under the pointer, and pressing it opens the
 // dialog with that date already answered.
 //
+// Drawn in Ant Design, like the rest of the page: the card is a Popover, its
+// actions are Buttons, the add dialog is a Modal and the confirms are
+// Modal.confirm (widgets/ant.js).
+//
 // Globals in play (loaded before this script): apiFetch (api.js), escapeHtml
 // (escape.js), CURRENCY_SYMBOL / formatCurrency / stripCurrencyValue /
-// applyCurrencyFormat (currency.js), UI (ui.js).
+// applyCurrencyFormat (currency.js), UI (ui.js), Ant (ant.js).
 
 (function () {
   const ALLOWED_MONTHS = [1, 3, 6];
@@ -45,15 +49,9 @@
   const FLOW_LABEL = { expense: 'Expense', income: 'Income' };
 
   // Grace period before the card closes when the pointer leaves a pin — enough
-  // to cross the gap into the card, which is how the pencil and trash are
-  // reachable without clicking first. Same figure as the Recurring calendar.
+  // to cross the gap into the card, which is how its edit and delete buttons
+  // are reachable without clicking first.
   const CLOSE_DELAY_MS = 180;
-
-  // Same drawings (and the same 20-box, 1.5-stroke language) as the Recurring
-  // card's actions and the ledger's row actions — these are the same verbs.
-  // The card glyphs and the card chrome below come from UI (shell/ui.js),
-  // shared with the Recurring calendar's chip cards.
-  const ICONS = UI.CARD_ICONS;
 
   const state = {
     months: 3,
@@ -193,12 +191,11 @@
     const { summary, accounts, start_account: startKey } = d;
 
     if (!hasAnythingToShow()) {
-      el.innerHTML = UI.emptyState({
-        icon: 'forecast',
+      el.innerHTML = Ant.empty({
         title: 'Nothing to forecast yet',
         desc: 'Import a few months of transactions, or record a cash balance on your Balance Sheet, '
           + 'and Aventurine Manage will project your balance forward from them.',
-        action: { label: 'Add transactions', href: '/transactions', primary: true },
+        action: { label: 'Add transactions', href: '/transactions' },
       });
       return;
     }
@@ -215,10 +212,17 @@
     // controls the reader just used.
     const money = (n, extra = '') => strong(fmtMoney(n), `fc-lead-money${extra ? ' ' + extra : ''}`);
     if (months > 0) {
+      // The range is how far past months strayed from their own average, so it
+      // sits beside the figure it qualifies rather than in a legend.
+      const last = d.series[d.series.length - 1];
+      const range = last && last.low != null
+        ? ` (typical range ${money(last.low, last.low < 0 ? 'fc-neg' : '')}
+            to ${money(last.high, last.high < 0 ? 'fc-neg' : '')})`
+        : '';
       html += `<p class="fc-lead">If the next ${strong(horizon)} look like your recent history,
         ${escapeHtml(accountName)} lands near
         ${money(summary.endBalance, summary.endBalance < 0 ? 'fc-neg' : '')}
-        on ${strong(fmtShortDate(summary.endDate))}.</p>`;
+        on ${strong(fmtShortDate(summary.endDate))}${range}.</p>`;
     } else {
       // No complete months to average: the line shows only the pinned planned
       // items, so no "typical month" figure is stated.
@@ -227,12 +231,15 @@
         ${money(d.start_balance)} forward with only your planned items applied.</p>`;
     }
 
-    // ── Risk line, only when the balance goes below zero. A tighter week is a
-    // level the line already draws, so it gets no sentence.
+    // ── Risk line, only when the balance goes below zero: an error Alert. A
+    // tighter week is a level the line already draws, so it gets no sentence.
     if (summary.belowZero) {
-      html += `<p class="fc-risk fc-risk-alarm">Runs out of money the week of
-        ${escapeHtml(summary.lowest.label)}, down to
-        ${escapeHtml(fmtMoney(summary.lowest.balance))}.</p>`;
+      html += `<div class="ant-alert ant-alert-error fc-risk" role="alert">
+        <span class="ant-alert-icon">${Ant.icon('close-circle')}</span>
+        <div class="ant-alert-content"><div class="ant-alert-message">Runs out of money the week of
+          ${escapeHtml(summary.lowest.label)}, down to
+          ${escapeHtml(fmtMoney(summary.lowest.balance))}.</div></div>
+      </div>`;
     }
 
     // ── Caveats ONLY. There is no standing provenance line and no "hover the
@@ -346,7 +353,23 @@
       ...series.map((s) => ({ date: s.weekEnd, balance: s.balance, week: s })),
     ];
 
-    const yTicks = valueTicks([...pastPts, ...futurePts].map((p) => p.balance));
+    // The range is part of what the axis must hold, but only up to one line-span
+    // beyond the line either side: a very wide band must not flatten the line it
+    // is meant to qualify. Whatever pokes past that is clipped at the plot edge.
+    const hasBand = series.length > 0 && series.every((s) => s.low != null && s.high != null);
+    const lineVals = [...pastPts, ...futurePts].map((p) => p.balance);
+    let axisVals = lineVals;
+    if (hasBand) {
+      const lo = Math.min(...lineVals);
+      const hi = Math.max(...lineVals);
+      const span = (hi - lo) || Math.abs(hi) || 1;
+      axisVals = [
+        ...lineVals,
+        Math.max(Math.min(...series.map((s) => s.low)), lo - span),
+        Math.min(Math.max(...series.map((s) => s.high)), hi + span),
+      ];
+    }
+    const yTicks = valueTicks(axisVals);
     const minVal = yTicks[0];
     const maxVal = yTicks[yTicks.length - 1];
     const valRange = maxVal - minVal || 1;
@@ -442,6 +465,20 @@
           ${projected ? '' : 'pathLength="1"'} fill="none" stroke="${color}"
           stroke-width="${projected ? 2 : 2.25}" stroke-linejoin="round" stroke-linecap="round"/>`;
     };
+    // The range, behind both lines: an upper edge out along the highs and a lower
+    // edge back along the lows, closed into one shape. It opens from a point at
+    // today (the balance is known there) and widens with the horizon.
+    if (hasBand) {
+      const edge = (key) => futurePts.map((p) => ({
+        x: xScale(p.date), y: yScale(p.week ? p.week[key] : p.balance),
+      }));
+      const upper = ChartMath.smoothPath(edge('high'));
+      const lower = ChartMath.smoothPath(edge('low').reverse()).replace(/^M/, 'L');
+      svg += `<clipPath id="fcbandclip"><rect x="${PL}" y="${PT}" width="${CW}" height="${CH}"/></clipPath>
+        <path class="fc-band" d="${upper} ${lower} Z" fill="${color}" clip-path="url(#fcbandclip)">
+          <title>Typical range: where the balance has landed about half the time, judging by how far recent months strayed from their average.</title>
+        </path>`;
+    }
     svg += draw(pastXY, { projected: false });
     svg += draw(futureXY, { projected: true });
 
@@ -451,7 +488,11 @@
       let title;
       if (p.anchor) title = `Today: ${fmtMoney(p.balance)}`;
       else if (p.past) title = `Week of ${p.past.label}: ${fmtMoney(p.balance)}`;
-      else title = `Projected week of ${p.week.label}: ${fmtMoney(p.balance)} (net ${fmtMoney(p.week.net)})`;
+      else {
+        const range = p.week.low != null
+          ? `, typical range ${fmtMoney(p.week.low)} to ${fmtMoney(p.week.high)}` : '';
+        title = `Projected week of ${p.week.label}: ${fmtMoney(p.balance)} (net ${fmtMoney(p.week.net)}${range})`;
+      }
       return `<circle class="${cls}" cx="${xScale(p.date)}" cy="${yScale(p.balance)}"
         r="3" fill="${color}"><title>${escapeHtml(title)}</title></circle>`;
     };
@@ -501,8 +542,8 @@
     // overlapped the tick labels.
     host.insertAdjacentHTML('beforeend', `<div class="fc-guide" id="fc-guide" hidden>
       <div class="fc-guide-line"></div>
-      <button type="button" class="fc-guide-add" id="fc-guide-add"
-        aria-label="Plan an item on this date">${ICONS.plus}<span class="fc-guide-date" id="fc-guide-date"></span></button>
+      <button type="button" class="ant-btn ant-btn-default ant-btn-sm fc-guide-add" id="fc-guide-add"
+        aria-label="Plan an item on this date">${Ant.icon('plus')}<span class="fc-guide-date" id="fc-guide-date"></span></button>
     </div>`);
   }
 
@@ -560,18 +601,22 @@
   // One floating element, reused for whichever pin is active — the row the
   // Planned Items table used to hold, now anchored to the pin it describes.
   // Parked on <body> and fixed-positioned so the page's scroll container can't
-  // clip it. The Recurring calendar drew the same card until its chips began
-  // opening the schedule editor, so this is the last one in the app.
+  // clip it, which is also why it carries .ant-scope itself.
 
-  const popEl = () => UI.floatingCard('fc-pop', 'fc-pop', 'Planned item');
+  const popEl = () => UI.floatingCard('fc-pop', 'fc-pop ant-scope', 'Planned item');
 
   const pinFor = (id) =>
     (id == null ? null : document.querySelector(`.fc-pin[data-id="${CSS.escape(String(id))}"]`));
 
-  const actionBtn = UI.cardActions('fc', 'id');
+  /** One of the card's icon Buttons: text type, small, its name in a Tooltip.
+   *  `extra` adds classes (the commit is primary, delete is danger). */
+  function actionBtn(action, id, iconName, label, extra = 'ant-btn-text') {
+    return `<button type="button" class="ant-btn ${extra} ant-btn-sm ant-btn-icon-only fc-action-btn"
+      data-action="${action}" data-id="${escapeHtml(String(id))}"
+      aria-label="${escapeHtml(label)}" data-tip="${escapeHtml(label)}">${Ant.icon(iconName)}</button>`;
+  }
 
-  /** Display mode: label · date · amount, then the actions — one flat line, the
-   *  same rhythm as the Recurring card. */
+  /** Display mode: label · date · amount, then the actions — one flat line. */
   function cardDisplayHtml(p) {
     const sign = p.flow === 'income' ? '+' : '−';
     return `<div class="fc-pop-row">
@@ -579,8 +624,8 @@
       <span class="fc-pop-date">${escapeHtml(fmtShortDate(p.date))}</span>
       <span class="fc-pop-amount fc-amount-${p.flow}">${escapeHtml(sign + fmtMoney(p.amount))}</span>
       <span class="fc-action-group">
-        ${actionBtn('edit', p.id, 'pencil', `Edit ${p.label}`)}
-        ${actionBtn('delete', p.id, 'trash', `Delete ${p.label}`, 'fc-action-delete')}
+        ${actionBtn('edit', p.id, 'edit', `Edit ${p.label}`)}
+        ${actionBtn('delete', p.id, 'delete', `Delete ${p.label}`, 'ant-btn-text ant-btn-dangerous')}
       </span>
     </div>`;
   }
@@ -590,24 +635,33 @@
    *  typing; ✓ commits all four fields at once. */
   function cardEditHtml(p) {
     return `<div class="fc-pop-row fc-pop-editing">
-      <input type="text" class="fc-input fc-input-label" data-field="label" maxlength="100"
+      <input type="text" class="ant-input fc-input fc-input-label" data-field="label" maxlength="100"
         value="${escapeHtml(p.label)}" aria-label="Description" placeholder="Description">
       <div class="fc-pop-edit-fields">
-        <select class="fc-input fc-select" data-field="flow" aria-label="Type">
-          ${Object.keys(FLOW_LABEL).map((f) =>
-            `<option value="${f}"${f === p.flow ? ' selected' : ''}>${FLOW_LABEL[f]}</option>`).join('')}
-        </select>
-        <input type="date" class="fc-input fc-input-date" data-field="date"
+        ${flowSelectHtml(p.flow, 'data-field="flow" aria-label="Type"')}
+        <input type="date" class="ant-input fc-input fc-input-date" data-field="date"
           value="${escapeHtml(p.date)}" min="${escapeHtml(plot ? plot.first : '')}"
           max="${escapeHtml(maxPlannedDate())}" aria-label="Date">
-        <input type="text" inputmode="decimal" class="fc-input fc-input-amount" data-field="amount"
+        <input type="text" inputmode="decimal" class="ant-input fc-input fc-input-amount" data-field="amount"
           value="${escapeHtml(formatCurrency(p.amount, true, { editable: true }))}" aria-label="Amount">
         <span class="fc-action-group">
-          ${actionBtn('save', p.id, 'check', 'Save changes', 'fc-action-save')}
-          ${actionBtn('cancel', p.id, 'cross', 'Discard changes')}
+          ${actionBtn('save', p.id, 'check', 'Save changes', 'ant-btn-primary')}
+          ${actionBtn('cancel', p.id, 'close', 'Discard changes')}
         </span>
       </div>
     </div>`;
+  }
+
+  /** The Expense / Income choice as Ant's Select: the native <select> is the
+   *  box and DownOutlined sits over it (ant.css). `attrs` is trusted markup. */
+  function flowSelectHtml(selected, attrs) {
+    return `<span class="ant-select">
+        <select class="ant-select-selector" ${attrs}>
+          ${Object.keys(FLOW_LABEL).map((f) =>
+            `<option value="${f}"${f === selected ? ' selected' : ''}>${FLOW_LABEL[f]}</option>`).join('')}
+        </select>
+        <span class="ant-select-arrow">${Ant.icon('down')}</span>
+      </span>`;
   }
 
   /** The furthest date a planned item can usefully carry: the end of the
@@ -685,6 +739,13 @@
     renderCard();
   }
 
+  /** Ant's error status on a field: the red border (ant.css keys it off
+   *  aria-invalid), which also tells a screen reader. */
+  function markInvalid(input, invalid) {
+    if (invalid) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+  }
+
   /** Read the card's inputs, marking (rather than auto-correcting) anything the
    *  backend would reject, so ✓ never writes a value the user did not enter. */
   function readEditCard() {
@@ -698,9 +759,9 @@
     const amount = parseFloat(stripCurrencyValue(amountInput.value));
     const date = dateInput.value;
 
-    labelInput.classList.toggle('invalid', !label);
-    amountInput.classList.toggle('invalid', !(amount > 0));
-    dateInput.classList.toggle('invalid', !/^\d{4}-\d{2}-\d{2}$/.test(date));
+    markInvalid(labelInput, !label);
+    markInvalid(amountInput, !(amount > 0));
+    markInvalid(dateInput, !/^\d{4}-\d{2}-\d{2}$/.test(date));
     if (!label || !(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
 
     return { label, amount, date, flow: pop.querySelector('[data-field="flow"]').value };
@@ -715,7 +776,7 @@
       body: JSON.stringify(patch),
     });
     if (!res.ok) {
-      UI.toast("Couldn't save that item — it hasn't been stored.", { type: 'error' });
+      Ant.message.error("Couldn't save that item — it hasn't been stored.");
       return;
     }
     state.editingId = null;
@@ -743,21 +804,22 @@
     setHorizon(fits);
     await load();
     openCard(id, { pin: true });
-    UI.toast(`Showing ${fits} month${fits === 1 ? '' : 's'} so ${fmtShortDate(date)} is on the chart.`);
+    Ant.message.info(`Showing ${fits} month${fits === 1 ? '' : 's'} so ${fmtShortDate(date)} is on the chart.`);
   }
 
   async function confirmDelete(id) {
     const item = itemFor(id);
     if (!item) return;
-    const ok = await UI.confirm({
-      message: `
-      <p>Delete the <strong>${escapeHtml(item.label)}</strong> planned item?</p>
-      <p class="fc-dialog-note">It only affects this projection — no transaction is touched.</p>`,
+    const ok = await Ant.confirm({
+      title: `Delete ${item.label}?`,
+      content: '<p>It only affects this projection — no transaction is touched.</p>',
+      okText: 'Delete',
+      danger: true,
     });
     if (!ok) return;
     const res = await apiFetch(`/api/forecast/planned/${id}`, { method: 'DELETE' });
     if (!res.ok) {
-      UI.toast("Couldn't delete that item — try again.", { type: 'error' });
+      Ant.message.error("Couldn't delete that item — try again.");
       return;
     }
     closeCard();
@@ -766,65 +828,76 @@
 
   /** Add dialog, opened from the guide's +, so the date is pre-filled from the
    *  pointer position — the same pattern as the Recurring page's day-cell +. It
-   *  stays an editable field so the date can still be changed. */
+   *  stays an editable field so the date can still be changed. Ant's Modal with
+   *  a vertical Form: each field's label over it, and the reason it was refused
+   *  under it in words, so the red border is never the only signal. */
   function openAddDialog(iso) {
     closeCard();
-    const { overlay, close } = UI.dialog(`
-      <p><strong>Plan an item</strong></p>
-      <p class="fc-dialog-note">A one-off payment or receipt you already know about. It bends this
-        projection only — it is not a transaction, and nothing is added to your ledger.</p>
-      <label class="fc-add-field">
-        <span class="fc-add-label">Description</span>
-        <input type="text" class="fc-dialog-input" id="fc-add-label" maxlength="100"
-          placeholder="e.g. Property tax" autocomplete="off">
-      </label>
-      <label class="fc-add-field">
-        <span class="fc-add-label">Type</span>
-        <select class="fc-select" id="fc-add-flow">
-          ${Object.keys(FLOW_LABEL).map((f) => `<option value="${f}">${FLOW_LABEL[f]}</option>`).join('')}
-        </select>
-      </label>
-      <label class="fc-add-field">
-        <span class="fc-add-label">Amount</span>
-        <input type="text" inputmode="decimal" class="fc-dialog-input" id="fc-add-amount"
-          placeholder="${escapeHtml(formatCurrency(0, true, { editable: true }))}" autocomplete="off">
-      </label>
-      <label class="fc-add-field">
-        <span class="fc-add-label">Date</span>
-        <input type="date" class="fc-dialog-input" id="fc-add-date"
-          value="${escapeHtml(iso || todayIso())}"
-          min="${escapeHtml(todayIso())}" max="${escapeHtml(maxPlannedDate())}">
-      </label>
-      <div class="confirm-actions">
-        <button class="button-secondary confirm-cancel">Cancel</button>
-        <button class="button-primary confirm-add">Add</button>
-      </div>`, { className: 'fc-add-dialog' });
+    const field = (id, label, control) => `<div class="ant-form-item">
+        <label class="ant-form-item-label" for="${id}">${label}</label>
+        ${control}
+        <div class="ant-form-item-explain" id="${id}-explain"></div>
+      </div>`;
+    const { dialog, close } = Ant.modal({
+      title: 'Plan a one-off payment or receipt',
+      width: 440,
+      body: `<div class="ant-typography-secondary">It bends this projection only — it is not a
+          transaction, and nothing is added to your ledger.</div>
+        <div class="fc-add-form">
+          ${field('fc-add-label', 'Description', `<input type="text" class="ant-input" id="fc-add-label"
+            maxlength="100" placeholder="e.g. Property tax" autocomplete="off" aria-describedby="fc-add-label-explain">`)}
+          ${field('fc-add-flow', 'Type', flowSelectHtml('expense', 'id="fc-add-flow"'))}
+          <div class="fc-add-row">
+            ${field('fc-add-amount', 'Amount', `<input type="text" inputmode="decimal" class="ant-input" id="fc-add-amount"
+              placeholder="${escapeHtml(formatCurrency(0, true, { editable: true }))}" autocomplete="off"
+              aria-describedby="fc-add-amount-explain">`)}
+            ${field('fc-add-date', 'Date', `<input type="date" class="ant-input" id="fc-add-date"
+              value="${escapeHtml(iso || todayIso())}" min="${escapeHtml(todayIso())}"
+              max="${escapeHtml(maxPlannedDate())}" aria-describedby="fc-add-date-explain">`)}
+          </div>
+        </div>`,
+      footer: `<button type="button" class="ant-btn ant-btn-default" data-act="cancel">Cancel</button>
+        <button type="button" class="ant-btn ant-btn-primary" data-act="add">Add to forecast</button>`,
+    });
 
-    const labelInput = overlay.querySelector('#fc-add-label');
-    const flowSelect = overlay.querySelector('#fc-add-flow');
-    const amountInput = overlay.querySelector('#fc-add-amount');
-    const dateInput = overlay.querySelector('#fc-add-date');
+    const labelInput = dialog.querySelector('#fc-add-label');
+    const flowSelect = dialog.querySelector('#fc-add-flow');
+    const amountInput = dialog.querySelector('#fc-add-amount');
+    const dateInput = dialog.querySelector('#fc-add-date');
+    const addBtn = dialog.querySelector('[data-act="add"]');
     amountInput.addEventListener('input', () => applyCurrencyFormat(amountInput));
+    dialog.addEventListener('input', (e) => showError(e.target, ''));
+    dialog.querySelector('[data-act="cancel"]').addEventListener('click', close);
     labelInput.focus();
 
-    overlay.querySelector('.confirm-add').addEventListener('click', async () => {
+    /** One field's error, or '' to clear it. */
+    function showError(input, text) {
+      markInvalid(input, !!text);
+      const explain = dialog.querySelector(`#${input.id}-explain`);
+      if (explain) explain.textContent = text;
+    }
+
+    addBtn.addEventListener('click', async () => {
+      if (Ant.isLoading(addBtn)) return;
       const label = labelInput.value.trim();
       const amount = parseFloat(stripCurrencyValue(amountInput.value));
-      let invalid = false;
-      const mark = (input, ok) => { input.classList.toggle('invalid', !ok); if (!ok) invalid = true; };
-      mark(labelInput, !!label);
-      mark(amountInput, amount > 0);
-      mark(dateInput, /^\d{4}-\d{2}-\d{2}$/.test(dateInput.value));
-      if (invalid) return;
+      const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(dateInput.value);
+      showError(labelInput, label ? '' : 'Name it, e.g. Car registration.');
+      showError(amountInput, amount > 0 ? '' : 'Enter an amount above zero.');
+      showError(dateInput, dateOk ? '' : 'Pick a date.');
+      if (!label || !(amount > 0) || !dateOk) {
+        dialog.querySelector('[aria-invalid="true"]').focus();
+        return;
+      }
 
-      const res = await apiFetch('/api/forecast/planned', {
+      const res = await Ant.whileLoading(addBtn, () => apiFetch('/api/forecast/planned', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label, flow: flowSelect.value, amount, date: dateInput.value }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        UI.toast(data.error || "Couldn't add that item — try again.", { type: 'error' });
+      }));
+      if (!res || !res.ok) {
+        const data = res ? await res.json().catch(() => ({})) : {};
+        Ant.message.error(data.error || "Couldn't add that item — try again.");
         return;
       }
       const added = await res.json().catch(() => ({}));
@@ -866,12 +939,13 @@
   async function confirmClearStranded() {
     const stranded = strandedItems();
     if (!stranded.length) return;
-    const ok = await UI.confirm({
-      message: `
-      <p>Clear <strong>${stranded.length}</strong> planned item${stranded.length === 1 ? '' : 's'} outside the forecast?</p>
-      <p class="fc-dialog-note">These are dated before today or beyond the longest horizon, so nothing
-        projects them. No transaction is touched.</p>`,
-      confirmLabel: 'Clear',
+    const n = stranded.length;
+    const ok = await Ant.confirm({
+      title: `Clear ${n} planned item${n === 1 ? '' : 's'} outside the forecast?`,
+      content: `<p>${n === 1 ? 'It is' : 'These are'} dated before today or beyond the longest horizon,
+        so nothing projects ${n === 1 ? 'it' : 'them'}. No transaction is touched.</p>`,
+      okText: 'Clear',
+      danger: true,
     });
     if (!ok) return;
     for (const p of stranded) {
@@ -983,7 +1057,7 @@
     });
     pop.addEventListener('input', (e) => {
       if (e.target.classList.contains('fc-input-amount')) applyCurrencyFormat(e.target);
-      if (e.target.classList.contains('fc-input')) e.target.classList.remove('invalid');
+      if (e.target.classList.contains('fc-input')) markInvalid(e.target, false);
     });
 
     // A pinned card is dismissed like every other transient surface: Escape, or a

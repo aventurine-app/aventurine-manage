@@ -21,7 +21,7 @@
 //     portfolio, recurring, trends, topmerchants, transfers, metrics),
 //     static/js/widgets/*.js (txfileimport, txexport, forecast,
 //     cashflow-sankey, tables, onboarding), and static/js/shell/*.js
-//     (dbactions, autolock, settings, settingsCategories), plus
+//     (dbactions, autolock, settings), plus
 //     core/store.js and core/encryption.js. titlebar.js reads the database
 //     name through window.dbStatus() below rather than calling apiFetch
 //     itself.
@@ -523,9 +523,10 @@
         { id: 4, key: 'food',   name: 'Food',   cat_type: 'expense', position: 5 },
       ],
     },
-    // static/js/shell/settingsCategories.js and any page with a category
-    // picker (transactions, home) — the full category taxonomy, keyed by
-    // cat_type (income/expense/transfer) and ordered by position.
+    // The Statements page's Manage Columns (which asks ?counts=true; the
+    // fixture has no counts) and any page with a category picker
+    // (transactions, home) — the full category taxonomy, keyed by cat_type
+    // (income/expense/transfer) and ordered by position.
     '/api/categories': {
       categories: [
         { id: 1, key: 'income',     name: 'Primary Income',    cat_type: 'income',   position: 0 },
@@ -620,7 +621,7 @@
     // static/js/pages/transactions.js — "find similar" lookup used by the
     // bulk-recategorize action.
     '/api/transactions/similar': { transactions: [] },
-    // static/js/pages/statements.js — ledger rows per calendar year, read by
+    // static/js/pages/stmtmanagers.js — ledger rows per calendar year, read by
     // the "Manage Years" modal to lock the years whose cells are computed from
     // transactions. The one fixture year carries computed cells in /api/data
     // above, so it reads as locked here too.

@@ -54,7 +54,7 @@
      *
      * The start is found by MATCHING that token against the ramp rather than by
      * cutting a fixed number of steps, because the slot it points at is a
-     * palette decision — Aventurine takes step 4, Gemstone step 2 (themes.css) —
+     * palette decision — the stock ramp starts at its first step (ant.css) —
      * and a fixed cut would trim the wrong end of a palette whose ramp starts
      * deep. A palette pointing --chart-expense somewhere off the ramp matches
      * nothing and keeps all eight steps.

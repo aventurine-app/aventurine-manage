@@ -29,7 +29,7 @@
 // so it is not mistaken for an account.
 //
 // Globals: apiFetch (api.js), escapeHtml (escape.js), formatCurrency
-// (currency.js), FinanceChart (chart.js), UI (ui.js).
+// (currency.js), FinanceChart (chart.js), UI (ui.js), Ant (ant.js).
 
 (function () {
   const WINDOW_LABELS = { 3: '3 Months', 6: '6 Months', 12: '12 Months', 24: '24 Months' };
@@ -138,16 +138,14 @@
     if (!(total > 0)) {
       FinanceChart.render('transfers-chart', { series: [], slots: [] });
       container.innerHTML = everTransferred
-        ? UI.emptyState({
-            icon: 'chart',
+        ? Ant.empty({
             title: 'Nothing put away in this time frame',
             desc: 'Try a longer one.',
           })
-        : UI.emptyState({
-            icon: 'chart',
+        : Ant.empty({
             title: 'Nothing saved or invested yet',
             desc: 'Set a category to Transfer and Aventurine Manage will chart what you put away.',
-            action: { label: 'Open transactions', href: '/transactions', primary: true },
+            action: { label: 'Open transactions', href: '/transactions' },
           });
       return;
     }
@@ -177,8 +175,8 @@
       // empty line mean the same thing, and the card above already states it and
       // holds the action. Two full empty states stacked would fill the panel and
       // repeat the same message twice.
-      container.innerHTML = UI.emptyState({
-        icon: 'chart', compact: true,
+      container.innerHTML = Ant.empty({
+        compact: true,
         title: 'Nothing to break out',
       });
       if (legend) legend.innerHTML = '';
@@ -198,8 +196,10 @@
 
   // A legend, always: eight bands cannot be told apart by hue alone, and colour
   // is never allowed to be the only channel carrying identity. It doubles as the
-  // table view — each row states the account's window total next to its swatch,
-  // so every number in the stack is readable without hovering anything.
+  // table view — each entry states the account's window total next to its
+  // swatch, so every number in the stack is readable without hovering anything.
+  // An entry that opens the ledger is a small Button; one that cannot stays
+  // plain text on the same footprint.
   function renderLegend(accounts) {
     const el = document.getElementById('transfers-legend');
     if (!el) return;
@@ -215,8 +215,8 @@
         if (!m.cat) {
           return `<span class="tfr-legend-item">${swatch}<span class="tfr-legend-name">${label}</span>${amount}</span>`;
         }
-        return `<a class="tfr-legend-item tfr-legend-link" href="/transactions?cat=${encodeURIComponent(m.cat)}"
-          title="See ${label} transactions in the ledger">${swatch}<span class="tfr-legend-name">${label}</span>${amount}</a>`;
+        return `<a class="ant-btn ant-btn-default ant-btn-sm tfr-legend-item" href="/transactions?cat=${encodeURIComponent(m.cat)}"
+          data-tip="See ${label} transactions in the ledger">${swatch}<span class="tfr-legend-name">${label}</span>${amount}</a>`;
       })
       .join('');
   }

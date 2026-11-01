@@ -1,175 +1,368 @@
 /* ============================================================================
-   statements.css — Statements page (Cash Flow + Balance Sheet behind tabs,
-   with a compact ‹ year › stepper and the page's two actions on the same
-   toolbar row as the tabs).
-
-   The tables themselves are styled by tables.css; the page scroll shell is the
-   standard `.page:has(.db-page)` one. The toolbar grid and segmented tab
-   control live in ui.css (shared with Dashboard). This file owns the
-   statement-specific overrides only.
-   Loads AFTER tables.css and categories.css (see statements.html), so the
-   year-manager rules below override the shared .cat-* ones they sit on.
+   statements.css — the Statements page (pages/statements.html), in Ant Design.
+   ============================================================================
+   The components (tabs, buttons, select, card, table, list, modal…) are
+   ant.css. This file is the page: the toolbar row, the statement grid built
+   by widgets/tables.js (Ant's bordered table with grouped headers and pinned
+   columns, its cells always-editable inputs), and the rows of the two
+   managers (pages/stmtmanagers.js).
    ============================================================================ */
 
-.stmt-page {
-    gap: var(--space-8);
+/* Anchor to the top so the toolbar never scrolls out of reach when zoomed in
+   (same pattern as the other pages). */
+.page:has(.stmt-page) {
+    align-items: flex-start;
 }
 
-/* The grids are a spreadsheet, so their figures stay monospaced while the rest
-   of the app renders money in the body face. Re-pointing --font-numeric here
-   covers every cell, input and total inside the sheet (tables.css) in one place
-   instead of a mono declaration per selector. */
-.stmt-sheet {
+/* The full width the page is given, with the app's page padding. Grown as a
+   flex item rather than width:100%: .page is a scroll container whose content
+   box still counts the scrollbar's track. */
+.stmt-page {
+    flex: 1;
+    min-width: 0;
+    padding: var(--page-pad);
     display: flex;
     flex-direction: column;
-    gap: var(--space-8);
-    --font-numeric: var(--font-mono);
+    gap: 16px;
 }
 
-/* Bare years never need the wide month-name label slot (ui.css default). */
-.stmt-year-stepper {
-    --stepper-label-min: 56px;
+
+/* ─── Toolbar: Tabs with extra content ──────────────────────────────────────
+   The tabs and the extra group share the Tabs' hairline. wrap-reverse sends
+   the extra group to a line ABOVE the tabs when the row is too narrow, so the
+   hairline (drawn at the nav's bottom) stays under the tabs. */
+.stmt-bar {
+    flex-wrap: wrap-reverse;
+    column-gap: 16px;
+    row-gap: 8px;
 }
 
-/* ─── Toolbar — tabs left; stepper dead-center; actions right ───────────────
-   Segmented tab styles are shared via ui.css. The 1fr/auto/1fr grid pins the
-   stepper to the midpoint of the FULL row width (the equal side tracks absorb
-   the tabs/actions width difference) — not merely the middle of the space
-   left between them. If the window gets too narrow for that, a 1fr track
-   grows past its twin and the stepper yields off-center rather than
-   overlapping its neighbours. */
-.stmt-toolbar {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: var(--space-8);
-}
-
-.stmt-tabs { justify-self: start; }
-.stmt-year-stepper { justify-self: center; }
-
-/* Narrow window: the three groups no longer fit on one line (two labelled
-   action buttons need far more room than the ⋮ they replaced), so the stepper
-   drops to a second row and keeps its centring, with the tabs and the actions
-   holding the ends of the first. Wrapping beats the alternatives: shrinking the
-   buttons would truncate their labels, and leaving the row to overflow would
-   push the last action off the edge with nothing to scroll it back. */
-@media (max-width: 1000px) {
-    .stmt-toolbar {
-        grid-template-columns: auto auto;
-        row-gap: var(--space-8);
-    }
-
-    .stmt-tabs         { grid-area: 1 / 1; }
-    .stmt-toolbar-right { grid-area: 1 / 2; }
-    .stmt-year-stepper { grid-area: 2 / 1 / 3 / 3; }
-}
-
-.stmt-toolbar-right {
-    justify-self: end;
+.stmt-tablist {
     display: flex;
+    column-gap: 32px;
+}
+
+.stmt-extra {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-8);
+    gap: 8px;
+    margin-inline-start: auto;
 }
 
-/* The year cards are display:flex, which overrides the UA's
-   [hidden] { display: none }, so it is restated at author level. */
-.db-outer[hidden] { display: none; }
+.stmt-year-select {
+    flex: none;
+    width: 96px;
+}
+.stmt-year-select .ant-select-selector { font-variant-numeric: tabular-nums; }
 
-/* Tighter bottom corners on the Cash Flow and Balance Sheet cards only; the
-   top keeps the shared 12px card radius (tables.css). The wrapper scrollbar's
-   3px inset clears a 6px arc with more room than the 12px one it was sized for. */
-.stmt-page .db-wrapper {
-    border-bottom-left-radius: 6px;
-    border-bottom-right-radius: 6px;
+
+/* ─── Statement card ─────────────────────────────────────────────────────────
+   One per year: the scrolling table, then the note under it. The card clips
+   the table to its rounded corners. */
+.stmt-year {
+    overflow: hidden;
+}
+.stmt-year[hidden] { display: none; }
+
+/* Column widths. The table is as wide as its columns or the card, whichever is
+   wider; the scroll box scrolls it sideways inside the card. Keyboard focus
+   scrolls a cell clear of the pinned columns rather than under them. */
+.stmt-sheet-cashflow { --stmt-col-w: 138px; --stmt-summary-w: 130px; }
+.stmt-sheet-balance  { --stmt-col-w: 150px; --stmt-summary-w: 150px; }
+.stmt-years { --stmt-month-w: 120px; }
+
+/* Sideways only: the pinned columns' edge shadows reach a pixel below the
+   last row, which must not make the box scroll down. */
+.stmt-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-padding-inline: var(--stmt-month-w) var(--stmt-summary-w);
 }
 
-/* Shown when the selected year has no table in this tab (or no years exist). */
-.stmt-empty {
+.stmt-grid {
+    width: max-content;
+    min-width: 100%;
+}
+
+/* Ant's bordered table: every cell ruled right and below. The card's own
+   border closes the outside, so the pinned last column and the last row
+   carry none. */
+.stmt-grid th,
+.stmt-grid td {
+    border-bottom: var(--ant-line-width) solid var(--ant-color-split);
+    border-inline-end: var(--ant-line-width) solid var(--ant-color-split);
+    white-space: nowrap;
+}
+.stmt-grid .stmt-fixed-end { border-inline-end: 0; }
+.stmt-grid > :last-child > tr:last-child > :is(td, th) { border-bottom: 0; }
+/* Bordered tables draw no half-height splitters between header cells, and a
+   header cell flush in a card has no corners of its own. */
+.stmt-grid thead th:not(:last-child):not(.ant-table-selection-column)::before { content: none; }
+.stmt-grid thead th:is(:first-child, :last-child) { border-radius: 0; }
+
+/* ─── Header: groups over their columns ─────────────────────────────────────
+   Each group and its columns are underlined in the type's colour, so a column
+   reads as part of its group. The group's name says the same in words. */
+.stmt-grid thead th { padding: 8px 12px; }
+.stmt-grid .stmt-group { text-align: start; }
+.stmt-grid .stmt-col {
+    width: var(--stmt-col-w);
+    min-width: var(--stmt-col-w);
+    box-sizing: border-box;
+    text-align: end;
+}
+.stmt-grid :is(.stmt-group, .stmt-col) { border-bottom: 2px solid var(--stmt-type); }
+
+[data-type="income"]     { --stmt-type: var(--ant-color-success); }
+[data-type="expense"]    { --stmt-type: var(--ant-color-error); }
+[data-type="transfer"]   { --stmt-type: var(--ant-color-info); }
+[data-type="cash"]       { --stmt-type: var(--ant-chart-1); }
+[data-type="investment"] { --stmt-type: var(--ant-chart-3); }
+[data-type="retirement"] { --stmt-type: var(--ant-chart-2); }
+[data-type="debt"]       { --stmt-type: var(--ant-color-error); }
+
+.stmt-grid .stmt-month {
+    width: var(--stmt-month-w);
+    min-width: var(--stmt-month-w);
+    box-sizing: border-box;
+    padding: 8px 12px;
+    font-weight: var(--ant-font-weight-strong);
+    text-align: start;
+}
+.stmt-grid .stmt-summary {
+    width: var(--stmt-summary-w);
+    min-width: var(--stmt-summary-w);
+    box-sizing: border-box;
+    padding: 8px 12px;
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+.stmt-grid thead .stmt-summary .ant-info-tip { margin-inline-start: 4px; }
+
+/* ─── Rows ──────────────────────────────────────────────────────────────────
+   Each row's fill is one opaque colour, so the pinned cells cover what
+   scrolls under them: the card, a faint tint on months still to come, a step
+   deeper under the pointer. */
+.stmt-grid tbody tr { --stmt-row: var(--ant-color-bg-container); }
+.stmt-grid tbody tr.stmt-future { --stmt-row: color-mix(in srgb, var(--ant-color-text) 2.5%, var(--ant-color-bg-container)); }
+.stmt-grid tbody tr:hover { --stmt-row: color-mix(in srgb, var(--ant-color-text) 4%, var(--ant-color-bg-container)); }
+.stmt-grid tbody tr > :is(td, th),
+.stmt-grid tbody tr:hover > :is(td, th) { background: var(--stmt-row); }
+
+/* Table.Summary: the Total row on the header's tint. */
+.stmt-grid tfoot :is(td, th) {
+    padding: 8px 12px;
+    background: var(--ant-table-header-bg);
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
+}
+.stmt-grid .stmt-total-cell { text-align: end; }
+
+/* Net: which way the month went, in words (the sign) and in colour. */
+.stmt-pos { color: var(--ant-color-success); }
+.stmt-neg { color: var(--ant-color-error); }
+
+/* ─── Pinned columns ────────────────────────────────────────────────────────
+   Month stays at the left edge and the summary at the right while the
+   columns between scroll. A soft shadow marks the edge that has cells under
+   it (tables.js sets the ping classes from the scroll position). */
+.stmt-grid .stmt-fixed-start,
+.stmt-grid .stmt-fixed-end {
+    position: sticky;
+    z-index: 2;
+}
+.stmt-grid .stmt-fixed-start { left: 0; }
+.stmt-grid .stmt-fixed-end { right: 0; }
+.stmt-grid thead :is(.stmt-fixed-start, .stmt-fixed-end) { z-index: 3; }
+
+.stmt-grid :is(.stmt-fixed-start, .stmt-fixed-end)::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: -1px;
+    width: 30px;
+    pointer-events: none;
+    transition: box-shadow var(--ant-motion-slow);
+}
+.stmt-grid .stmt-fixed-start::after { right: 0; transform: translateX(100%); }
+.stmt-grid .stmt-fixed-end::after { left: 0; transform: translateX(-100%); }
+.stmt-years { --stmt-pin-shadow: rgba(5, 5, 5, 0.16); }
+html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
+.stmt-ping-start .stmt-grid .stmt-fixed-start::after { box-shadow: inset 10px 0 8px -8px var(--stmt-pin-shadow); }
+.stmt-ping-end .stmt-grid .stmt-fixed-end::after { box-shadow: inset -10px 0 8px -8px var(--stmt-pin-shadow); }
+
+/* ─── Cells ─────────────────────────────────────────────────────────────────
+   As in a spreadsheet, a cell is its field: the input fills it edge to edge
+   with no box of its own, so the only thing that marks the current cell is
+   the 2px border cellselect.js draws on it (on click, arrow or Tab alike, so
+   it is also the keyboard focus indicator). The field's 12px padding matches
+   the header's, so a figure lines up under its column's name and over its
+   total. */
+.stmt-grid td.data-cell {
+    position: relative;
+    padding: 0;
+}
+
+.stmt-input {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: 38px;   /* the row: Ant's small table, 8px + 22px + 8px */
     margin: 0;
-    padding: 8px 0;
-    color: var(--text-tertiary);
-    font-size: var(--size-small);
+    padding: 0 12px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    outline: none;
+}
+/* A balance carried forward from an earlier month: shown, faded and slanted,
+   until a balance is typed for this one. */
+.stmt-input::placeholder {
+    color: var(--ant-color-text-placeholder);
     font-style: italic;
 }
 
-/* ─── "Manage Years" modal ───────────────────────────────────────────────────
-   The toolbar's year manager (statements.js). Shell, rows, add-row and lock
-   glyph are the shared .cat-* set (categories.css), so the three managers in
-   this menu look alike; only what a year row needs differently is declared
-   here.
-
-   A row is [year] [ledger count] [remove ×], or, when the ledger has
-   transactions in that year, [year] [ledger count] [lock]. The trailing slots
-   are both 32px, so the two row shapes line up.
-   ───────────────────────────────────────────────────────────────────────── */
-
-/* Narrower than the 560px column managers: a year row holds a four-digit
-   figure and a short count, not a long name. The overlay's own class is the
-   hook, since the frame inside it is the shared .cat-manager. */
-.year-manager-overlay .cat-manager { width: 400px; }
-
-/* No drag handle on a year row (years sort by value), so the left edge takes
-   the padding the grip would have occupied. */
-.year-row {
-    padding-left: 12px;
+/* A cell just entered (tables.js): its value is selected, so typing replaces
+   it, but neither the selection nor a caret shows; the cell reads as selected
+   by its border alone. Double-click or F2 edits in place, with the caret. */
+.stmt-input.is-entered { caret-color: transparent; }
+.stmt-input.is-entered::selection {
+    background: transparent;
+    color: inherit;
 }
 
-/* Years are figures: same monospaced face the statement grids use. The field
-   is sized to its four digits (border-box, so the width carries .cat-name's
-   padding and border too) rather than stretching like a name would. */
-.year-value {
-    flex: none;
-    width: 8ch;
-    font-family: var(--font-mono);
+/* Computed from transactions: the primary colour (the legend under the table
+   says so in words). */
+.cell-computed { color: var(--ant-color-primary); }
+
+/* A cleared override fading its computed value back in: the moment that
+   shows clearing a cell returns it to the transactions. */
+.stmt-input.cell-flash { animation: ant-fade-in 240ms ease-out; }
+
+/* ↺ on a typed-over cell, in the cell's left gutter clear of the figure. */
+.stmt-revert {
+    position: absolute;
+    top: 50%;
+    inset-inline-start: 4px;
+    z-index: 1;
+    color: var(--ant-color-text-tertiary);
+    transform: translateY(-50%);
+}
+.stmt-revert:not(:disabled):hover { color: var(--ant-color-text); }
+
+/* Range selection (cellselect.js): outlined, not filled — the 2px border it
+   draws round the range is the whole highlight. No caret blinks inside one. */
+.stmt-grid { --cell-select-border: var(--ant-color-primary); }
+.stmt-grid td.cell-selected .stmt-input { caret-color: transparent; }
+
+/* ─── The note under the table ──────────────────────────────────────────────
+   Table's footer: the legend for Cash Flow, the carry-forward rule for the
+   Balance Sheet. */
+.stmt-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+    padding: 8px 12px;
+    border-top: var(--ant-line-width) solid var(--ant-color-split);
+    background: var(--ant-table-header-bg);
+    color: var(--ant-color-text-tertiary);
+}
+.stmt-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--ant-font-size-sm);
+    line-height: var(--ant-line-height-sm);
+}
+.stmt-legend-figure {
+    color: var(--ant-color-text);
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
+}
+.stmt-legend-figure.cell-computed { color: var(--ant-color-primary); }
+
+/* Standing in for a year's card: no years, a year this statement lacks, no
+   accounts, or a failed load. */
+.stmt-empty { padding: 8px 24px; }
+.stmt-empty[hidden] { display: none; }
+
+
+/* ─── Managers (stmtmanagers.js) ────────────────────────────────────────────
+   Manage Years and Manage Columns: lists whose rows are a name (with Ant's
+   edit pencil) and its actions, and a joined field-and-button to add one. */
+.stmt-modal-note {
+    margin: 0 0 12px;
+    color: var(--ant-color-text-tertiary);
 }
 
-/* Pins the remove × to the right edge, in line with the lock glyph on the
-   locked rows above it — there the ledger count fills that gap. */
-.year-row .cat-delete {
-    margin-left: auto;
-}
+.stmt-modal-tabs { margin-bottom: 16px; }
 
-/* Spin buttons would crowd a 4-digit field and duplicate what typing does;
-   the same suppression .year-prompt-input carries (tables.css). */
-.year-value::-webkit-outer-spin-button,
-.year-value::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
+.stmt-item-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
-
-/* Rejected year (outside 1000-9999, or one the statement already has). The
-   field has already snapped back to the old value, so this brief flash is
-   what shows the edit did not take. */
-.year-row .year-value.invalid {
-    border-color: var(--accent-negative);
-    background: color-mix(in srgb, var(--accent-negative) 10%, transparent);
-}
-
-/* Ledger count fills the middle so the trailing button pins to the right. */
-.year-count {
-    flex: 1;
+.stmt-item-main .ant-typography-edit { margin-inline-start: -4px; }
+.stmt-item-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: right;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
+}
+.stmt-item-count { font-variant-numeric: tabular-nums; }
+.stmt-year-value {
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
 }
 
-/* Locked row — the year's cells are computed from transactions, so there is
-   nothing here to rename or remove. The muted figure plus the lock glyph in
-   the delete slot are the two signals that the row is read-only. */
-.year-row-locked .year-value {
-    color: var(--text-tertiary);
+/* The name's field while it is being edited: a small input in the row. */
+.stmt-edit-input {
+    width: 220px;
+    max-width: 100%;
+    height: var(--ant-control-height-sm);
+    padding: 0 7px;
+}
+.stmt-edit-input[type="number"] { width: 96px; }
+
+/* Why a control cannot be used (a year with transactions, a category still
+   in use) is a Tooltip on the pointer and part of the control's name for a
+   screen reader. The Required tag is a tab stop, so its reason can be read
+   from the keyboard too. */
+.stmt-lock,
+.stmt-tip-wrap {
+    display: inline-flex;
+    align-items: center;
+}
+.stmt-lock { color: var(--ant-color-text-tertiary); }
+.stmt-cat-card .ant-tag:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
 }
 
-/* The add row is disabled only while the ledger counts are in flight. */
-.year-manager-overlay .cat-add-row:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: transparent;
-    color: var(--text-secondary);
+.stmt-year-add { align-self: flex-start; margin-top: 12px; }
+.stmt-year-add .ant-input { width: 120px; font-variant-numeric: tabular-nums; }
+
+.stmt-cat-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.stmt-add-row { margin-top: 8px; }
+.stmt-account-list + .stmt-add-row { margin-top: 12px; }
+.stmt-add-row > .ant-btn { flex: none; }
+.stmt-type-select { width: 130px; flex: none; }
+.stmt-add-row .stmt-type-select { width: 140px; }
+
+
+@media (prefers-reduced-motion: reduce) {
+    .stmt-grid :is(.stmt-fixed-start, .stmt-fixed-end)::after { transition: none; }
+    .stmt-input.cell-flash { animation: none; }
 }

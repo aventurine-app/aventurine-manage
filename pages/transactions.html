@@ -4,11 +4,11 @@
     <meta charset="utf-8">
     <title>Aventurine Manage | Transactions</title>
     <!-- @include head -->
-    <link rel="stylesheet" href="/static/css/tables.css">
+    <link rel="stylesheet" href="/static/css/ant.css">
     <link rel="stylesheet" href="/static/css/transactions.css">
-    <!-- The import-results digest ("here's what we found") is shared with
-         first-run setup and lives in onboarding.css. -->
-    <link rel="stylesheet" href="/static/css/onboarding.css">
+    <!-- The import wizard's own rows; the Dashboard's first-run setup opens
+         the same wizard and loads this file too. -->
+    <link rel="stylesheet" href="/static/css/tximport.css">
 </head>
 <body>
     <!-- @include chrome -->
@@ -17,117 +17,71 @@
         <!-- @include sidebar -->
 
         <div class="page">
-             
-<div class="db-page tx-page">
-    <!-- Chip row above the table — no container background. The left group is
-         one filter chip per search field (Date / Name / Type / Account /
-         Category / Amount — same order as the table columns) plus a Clear all;
-         the right group holds the action chips
-         (icon chips for Edit / Delete / Add, labeled primary buttons for
-         Import / Export). Inactive filter chips read as a
-         quiet grey fill with just the field name; clicking one drops a popover of
-         options, and once a value is picked the chip fills with the primary
-         accent and reads "Field : value" with a leading × to clear it. Type,
-         Account and Category take several values at once (checkbox lists,
-         OR-matched), and their chips read "value +N". The option popovers are
-         built on demand in transactions.js. -->
-    <div class="tx-chips">
-        <div class="tx-chips-group tx-chips-left" id="tx-filter-chips">
-            <div class="tx-filter-chip" data-filter="date">
-                <button class="tx-filter-clear" type="button" aria-label="Clear date filter">
-                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                </button>
-                <button class="tx-filter-main" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Filter by Date">
-                    <span class="tx-filter-name">Date</span><span class="tx-filter-rule" aria-hidden="true"></span><span class="tx-filter-value"></span>
-                </button>
-            </div>
-            <div class="tx-filter-chip" data-filter="name">
-                <button class="tx-filter-clear" type="button" aria-label="Clear name filter">
-                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                </button>
-                <button class="tx-filter-main" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Filter by Name">
-                    <span class="tx-filter-name">Name</span><span class="tx-filter-rule" aria-hidden="true"></span><span class="tx-filter-value"></span>
-                </button>
-            </div>
-            <div class="tx-filter-chip" data-filter="type">
-                <button class="tx-filter-clear" type="button" aria-label="Clear type filter">
-                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                </button>
-                <button class="tx-filter-main" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Filter by Type">
-                    <span class="tx-filter-name">Type</span><span class="tx-filter-rule" aria-hidden="true"></span><span class="tx-filter-value"></span>
-                </button>
-            </div>
-            <div class="tx-filter-chip" data-filter="account">
-                <button class="tx-filter-clear" type="button" aria-label="Clear account filter">
-                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                </button>
-                <button class="tx-filter-main" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Filter by Account">
-                    <span class="tx-filter-name">Account</span><span class="tx-filter-rule" aria-hidden="true"></span><span class="tx-filter-value"></span>
-                </button>
-            </div>
-            <div class="tx-filter-chip" data-filter="category">
-                <button class="tx-filter-clear" type="button" aria-label="Clear category filter">
-                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                </button>
-                <button class="tx-filter-main" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Filter by Category">
-                    <span class="tx-filter-name">Category</span><span class="tx-filter-rule" aria-hidden="true"></span><span class="tx-filter-value"></span>
-                </button>
-            </div>
-            <div class="tx-filter-chip" data-filter="amount">
-                <button class="tx-filter-clear" type="button" aria-label="Clear amount filter">
-                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                </button>
-                <button class="tx-filter-main" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Filter by Amount">
-                    <span class="tx-filter-name">Amount</span><span class="tx-filter-rule" aria-hidden="true"></span><span class="tx-filter-value"></span>
-                </button>
-            </div>
-            <button class="tx-clear-all" type="button" id="tx-clear-all" hidden>Clear all</button>
-        </div>
-        <div class="tx-chips-group tx-chips-right">
-            <!-- Selection-driven action chips: disabled until at least one row
-                 is checked; the live count rides in the aria-label / tooltip
-                 now that these are icon-only. -->
-            <button class="button-icon tx-icon-btn tx-edit-btn" type="button" disabled aria-label="Edit" title="Edit">
-                <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"></path></svg>
-            </button>
-            <button class="tx-chip tx-chip-icon tx-delete-btn" type="button" disabled aria-label="Delete" title="Delete">
-                <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"></path></svg>
-            </button>
-            <button class="button-icon tx-icon-btn tx-add-btn" type="button" aria-label="Add transaction" title="Add transaction">
-                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-            </button>
-            <button class="button-primary tx-import-btn" type="button">Import</button>
-            <button class="button-primary tx-export-btn" type="button">Export</button>
-        </div>
+
+<!-- The workspace is drawn in Ant Design (ant.css, ant.js), like Recurring,
+     Portfolio, Reports, Budgets and Statements: the page's three actions, then
+     one card holding the filters, the bar for the rows ticked, the ledger
+     table and its pages. The app chrome around it keeps its own design. -->
+<div class="tx-page ant-scope">
+
+    <!-- Hard left, like the other pages' toolbars. No page heading: the
+         sidebar's active link already names the page. -->
+    <div class="tx-toolbar">
+        <button type="button" class="ant-btn ant-btn-default" id="tx-import-btn"><span class="anticon" data-ant-icon="upload" aria-hidden="true"></span>Import</button>
+        <button type="button" class="ant-btn ant-btn-default" id="tx-export-btn"><span class="anticon" data-ant-icon="download" aria-hidden="true"></span>Export</button>
+        <button type="button" class="ant-btn ant-btn-primary" id="tx-add-btn"><span class="anticon" data-ant-icon="plus" aria-hidden="true"></span>Add transaction</button>
     </div>
 
-    <div class="tx-wrapper">
-        <table class="tx-table">
-            <thead>
-                <tr class="tx-header-row">
-                    <th class="tx-col-select"><input type="checkbox" id="tx-select-all" class="tx-checkbox" aria-label="Select all transactions"></th>
-                    <th class="tx-col-date">Date</th>
-                    <th class="tx-col-avatar"></th>
-                    <th class="tx-col-description">Description</th>
-                    <th class="tx-col-account">Account</th>
-                    <th class="tx-col-category">Category</th>
-                    <th class="tx-col-amount">Amount</th>
-                    <th class="tx-col-notes">Notes</th>
-                </tr>
-            </thead>
-            <tbody id="tx-tbody"></tbody>
-        </table>
-        <!-- Pagination — client-side, 100 rows per page over the filtered rows.
-             Deliberately OUTSIDE the table: it's a fixed band under the body's
-             two scrollbars (transactions.css §1), so the horizontal bar scrolls
-             the header + rows past a footer that never moves. Hidden by JS
-             whenever everything fits on a single page. -->
-        <div class="tx-footer" id="tx-footer" hidden>
-            <div class="tx-pagination" id="tx-pagination"></div>
+    <section class="ant-card tx-ledger" aria-label="Ledger">
+
+        <!-- The six filters in the table's order of interest: a search, the
+             dates, then Type, Account and Category (each several values at
+             once) and Amount. transactions.js builds the Selects and the date
+             range into their slots. Clear filters shows while any is set. -->
+        <div class="tx-filters">
+            <div class="tx-filter-row" role="search" aria-label="Filter transactions">
+                <span class="ant-input-affix-wrapper tx-search">
+                    <span class="ant-input-prefix"><span class="anticon" data-ant-icon="search" aria-hidden="true"></span></span>
+                    <input type="text" class="ant-input" id="tx-search" placeholder="Search descriptions and notes"
+                        aria-label="Search descriptions and notes" autocomplete="off" spellcheck="false">
+                    <span class="ant-input-suffix"><button type="button" class="ant-input-clear-icon" id="tx-search-clear"
+                        aria-label="Clear the search"><span class="anticon" data-ant-icon="close-circle" aria-hidden="true"></span></button></span>
+                </span>
+                <div class="tx-dates" id="tx-dates"></div>
+                <div class="tx-filter-type" id="tx-filter-type"></div>
+                <div class="tx-filter-account" id="tx-filter-account"></div>
+                <div class="tx-filter-category" id="tx-filter-category"></div>
+                <button type="button" class="ant-btn ant-btn-default" id="tx-amount-btn" aria-haspopup="dialog" aria-expanded="false">
+                    <span class="anticon" data-ant-icon="filter" aria-hidden="true"></span><span id="tx-amount-text">Amount</span>
+                </button>
+                <button type="button" class="ant-btn ant-btn-link" id="tx-clear-filters" hidden>Clear filters</button>
+            </div>
         </div>
-    </div>
+
+        <!-- The rows ticked: how many, their net, and what can be done to
+             them. Shown only while at least one is ticked. -->
+        <div class="tx-batch" id="tx-batch" role="region" aria-label="Selected transactions" hidden>
+            <span class="ant-typography-strong" id="tx-batch-count"></span>
+            <span class="ant-typography-secondary tx-num" id="tx-batch-net"></span>
+            <div class="tx-batch-actions">
+                <button type="button" class="ant-btn ant-btn-default ant-btn-sm" id="tx-batch-edit"><span class="anticon" data-ant-icon="edit" aria-hidden="true"></span>Edit</button>
+                <button type="button" class="ant-btn ant-btn-default ant-btn-sm ant-btn-dangerous" id="tx-batch-delete"><span class="anticon" data-ant-icon="delete" aria-hidden="true"></span>Delete</button>
+                <button type="button" class="ant-btn ant-btn-text ant-btn-sm" id="tx-batch-clear"><span class="anticon" data-ant-icon="close" aria-hidden="true"></span>Clear</button>
+            </div>
+        </div>
+
+        <!-- The ledger. Its header is drawn by transactions.js too (the
+             sorters and the select-all box follow the state); the body is
+             one page of the filtered rows. -->
+        <div class="ant-table-wrapper tx-table-wrap">
+            <table class="ant-table ant-table-middle ant-table-fixed tx-table">
+                <thead id="tx-thead"></thead>
+                <tbody id="tx-tbody"></tbody>
+            </table>
+        </div>
+
+        <ul class="tx-pagination" id="tx-pagination" aria-label="Pages" hidden></ul>
+    </section>
 </div>
         </div>
     </div>
@@ -139,6 +93,9 @@
          window.MERCHANT_ICONS. -->
     <script src="/static/js/core/merchant-icons.js"></script>
     <script src="/static/js/core/avatar.js"></script>
+    <!-- Ant Design's interactive pieces. After the shared block: its Modal is
+         UI.dialog underneath. -->
+    <script src="/static/js/widgets/ant.js"></script>
     <script src="/static/js/widgets/txparse.js"></script>
     <script src="/static/js/widgets/txfileimport.js"></script>
     <script src="/static/js/widgets/txexport.js"></script>

@@ -4,19 +4,16 @@
     <meta charset="utf-8">
     <title>Aventurine Manage | Dashboard</title>
     <!-- @include head -->
+    <!-- Drawn in Ant Design (ant.css, ant.js), like the other workspaces. -->
+    <link rel="stylesheet" href="/static/css/ant.css">
     <link rel="stylesheet" href="/static/css/donut.css">
     <!-- The stacked-column rules (.chart-col, .chart-seg) the Spending card draws with. -->
     <link rel="stylesheet" href="/static/css/transfers.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
-    <!-- First-run setup runs the ordinary import flow inside its modal, so
-         Dashboard also loads the import widget's styles (transactions.css defines
-         the .tx-import-* modal shell; onboarding.css defines .onb-* and the
-         shared import-results summary). -->
-    <link rel="stylesheet" href="/static/css/transactions.css">
+    <!-- First-run setup (onboarding.css) hands its file to the ordinary
+         import wizard: tximport.css for the wizard's own rows. -->
     <link rel="stylesheet" href="/static/css/onboarding.css">
-    <!-- The Customize panel's widget list is the Categories editor's
-         collapsible group cards (.cat-group). -->
-    <link rel="stylesheet" href="/static/css/categories.css">
+    <link rel="stylesheet" href="/static/css/tximport.css">
 </head>
 <body>
     <!-- @include chrome -->
@@ -26,7 +23,7 @@
 
         <div class="page">
 
-<div class="dashboard-page">
+<div class="dashboard-page ant-scope">
 
     <!-- First-run hero. Replaces the dashboard only while the database holds
          nothing the user put there and they haven't waved setup off (both
@@ -35,47 +32,42 @@
          in dashboard.js reveals it. Skipping removes it and shows the ordinary
          dashboard, whose own empty states lead into each surface. -->
     <div class="dashboard-firstrun" id="dashboard-firstrun" hidden>
-        <div class="dashboard-firstrun-card">
-            <h1 class="dashboard-firstrun-title">Your dashboard is empty — let’s fix that</h1>
-            <p class="dashboard-firstrun-sub">Point Aventurine Manage at one transaction export and it
-                builds your ledger, statements, and charts from it. Everything is read and
-                categorized on this computer; nothing is uploaded.</p>
-            <div class="dashboard-firstrun-actions">
-                <button type="button" class="button-primary" id="dashboard-firstrun-start">Set up my accounts</button>
-                <button type="button" class="dashboard-firstrun-skip" id="dashboard-firstrun-skip">Skip for now</button>
+        <section class="ant-card dashboard-firstrun-card">
+            <div class="ant-card-body">
+                <img class="dashboard-firstrun-logo" src="/static/icons/logo/logo.svg" alt="" width="56" height="56" draggable="false">
+                <h1 class="dashboard-firstrun-title">Your dashboard is empty. Let’s fix that.</h1>
+                <p class="dashboard-firstrun-sub">Point Aventurine Manage at one transaction export and it
+                    builds your ledger, statements and charts from it. Everything is read and
+                    categorized on this computer; nothing is uploaded.</p>
+                <div class="dashboard-firstrun-actions">
+                    <button type="button" class="ant-btn ant-btn-primary ant-btn-lg" id="dashboard-firstrun-start">Set up my accounts</button>
+                    <button type="button" class="ant-btn ant-btn-text ant-btn-lg" id="dashboard-firstrun-skip">Skip for now</button>
+                </div>
             </div>
-        </div>
+        </section>
     </div>
 
-    <!-- The dashboard: a toolbar (layout tabs, Customize) over a grid of cards,
-         with the Customize panel beside both while customizing, its heading level
-         with the toolbar. dashboard.js builds the tabs, the buttons,
-         the cards and the panel's contents from the saved layouts; the cards
-         themselves are defined in dashcards.js. -->
+    <!-- The dashboard: the layouts as line Tabs, with Customize as their extra
+         content hard right on the same hairline, over a grid of cards. While
+         customizing the tabs turn editable cards and the extra content becomes
+         the layout's name, Add widgets, Cancel and Save. dashboard.js builds
+         the tabs, the controls, the cards and the widget Drawer from the saved
+         layouts; the cards themselves are defined in dashcards.js. No page
+         heading: the sidebar's active link already names the page. -->
     <div class="dash-shell">
-        <div class="dash-toolbar" id="dash-toolbar">
+        <div class="ant-tabs-nav dash-bar" id="dash-toolbar">
             <div class="dash-layouts" id="dash-layouts"></div>
-            <div class="dash-actions" id="dash-actions"></div>
+            <div class="dash-extra" id="dash-actions"></div>
         </div>
         <div class="dash-main">
             <div class="dash-canvas" id="dash-canvas" role="tabpanel">
                 <div class="dash-placeholder" id="dash-placeholder" hidden></div>
             </div>
-            <div class="dash-empty" id="dash-empty" hidden></div>
+            <section class="ant-card dash-empty" id="dash-empty" hidden></section>
         </div>
-
-        <aside class="dash-drawer" id="dash-drawer" aria-label="Customize">
-            <div class="dash-drawer-head">
-                <h2 class="dash-drawer-title">Widgets</h2>
-                <button type="button" class="button-primary" data-act="done">Save</button>
-            </div>
-            <div class="dash-drawer-card">
-                <div class="dash-drawer-body" id="dash-drawer-body"></div>
-            </div>
-        </aside>
     </div>
 
-    <div class="dash-sr-only" id="dash-live" aria-live="polite"></div>
+    <div class="ant-visually-hidden" id="dash-live" aria-live="polite"></div>
 
 </div>
         </div>
@@ -95,13 +87,16 @@
          the page script below. -->
     <script src="/static/js/widgets/dashgrid.js"></script>
     <script src="/static/js/widgets/dashperiod.js"></script>
-    <script src="/static/js/widgets/monthstepper.js"></script>
     <!-- Merchant avatars (Top Merchants, Recent Transactions, Upcoming Bills):
          the generated manifest, then the renderer that reads it. -->
     <script src="/static/js/core/merchant-icons.js"></script>
     <script src="/static/js/core/avatar.js"></script>
+    <!-- Ant Design's interactive pieces (Popover, Drawer, Dropdown, the month
+         panel, Modal for the import wizard), before the cards that use them. -->
+    <script src="/static/js/widgets/ant.js"></script>
     <!-- Every card the dashboard can hold, then the page that places them. -->
     <script src="/static/js/pages/dashcards.js"></script>
+    <!-- The import wizard first-run setup opens: the parser, then the wizard. -->
     <script src="/static/js/widgets/txparse.js"></script>
     <script src="/static/js/widgets/txfileimport.js"></script>
     <script src="/static/js/widgets/onboarding.js"></script>

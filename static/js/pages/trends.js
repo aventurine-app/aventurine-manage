@@ -39,7 +39,7 @@
 // the keyboard path, and the swatch stays the only way to hide a category.
 //
 // Globals: apiFetch (api.js), escapeHtml (escape.js), formatCurrency (currency.js),
-// FinanceChart (chart.js), UI (ui.js).
+// FinanceChart (chart.js), UI (ui.js), Ant (ant.js).
 
 (function () {
   const WINDOW_LABELS = { 3: '3 Months', 6: '6 Months', 12: '1 Year', 24: '2 Years', 60: '5 Years' };
@@ -281,14 +281,13 @@
       // Clear whichever form is mounted, then take the container over.
       FinanceChart.render('trends-chart', { series: [], slots: [] });
       container.innerHTML = categories.length === 0
-        ? UI.emptyState({
-            icon: 'chart',
+        ? Ant.empty({
             title: 'No spending to chart yet',
             desc: 'Categorize some transactions and Aventurine Manage will chart how your spending shifts over time.',
-            action: { label: 'Add transactions', href: '/transactions', primary: true },
+            action: { label: 'Add transactions', href: '/transactions' },
           })
-        : UI.emptyState({
-            icon: 'chart', compact: true,
+        : Ant.empty({
+            compact: true,
             title: 'Nothing selected',
             desc: 'Pick a category to plot it.',
           });

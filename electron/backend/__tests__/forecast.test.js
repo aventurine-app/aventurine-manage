@@ -14,7 +14,7 @@ const path = require('node:path');
 
 const {
   forecast, HISTORY_MONTHS, historySeries,
-  recurringPatterns, placeRecurring, weekCount, horizonEnd, addMonthKey,
+  recurringPatterns, recurringMonthlyRate, placeRecurring, weekCount, horizonEnd, addMonthKey,
 } = require('../services/forecast');
 const { localTodayIso } = require('../services/predictions');
 const { connect } = require('../db');
@@ -253,6 +253,123 @@ test('forecast: irregular (non-recurring) spend is smoothed across the weeks', (
   assert.deepStrictEqual(r.series.map((s) => s.expense), [700, 700, 700, 700, 200]);
   assert.deepStrictEqual(r.series.map((s) => s.balance), [-700, -1400, -2100, -2800, -3000]);
   assert.equal(r.summary.belowZero, true);
+});
+
+// ── the total is the typical month, however the rows are grouped ─────────────
+
+// One biweekly paycheck whose bank description changed twice, plus monthly
+// spending under distinct merchants. Only the newest spelling is long and regular
+// enough to be detected as recurring; the two older ones are not.
+function reworded() {
+  const income = [];
+  let d = '2026-04-03';
+  const addDaysIso = (iso, n) => {
+    const t = new Date(`${iso}T00:00:00Z`);
+    t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  while (d < '2026-11-01') {
+    const description = d < '2026-06-01' ? 'Payroll Acme Corp'
+      : d < '2026-08-01' ? 'Acme Corp Payroll ACH Credit' : 'Acme Corp';
+    income.push(inc(d, 1500, description));
+    d = addDaysIso(d, 14);
+  }
+  const expense = ['04', '05', '06', '07', '08', '09', '10'].map((m, i) =>
+    exp(`2026-${m}-12`, 4000, `Spending ${i}`));
+  return { income, expense };
+}
+
+test('forecast: a paycheck reworded in the ledger is not projected twice', () => {
+  // Regression. The newest spelling was projected as a dated biweekly paycheck
+  // while the older two spellings sat in the "irregular" history and were
+  // projected again as baseline: ~$6.4k/mo of income against ~$4.8k/mo real, and
+  // an account losing ~$1.1k a month forecast to gain money.
+  const { income, expense } = reworded();
+  const today = '2026-11-01';
+  const r = forecast({ startBalance: 2000, income, expense, planned: [], months: 3, window: 6, today });
+
+  // Exactly one pattern is found, so the older spellings really are unmatched.
+  assert.equal(recurringPatterns(income, today).length, 1);
+
+  // Over 92 days the projected income is the typical month scaled to those days,
+  // to within a single paycheck of timing. The double count was worth ~4 of them.
+  const projected = r.series.reduce((sum, w) => sum + w.income, 0);
+  const expected = r.summary.avgIncome * (92 / (365.25 / 12));
+  assert.ok(Math.abs(projected - expected) <= 1500,
+    `projected ${projected} income vs ${expected} from the average`);
+
+  // And the line does not outrun the account's own history: the typical month
+  // here nets negative, so the end balance must sit below where it started.
+  assert.ok(r.summary.avgExpense > r.summary.avgIncome);
+  assert.ok(r.summary.endBalance < 2000, `end ${r.summary.endBalance}`);
+});
+
+test('forecast: dated flows redistribute the typical month, they do not add to it', () => {
+  // A monthly 4000 paycheck is the whole of a 4000 typical month, so the baseline
+  // is empty; and a patterns-only rate that EXCEEDS the average (a raise) is not
+  // topped up with a negative baseline.
+  const income = ['01', '02', '03', '04', '05'].map((m) => inc(`2026-${m}-01`, 4000));
+  const r = forecast({ startBalance: 0, income, expense: [], planned: [], months: 3, today: '2026-06-01' });
+  assert.equal(r.summary.recurringIncome, 4000);
+  assert.equal(r.summary.endBalance, 12000); // Jun 1, Jul 1, Aug 1 — nothing else
+
+  const raise = [
+    inc('2026-01-01', 2000), inc('2026-02-01', 2000), inc('2026-03-01', 2000),
+    inc('2026-04-01', 6000), inc('2026-05-01', 6000),
+  ];
+  const r2 = forecast({ startBalance: 0, income: raise, expense: [], planned: [], months: 3, today: '2026-06-01' });
+  // Median of the last three charges (2000, 6000, 6000) → 6000/mo of dated income
+  // against a 3600 average: the dated flows win, and nothing is subtracted below 0.
+  assert.equal(r2.summary.recurringIncome, 6000);
+  assert.equal(r2.summary.endBalance, 18000);
+});
+
+test('recurringMonthlyRate: calendar cycles are exact, day cycles use the average month', () => {
+  const p = (name, days, amount) => ({ name, days, amount });
+  assert.equal(recurringMonthlyRate([p('monthly', 30, 1500)]), 1500);
+  assert.equal(recurringMonthlyRate([p('quarterly', 91, 300)]), 100);
+  assert.equal(recurringMonthlyRate([p('yearly', 365, 1200)]), 100);
+  // Biweekly: 365.25/12 days a month ÷ 14 days a charge ≈ 2.174 charges.
+  assert.ok(Math.abs(recurringMonthlyRate([p('biweekly', 14, 100)]) - 217.41) < 0.01);
+  assert.equal(recurringMonthlyRate([]), 0);
+});
+
+// ── the range around the line ────────────────────────────────────────────────
+
+test('forecast: the range comes from the months\' net spread and widens with the horizon', () => {
+  // Five complete months of one-off spending (distinct merchants, nothing
+  // recurring) of 1000/2000/3000/2000/1000: mean 1800, sample sd √700000 ≈ 836.66.
+  const expense = [1000, 2000, 3000, 2000, 1000].map((amt, i) =>
+    exp(`2026-0${i + 1}-10`, amt, `One-off ${i}`));
+  const r = forecast({ startBalance: 10000, income: [], expense, planned: [], months: 3, today: '2026-06-01' });
+  assert.equal(r.summary.netSd, 836.66);
+
+  const half = (w) => {
+    const months = (Math.round((new Date(`${w.weekEnd}T00:00:00Z`) - new Date('2026-06-01T00:00:00Z')) / 864e5) + 1) / (365.25 / 12);
+    return 0.6745 * 836.66 * Math.sqrt(months);
+  };
+  for (const w of r.series) {
+    // Centred on the line, and as wide as the formula says (to the cent).
+    assert.ok(Math.abs((w.high + w.low) / 2 - w.balance) < 0.011);
+    assert.ok(Math.abs((w.high - w.low) / 2 - half(w)) < 0.011, `week of ${w.label}`);
+  }
+  // Wider the further out, and never zero-width here.
+  const widths = r.series.map((w) => w.high - w.low);
+  assert.ok(widths.every((x, i) => i === 0 || x > widths[i - 1]));
+});
+
+test('forecast: a perfectly steady account has no range, and too little history has none either', () => {
+  const steady = ['01', '02', '03', '04', '05'].map((m) => exp(`2026-${m}-10`, 1500, `Bill ${m}`));
+  const r = forecast({ startBalance: 9000, income: [], expense: steady, planned: [], months: 1, today: '2026-06-01' });
+  assert.equal(r.summary.netSd, 0);
+  assert.ok(r.series.every((w) => w.low === w.balance && w.high === w.balance));
+
+  // Two months is not enough to say how much a month strays.
+  const few = [exp('2026-04-10', 1000, 'A'), exp('2026-05-10', 3000, 'B')];
+  const r2 = forecast({ startBalance: 9000, income: [], expense: few, planned: [], months: 1, today: '2026-06-01' });
+  assert.equal(r2.summary.monthsUsed, 2);
+  assert.equal(r2.summary.netSd, null);
+  assert.ok(r2.series.every((w) => w.low === null && w.high === null));
 });
 
 test('forecast: no usable history → a flat line at the start balance', () => {

@@ -71,8 +71,6 @@ const appGlobals = {
   refreshUncatBadge: 'readonly',
   // shell/dbactions.js
   dbActions: 'readonly',
-  // shell/settingsCategories.js
-  mountCategoriesEditor: 'readonly',
   // shell/zoom.js
   aventurineZoom: 'readonly',
   // widgets/chart.js
@@ -91,8 +89,10 @@ const appGlobals = {
   appTheme: 'readonly',
   // widgets/bubblefield.js (the Budgets page's circles)
   BubbleField: 'readonly',
-  // widgets/monthstepper.js
-  MonthStepper: 'readonly',
+  // widgets/ant.js (Ant Design's Modal, Tooltip, Popconfirm, month picker,
+  // message and tabs; loaded by the pages drawn in Ant Design — Recurring,
+  // Portfolio, Reports, Budgets, Statements)
+  Ant: 'readonly',
   // core/format.js
   debounce: 'readonly',
   applyCommaFormat: 'readonly',
@@ -100,11 +100,10 @@ const appGlobals = {
   MONTHS_SHORT: 'readonly',
   todayIso: 'readonly',
   fmtShortDate: 'readonly',
-  // widgets/tables.js
-  confirmDelete: 'readonly',
-  promptAddYear: 'readonly',
-  openManagerModal: 'readonly',
+  // widgets/tables.js (the Statements grid)
   bootstrapYearTablePage: 'readonly',
+  // pages/stmtmanagers.js (the Statements page's Manage Years / Manage Columns)
+  StatementManagers: 'readonly',
   // widgets/txparse.js (pure parsing core; also require()d by the backend
   // test suite) / txfileimport.js / txexport.js
   TxParse: 'readonly',

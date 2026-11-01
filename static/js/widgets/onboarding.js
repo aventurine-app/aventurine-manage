@@ -163,12 +163,12 @@
                     onSkip: () => finish({ skipped: true }),
                     onDone: () => finish(),
                     onChosen: (account) => {
-                        // Hand off to the ordinary import with the account already
-                        // resolved, so the preview displays it instead of asking
-                        // again. The import's Step 4 ("Success!") offers the same
-                        // two choices onboarding needs next: add another account
-                        // (back to the picker, with this one added to the imported
-                        // chips) or finish.
+                        // Hand off to the ordinary import wizard with the account
+                        // already resolved, so it starts at the file instead of
+                        // asking again. Its Done step offers the two choices
+                        // onboarding needs next: add another account (back to the
+                        // picker, with this one added to the imported chips) or
+                        // finish.
                         modal.hide();
                         TxFileImport.run({
                             account,

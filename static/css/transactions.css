@@ -1,2371 +1,354 @@
 /* ============================================================================
-   transactions.css — Transactions page (independent ledger).
+   transactions.css — the Transactions page (pages/transactions.html), in Ant
+   Design.
    ============================================================================
-   Borrows the tables.css db-page-header treatment (header layout + action
-   buttons) but has its own table styling. Unlike the year-trackers, every
-   row here is a discrete record — there's no forehead/header-spanning
-   structure — so the table is a straight thead + tbody.
+   The components (buttons, inputs, Selects, the range picker, table, tags,
+   pagination, modal, steps, slider, notification…) are ant.css; this file is
+   the page: its layout, the filters' widths, the ledger's columns and cells,
+   and the rows of its Add, Edit and Export dialogs. The import wizard's rows
+   are tximport.css, shared with the Dashboard's first-run setup; so are the
+   pieces the wizard and these dialogs both use (Steps' spacing, the footer's
+   button group, money in and out, the dialog tables' column widths).
 
-   Layout of this file:
-     1. Table wrapper + base shell
-     2. Header row + column widths
-     3. Display-mode row (plain text cells)
-     4. Edit-mode + new-row (floating bordered inputs)
-     5. Action-button cell (pencil/check + trash/X)
-     6. Per-column input variants (date / select / amount sign)
+     1. Page and toolbar
+     2. The ledger card: filters, batch bar
+     3. The table: columns, cells, narrow widths
+     4. Amount filter popover
+     5. Add transaction
+     6. Edit wizard
+     7. Export
    ============================================================================ */
 
 
-/* ─── 1. Table wrapper + base shell ──────────────────────────────────────── */
-/* The Transactions page fills the viewport rather than letting the table grow
-   the page taller than the window: the page area itself stops scrolling, and
-   the table region (.tx-wrapper) claims the height left under the header + chip
-   row. Inside it <tbody> is the only scroller on EITHER axis, so both bars are
-   confined to the data rows: the header band above stays put vertically (and is
-   pulled sideways in step by txSyncHeaderScroll), and the pagination footer
-   below — a plain div outside the table — never moves at all, so the "Showing …"
-   count and the centered page controls stay put however narrow the window gets.
-
-   The alternative (scrolling the whole wrapper horizontally, which is what this
-   did before) put the body's vertical bar at the ROW's right edge — 1250px out —
-   so it slid off-screen the moment the window was narrow enough to need
-   horizontal scrolling, which read as the bar vanishing. Bars belong to the
-   viewport they scroll, so both now live on the band the user is looking at. */
+/* ─── 1. Page and toolbar ───────────────────────────────────────────────────
+   The full width the page is given, with the app's page padding, and a page
+   that scrolls as one: a long page of rows runs down the window rather than
+   inside a box of its own. */
 .page:has(.tx-page) {
-    overflow: hidden;
+    align-items: flex-start;
 }
 
 .tx-page {
-    width: 100%;
-    /* Fill the page's content box so the flex column below can hand its
-       leftover height to the scroll region. min-height:0 lets that region
-       shrink past its intrinsic content height. */
-    height: 100%;
-    min-height: 0;
-}
-
-/* Import / Export / Edit / Delete / Add are now action chips in the chip row
-   (section 1b) — shape, icon sizing and the primary fill live with .tx-chip. */
-
-.tx-wrapper {
-    border: var(--table-border-width) solid var(--border);
-    /* 12px — the card radius, shared with .db-wrapper and every other page
-       card, so the three table surfaces read the same. */
-    border-radius: 12px;
-    background: var(--surface1);
-    /* The shared card elevation (style.css), the same one .db-wrapper takes —
-       the Statements and Portfolio tables are the same surface as this one and
-       the three read at one height. The overflow:hidden below clips the
-       wrapper's CHILDREN; a box-shadow paints outside the border box, so it is
-       unaffected. */
-    box-shadow: var(--shadow-card);
-    /* Takes the height left under the header + chips and passes it to the flex
-       column inside (table + footer). It is NOT a scroller — overflow:hidden is
-       here only to clip the bands to the rounded corners. min-height:0 lets the
-       flex child shrink so the body can scroll. */
     flex: 1;
-    min-height: 0;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: var(--page-pad);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    /* .page (style.css) sets scrollbar-color, an inherited property, so it
-       cascades in here — and in Chromium a set scrollbar-color makes the
-       ::-webkit-scrollbar rules below be ignored (falling back to the native
-       17px bar with arrow buttons). Reset it so our custom bar applies; it
-       inherits down to thead/tbody too. */
-    scrollbar-color: auto;
-    scrollbar-width: auto;
+    gap: 16px;
 }
 
-/* The table is a flex COLUMN so the body can take the leftover height and scroll
-   on its own, with the header a fixed band above it. The table itself is only
-   as wide as the wrapper — the 1250px floor lives on the ROWS (§2), which is
-   what lets the bands stay viewport-width while their rows overflow. */
-.tx-table {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
-}
+/* The parts the script shows and hides set a display of their own, which
+   would otherwise outrank the attribute. */
+.tx-page [hidden],
+.tx-wizard [hidden],
+.tx-form-modal [hidden],
+.tx-export-modal [hidden] { display: none; }
 
-.tx-table > thead {
-    display: block;
-    flex: none;
-}
-
-.tx-table > tbody {
-    display: block;
-    flex: 1 1 auto;
-    min-height: 0;
-}
-
-/* <tbody> holds BOTH scrollbars. overflow-y stays `scroll` rather than `auto` so
-   the gutter is reserved whether or not the rows overflow, and <thead> reserves
-   the same gutter the same way — identical content-box narrowing keeps the two
-   bands' columns aligned to the pixel regardless of the platform's scrollbar
-   width. The header never scrolls horizontally by itself (hidden, not
-   auto): txSyncHeaderScroll drives its scrollLeft from the body's. */
-.tx-table > thead {
-    overflow-y: scroll;
-    overflow-x: hidden;
-}
-
-.tx-table > tbody {
-    overflow-y: scroll;
-    overflow-x: auto;
-}
-
-/* Each row becomes its own fixed-layout table so every band sizes its columns
-   from the same .tx-col-* widths; collapse removes the default 2px inter-cell
-   spacing that would otherwise apply once the rows are tables. width:100% fills
-   the band, and min-width (§2) is the floor that makes the row overflow it, so
-   the rows scroll sideways rather than the table. */
-.tx-table > thead > tr,
-.tx-table > tbody > tr {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-}
-
-/* The header divider lives on the band (full width), so it no longer needs the
-   per-cell sticky + box-shadow workaround. */
-.tx-table > thead { border-bottom: var(--table-border-width) solid var(--border); }
-
-/* ── Scrollbars ──────────────────────────────────────────────────────────────
-   One thin frosted treatment (matching .page / .db-wrapper) for both of the
-   body's bars; the native bar's arrow buttons and square track clashed with the
-   rounded corners. The header's vertical bar exists only to reserve the gutter,
-   so it's rendered fully invisible — which keeps the top corners clean and the
-   rows aligned with the header. */
-.tx-table > thead::-webkit-scrollbar,
-.tx-table > tbody::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-.tx-table > tbody::-webkit-scrollbar-track {
-    background: var(--surface1);
-}
-
-/* The body's horizontal track carries a top divider, mirroring the vertical
-   one below: the rows read as a framed channel rather than bleeding into the
-   pagination footer underneath. */
-.tx-table > tbody::-webkit-scrollbar-track:horizontal {
-    border-top: var(--table-border-width) solid var(--border);
-}
-
-/* The body's vertical track carries a left divider so the rows read as a framed
-   channel rather than ending abruptly against the bar. */
-.tx-table > tbody::-webkit-scrollbar-track:vertical {
-    border-left: var(--table-border-width) solid var(--border);
-}
-
-/* Square, full-bleed thumb — same recipe as div.page. */
-.tx-table > tbody::-webkit-scrollbar-thumb {
-    background: var(--surface4);
-}
-
-.tx-table > tbody::-webkit-scrollbar-thumb:hover {
-    background: var(--text-tertiary);
-}
-
-/* The header gutter reserves its width but paints nothing. */
-.tx-table > thead::-webkit-scrollbar-track,
-.tx-table > thead::-webkit-scrollbar-thumb {
-    background: transparent;
-    border: none;
-}
-
-/* Blend the square where the body's two bars meet. */
-.tx-table > tbody::-webkit-scrollbar-corner {
-    background: var(--surface1);
-}
-
-/* ── Pagination footer band ──────────────────────────────────────────────────
-   Outside the table and outside every scroller, so it keeps the wrapper's full
-   visible width: the horizontal bar above slides the rows past it instead of
-   dragging it along, and the centered page controls stay centered on the frame
-   the user can see. Styling for what's inside it is §7. */
-.tx-footer {
-    flex: none;
-    padding: 12px 16px;
-    border-top: var(--table-border-width) solid var(--border);
-}
-
-
-/* ─── 1b. Chip row + filter chips ────────────────────────────────────────────
-   The row between the page header and the table. It has NO container
-   background — chips sit directly on the page. The left group holds one filter
-   chip per search field (Date / Name / Amount / Type / Category) plus a Clear
-   all; the right group holds the action chips. The filter chips and their option
-   popovers are defined at the end of this section. */
-.tx-chips {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    /* The parent .db-page is a flex column with a 16px gap between children, so
-       the bottom value is offset against that: -4px nets a 12px chips→table gap
-       (16 − 4), tightening the row against the table it filters. */
-    margin: 0 0 -4px;
-    min-height: 32px;
-}
-
-.tx-chips-group {
+/* Import, Export and Add transaction, hard left like every page's toolbar. */
+.tx-toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
 }
 
-/* Generic chip shell. The icon chips (action chips + search trigger) and the
-   Uncategorized quick filter are squared off below; nothing else uses the base
-   pill radius now, but it's kept as the fallback shape. */
-.tx-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    /* 32px — on the 4px spacing scale (= --control-height). */
-    height: 32px;
-    padding: 0 12px;
-    border: var(--border-width) solid var(--border);
-    border-radius: 999px;
-    background: var(--surface1);
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    cursor: pointer;
-    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+
+
+/* ─── 2. The ledger card: filters, batch bar ────────────────────────────────
+   The card clips the table's corners to its own. The filters wrap onto as
+   many lines as the width needs. */
+.tx-ledger {
+    overflow: clip;
+    container: tx-ledger / inline-size;
 }
 
-/* Action chips lift on hover. */
-.tx-chip:not(:disabled):hover {
-    color: var(--text-primary);
-    border-color: var(--border);
-    background: var(--frost-3);
+.tx-filters {
+    padding: 14px 16px;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-border-secondary);
 }
-
-/* Rounded squares: the icon (action) chips. */
-.tx-chip-icon {
-    border-radius: 8px;
-}
-
-.tx-chip svg {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-}
-
-/* Disabled action chips (Edit/Delete with no selection) read inert. */
-.tx-chip:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-    color: var(--text-tertiary);
-}
-
-/* Icon-only chips (the action chips) — square footprint, so the width tracks
-   the chip height above. */
-.tx-chip-icon {
-    width: 32px;
-    padding: 0;
-    justify-content: center;
-}
-
-.tx-chip-icon svg {
-    width: 16px;
-    height: 16px;
-}
-
-/* Edit and Add take the shared icon-only secondary button (.button-secondary
-   .button-icon, buttons.css). Only the glyph size is set here. */
-.tx-icon-btn svg {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-}
-
-/* ── Filter chips ──────────────────────────────────────────────────────────
-   The chip is the visual unit; its two child buttons (clear ×, label) sit
-   transparently inside the shared shape. Inactive → solid grey fill with muted
-   ink, just the field name. Active → solid accent fill with the primary
-   button's ink, the leading × revealed and the " : value" half shown.
-
-   Both states are filled, so the border stays transparent: it holds the 1px
-   the outline used to take and keeps the chip's size the same either way.
-   Colours come from the --filter-chip-* tokens (style.css). */
-.tx-filter-chip {
-    position: relative;
-    display: inline-flex;
-    align-items: stretch;
-    height: 32px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: var(--filter-chip-bg);
-    color: var(--filter-chip-text);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-/* Inactive hover darkens the fill and lifts the text so the chip reads clickable. */
-.tx-filter-chip:not(.is-active):hover {
-    color: var(--filter-chip-text-hover);
-    background: var(--filter-chip-bg-hover);
-}
-
-/* Active → a solid accent fill, one rung lighter than the primary button's, with
-   the button's ink. Tokens, not raw ramp stops — the ramp never flips, so the
-   per-theme rung and ink have to come from the tokens. Hover drops back to the
-   primary button's own accent. */
-.tx-filter-chip.is-active {
-    background: var(--filter-chip-active-bg);
-    color: var(--filter-chip-active-text);
-}
-
-.tx-filter-chip.is-active:hover {
-    background: var(--filter-chip-active-hover);
-}
-
-/* The label button: field name, then a full-height divider + value once active. */
-.tx-filter-main {
-    display: inline-flex;
+.tx-filter-row {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    height: 100%;
-    padding: 0 12px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
 }
+.tx-search { width: 250px; }
+.tx-dates { width: 250px; }
+.tx-filter-type { min-width: 120px; max-width: 220px; }
+.tx-filter-account { min-width: 130px; max-width: 240px; }
+.tx-filter-category { min-width: 140px; max-width: 260px; }
 
-/* Active: the label sits tight against the × on its left. */
-.tx-filter-chip.is-active .tx-filter-main { padding-left: 6px; }
-
-.tx-filter-name { font-weight: var(--weight-medium); }
-
-/* The divider rule + value — only shown once the chip is active. The rule is a
-   full-height vertical line between the field name and its value: align-self
-   stretch makes it span the chip's full inner height regardless of the text. */
-.tx-filter-rule {
-    display: none;
-    align-self: stretch;
-    width: 1px;
-    background: currentColor;
-    opacity: 0.4;
-}
-
-.tx-filter-value {
-    display: none;
-    max-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-}
-
-.tx-filter-chip.is-active .tx-filter-rule,
-.tx-filter-chip.is-active .tx-filter-value { display: block; }
-
-/* The leading × — only in flow on an active chip. Its SVG wears a perfect
-   circle (equal box + border-radius:50%) around the glyph; the button itself is
-   just the hit area + left spacing. Ring and glyph are ONE colour: the circle
-   borders on currentColor, so both follow the chip's ink and dim together on
-   hover — a grey ring round a coloured × read as two controls, and the hover
-   has to promise the whole thing clears. */
-.tx-filter-clear {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    margin-left: 5px;
-    padding: 3px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    transition: opacity 0.15s ease;
-}
-.tx-filter-chip.is-active .tx-filter-clear { display: inline-flex; }
-.tx-filter-clear svg {
-    width: 16px;
-    height: 16px;
-    padding: 1px;
-    box-sizing: border-box;
-    border: 1px solid currentColor;
-    border-radius: 50%;
-}
-.tx-filter-clear:hover { opacity: 0.65; }
-
-/* Keyboard focus rings. The label ring is inset so the chip's rounded border
-   doesn't clip it; the × ring hugs its circle. */
-.tx-filter-main:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: -2px;
-    border-radius: 6px;
-}
-.tx-filter-clear:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 1px;
-    border-radius: 50%;
-}
-
-/* On the accent fill the accent-coloured ring above would vanish, so it takes
-   the chip's ink instead. */
-.tx-filter-chip.is-active .tx-filter-main:focus-visible,
-.tx-filter-chip.is-active .tx-filter-clear:focus-visible {
-    outline-color: var(--filter-chip-active-text);
-}
-
-/* Clear all — a quiet text button shown only while ≥1 filter is on. */
-.tx-clear-all {
-    height: 32px;
-    padding: 0 8px;
-    border: 0;
-    background: transparent;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    cursor: pointer;
-    transition: color 0.15s ease;
-}
-.tx-clear-all:hover { color: var(--text-primary); text-decoration: underline; }
-.tx-clear-all[hidden] { display: none; }
-
-/* ── Filter option popover ─────────────────────────────────────────────────
-   Built on demand under the clicked chip; the chip provides the positioning
-   origin. Reuses the dialog surface tokens. */
-.tx-filter-popover {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    z-index: 60;
+/* The rows ticked: a tinted band between the filters and the table. */
+.tx-batch {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-primary-border);
+    background: var(--ant-color-primary-bg);
+}
+.tx-batch-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-inline-start: auto;
+}
+
+.tx-pagination { padding: 16px; }
+
+
+/* ─── 3. The table: columns, cells, narrow widths ───────────────────────────
+   A fixed layout over the header's widths, the Description column taking
+   what is left. Notes, then Account, step out as the card narrows, so
+   Description never gets squeezed to nothing; past that the table keeps its
+   minimum width and scrolls sideways inside the card. */
+.tx-table { min-width: 760px; }
+.tx-table thead th { border-start-start-radius: 0; border-start-end-radius: 0; }
+/* Widths include the cells' padding, as Ant's column widths do. */
+.tx-table th { box-sizing: border-box; }
+.tx-table .tx-col-select { width: 44px; }
+.tx-table th.tx-col-date { width: 128px; }
+.tx-table th.tx-col-account { width: 160px; }
+.tx-table th.tx-col-category { width: 180px; }
+.tx-table th.tx-col-amount { width: 140px; }
+.tx-table th.tx-col-notes { width: 200px; }
+.tx-table td { vertical-align: middle; }
+.tx-col-date { white-space: nowrap; }
+
+@container tx-ledger (max-width: 1099px) {
+    .tx-table .tx-col-notes { display: none; }
+}
+@container tx-ledger (max-width: 819px) {
+    .tx-table { min-width: 600px; }
+    .tx-table .tx-col-account { display: none; }
+}
+
+/* Description: the merchant's mark, then its name over the bank's own
+   wording when the two differ. Both cut to one line. */
+.tx-desc {
+    display: flex;
+    align-items: center;
     gap: 10px;
-    min-width: 220px;
-    padding: 10px;
-    background: var(--surface1);
-    border: var(--border-width) solid var(--border);
-    border-radius: 10px;
-    box-shadow: var(--shadow-menu);
-}
-
-.tx-pop-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-/* Same eyebrow style as the table headers, one size smaller. */
-.tx-pop-label {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
-}
-
-/* Quick-range pills at the top of the Date popover: three equal ghost pills;
-   the one matching the active filter takes the accent, like a selected option. */
-.tx-pop-presets { display: flex; gap: 8px; }
-.tx-pop-preset {
-    flex: 1 1 auto;
-    height: 28px;
-    padding: 0 12px;
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-.tx-pop-preset:hover { background: var(--frost-3); color: var(--text-primary); }
-/* Selected wears the same accent ramp as an active filter chip. */
-.tx-pop-preset.is-selected {
-    border-color: var(--chip-active-stroke);
-    background: var(--chip-active-bg);
-    color: var(--chip-active-text);
-}
-.tx-pop-preset.is-selected:hover { background: var(--chip-active-bg-hover); }
-.tx-pop-preset:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: -2px;
-}
-
-/* Min/Max amount inputs side by side. */
-.tx-pop-row { display: flex; gap: 8px; }
-.tx-pop-row .tx-pop-field { flex: 1 1 0; min-width: 0; }
-
-.tx-filter-popover .tx-input {
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* Multi-select option lists (Type / Account / Category). */
-.tx-pop-options {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    max-height: 280px;
-    overflow-y: auto;
-    /* Thin frosted scrollbar, stated explicitly (not left to inheritance from
-       .page) so every dropdown list scrolls with the same bar — see
-       .p-dropdown-scroll in ui.css. Transparent track: the inherited surface1
-       track only looked trackless because the list's fill is surface1; make that
-       intent literal so it survives theme changes. */
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-    /* Let the option hover fill reach the popover's padding edge. */
-    margin: -2px;
-    padding: 2px;
-}
-
-/* Category-group headers inside the option list — the .tx-pop-label eyebrow
-   voice, spaced off the group above. */
-.tx-pop-group-label {
-    flex: 0 0 auto;   /* same no-squash rule as the options below */
-    padding: 8px 8px 3px;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
-}
-
-.tx-pop-option {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    width: 100%;
-    height: 30px;
-    /* Hold that height: as flex children in a capped-height column, rows shrink
-       before the list agrees to scroll, so a long Account/Category list squashed
-       its rows (and its hover fill) to ~21px while the short Type list kept the
-       full 30. Every list scrolls at the same row height now. */
-    flex: 0 0 auto;
-    padding: 0 8px;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-body);
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-
-/* Selection is carried by the checkbox alone — the label keeps its resting
-   colour, so a ticked row and an unticked one read as the same list. */
-.tx-pop-option:hover { background: var(--frost-3); color: var(--text-primary); }
-
-.tx-pop-option:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: -2px;
-}
-
-.tx-pop-option-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Leading tick box — these lists take several values at once, so each option
-   carries the checkbox affordance rather than the trailing single-select check.
-   Drawn rather than a native <input>: the option is a <button>, and nesting a
-   real control inside one is neither valid nor keyboard-sane. */
-.tx-pop-box {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-    border: var(--border-width) solid var(--border);
-    border-radius: 4px;
-    color: var(--button-text);
-    transition: background 0.12s ease, border-color 0.12s ease;
-}
-
-.tx-pop-option.is-selected .tx-pop-box {
-    border-color: var(--accent-primary);
-    background: var(--accent-primary);
-}
-
-.tx-pop-check { width: 11px; height: 11px; opacity: 0; }
-.tx-pop-option.is-selected .tx-pop-check { opacity: 1; }
-
-.tx-table {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-/* table-layout: fixed's "hand the one auto column whatever's left" step doesn't
-   reliably respect that column's own min-width when the other columns' explicit
-   widths already claim the row's available space (see §2) — notes (the flex
-   column now) could render under its 120px floor. Forcing every row to always
-   be at least wide enough for every other column's current width plus that
-   floor guarantees the row has that floor to hand over; <tbody>'s horizontal
-   scroll (§1) absorbs the rest on a narrow window. Never below the original
-   1250px design floor either, so a lightly populated ledger still reads
-   spacious. Description can't be a term in that sum — it's 30% of this very
-   width (§2), which would be circular. It's solved for instead: if description
-   takes 30% of the row, the px columns below have to fit in the other 70%, so
-   the floor is their total / 0.7.
-
-   This lives on the ROWS rather than on .tx-table because the table and its two
-   bands stay viewport-width — that's what keeps the body's vertical scrollbar
-   at the visible right edge instead of 1250px out (§1). */
-.tx-table > thead > tr,
-.tx-table > tbody > tr {
-    min-width: max(1250px, calc((
-        60px + 44px + var(--tx-w-date, 140px) + var(--tx-w-account, 150px) +
-        var(--tx-w-category, 140px) + var(--tx-w-amount, 140px) + 120px
-    ) / 0.7));
-}
-
-/* ─── 2. Header row + column widths ──────────────────────────────────────── */
-/* The eyebrow treatment (type, padding) is shared with .db-table th in
-   tables.css (grouped there); this header adds left alignment, a bottom-border
-   divider, and its own colour on top of it.
-   The header is a fixed band above the scrolling body (see .tx-table), so the
-   eyebrow cells only need left alignment; the divider is on <thead>. */
-.tx-header-row th {
-    text-align: left;
-    /* One step quieter than --text-tertiary, the last of the three semantic
-       text tiers, so this reaches past them into the palette. base-500 is the
-       right rung on BOTH themes: the tiers run 900/700/600 on light and
-       100/300/400 on dark, so the next step down converges on 500 either way
-       and one value covers both.
-
-       The column names are read once and then stop being read, while the
-       ledger rows are what the page is for — so the labels sit back and the
-       data reads loudest. Being below the tertiary placeholder colour is not a
-       clash: these cells are bold, uppercase and tracked out, so the eyebrow
-       treatment tells them apart from body text at any weight of grey.
-
-       CONTRAST: 3.4:1 on the light themes and 4.6:1 on dark, against 4.5:1 for
-       13px bold (too small to qualify for the large-text 3:1 allowance). The
-       light figure is BELOW AA and was accepted deliberately for the quieter
-       header; --text-tertiary is the rung to return to if that is revisited.
-
-       This overrides the shared rule in tables.css by source order (equal
-       specificity, transactions.css loads second); .db-table th on Statements
-       and Portfolio keeps the louder tier, since those grids are read BY their
-       month/account headers rather than down a single list. */
-    color: var(--color-base-500);
-    /* Cells default to content-box, which would add padding/border on top of
-       the width below instead of being included in it — border-box makes
-       offsetWidth (what txSyncColumnWidths measures) map 1:1 onto `width`. */
-    box-sizing: border-box;
-}
-
-.tx-header-row th.tx-col-amount {
-    text-align: right;
-}
-
-/* Column widths — date/account/category/amount are sized to their rendered
-   content: txSyncColumnWidths() (transactions.js) measures the header and every
-   mounted row after each render and writes the max back as --tx-w-*,
-   shared by the header/body bands via this custom property (the px
-   fallbacks below are only what shows before that first measurement runs).
-   Account can hold much longer text (account names up to 50 chars) than is
-   ever worth showing in a ledger row, so it caps with max-width + ellipsis
-   (below); category's 18-char input limit already bounds it, so it needs no
-   cap. Description is a percentage (30%), not a fixed px width: it's by far
-   the widest column, so a fixed width was what pushed the row past the
-   viewport and forced horizontal scrolling on a resize. As a share of the
-   table it gives the space back as the window narrows, and nothing is lost
-   by truncating — clicking the cell reveals the raw text below (see
-   .tx-desc-toggle). Notes is the one column left without an explicit width,
-   so table-layout: fixed hands it whatever the others don't claim — it's
-   the flex column now, with a 120px floor. */
-/* nowrap belongs on the column itself, not only on the measuring pass: the
-   measured width is what makes the date fit, and a fraction of a pixel of drift
-   (a stale measurement, a font swapping in after render) is enough to break
-   "Aug 20, 2026" across two lines and change the row's height. A date is one
-   short string with no acceptable break point. */
-.tx-col-date        { width: var(--tx-w-date, 140px); white-space: nowrap; }
-/* Merchant avatar — fixed, not content-fit: it's a decorative circle, not
-   text, so there's nothing for it to conform to. Its width is subtracted
-   from the calc() above so notes gives up exactly this much room. */
-.tx-col-avatar       { width: 44px; text-align: center; }
-.tx-col-description { width: 30%; }
-.tx-col-account     { width: var(--tx-w-account, 150px); max-width: 220px; }
-.tx-col-category    { width: var(--tx-w-category, 140px); }
-.tx-col-amount       {
-    width: var(--tx-w-amount, 140px);
-    min-width: 140px;
-    text-align: right;
-}
-.tx-col-notes       { width: auto; min-width: 120px; }
-/* Leading selection cell — a centered checkbox (or, on the inline add row, the
-   Save/Cancel buttons). Fixed narrow width keeps the column tight. 60px (not
-   44px) because this column is unaffected by the border-box switch above in
-   spirit — it's structural, not content-fit — so the value preserves the
-   same rendered size the old content-box 44px + this column's own 8px+8px
-   padding (§5 below) produced. */
-.tx-col-select      { width: 60px; text-align: center; }
-
-/* ── Content-fit measurement mode ────────────────────────────────────────
-   txSyncColumnWidths() toggles this class on .tx-table for one synchronous
-   pass: switching each row back to real table-layout: auto (every row is its
-   own one-row table — see §1) and forcing a single nowrap line lets the
-   browser report each cell's true natural width via offsetWidth, which JS
-   then takes the max of (header + every mounted row, per column) and writes
-   back as --tx-w-*. max-width: none during the pass so a long value isn't
-   pre-clamped before JS gets to apply its own cap. width: max-content on the
-   row itself matters just as much as table-layout: auto on its own: without
-   it the row stays 100% of its band, and automatic table layout responds by
-   proportionally handing every auto column a share of THAT leftover space —
-   inflating date/category/etc. past their real content width — instead of
-   each column shrinking to only what it needs. min-width: 0 for the same
-   reason: the row's 1250px design floor (§2) would otherwise stop it shrinking
-   to max-content and automatic layout would hand the slack to the very columns
-   being measured. */
-.tx-table.tx-measuring > thead > tr,
-.tx-table.tx-measuring > tbody > tr {
-    table-layout: auto;
-    width: max-content;
     min-width: 0;
 }
-.tx-table.tx-measuring .tx-col-date,
-.tx-table.tx-measuring .tx-col-account,
-.tx-table.tx-measuring .tx-col-category,
-.tx-table.tx-measuring .tx-col-amount,
-.tx-table.tx-measuring .tx-col-notes {
-    width: auto;
-    max-width: none;
-    white-space: nowrap;
-}
-/* Description has to drop its percentage width for the pass too, even though
-   it isn't a measured column. A percentage cell in an automatic-layout table
-   is a constraint on the TABLE's width, not just its own: the browser has to
-   grow the table until description is 30% of it, then hands the surplus to
-   the auto columns — so a row whose raw description is revealed
-   (.tx-desc-original, a much longer string) would inflate every measured
-   column's offsetWidth and shift the ledger. width: auto keeps the row's
-   max-content width equal to the sum of its columns' real content, which is
-   the only thing this pass is trying to read. */
-.tx-table.tx-measuring .tx-col-description {
-    width: auto;
-}
-
-
-/* ─── 3. Display-mode row ──────────────────────────────────────────────────
-   Every row — whether in display mode or edit mode — locks to the same
-   --tx-row-height. Without this, edit-mode rows (where the inputs are
-   taller than their plain-text counterparts) shift the table layout each
-   time the user opens or closes a row. height + vertical-align: middle
-   on the td gives both modes a consistent vertical rhythm; per-mode
-   horizontal padding is set below. */
-.tx-table { --tx-row-height: 52px; }
-
-.tx-row {
-    border-bottom: var(--table-border-width) solid var(--border);
-    transition: background-color 0.15s ease;
-}
-
-.tx-row:last-child { border-bottom: none; }
-.tx-row:hover      { background-color: var(--frost-2); }
-
-.tx-row td {
-    height: var(--tx-row-height);
-    /* Matches the row hover transition above: the selected-row fill is painted on
-       the CELLS (it has to sit over the row's frost), so without this the
-       select/deselect change would be the only background change on this table
-       without a transition. */
-    transition: background-color 0.15s ease;
-    padding-top: 0;
-    padding-bottom: 0;
-    padding-left: 16px;
-    padding-right: 16px;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-body);
-    font-weight: var(--weight-regular);
-    vertical-align: middle;
-    /* Cells default to content-box, which would add padding/border on top of
-       the width below instead of being included in it — border-box makes
-       offsetWidth (what txSyncColumnWidths measures) map 1:1 onto `width`. */
-    box-sizing: border-box;
-}
-
-.tx-row td.tx-col-amount {
-    font-family: var(--font-numeric);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-}
-
-/* Notes is capped + content-fit (unlike description, which flexes), so a long
-   note truncates instead of stretching the column — the full text is still
-   reachable via the cell's title attribute (see txRenderDisplayRow). */
-.tx-row td.tx-col-notes {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Clean description (imported rows): the cell shows the import-derived clean
-   merchant name; the raw bank string expands underneath on click. The toggle
-   is a real <button> for keyboard access but renders as plain cell text, with
-   a small chevron that appears on row hover / focus so an untouched table
-   stays visually quiet. */
-.tx-desc-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-width: 100%;
-    /* Lets .tx-desc-name (below) actually shrink below its content's natural
-       width — flex items default to a content-based min-width, which is
-       exactly what defeats an ellipsis in a flex child otherwise. */
+.tx-desc .avatar-circle { flex: none; }
+.tx-desc-text {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
-    padding: 0;
-    border: none;
-    background: none;
-    cursor: pointer;
-    color: inherit;
-    font: inherit;
-    text-align: left;
 }
-
-/* Description takes 30% of the table (§2), so most text fits comfortably —
-   but an unusually long merchant name still needs to truncate
-   rather than wrap or overflow. Full text is a hover (title attribute) or,
-   for a recognized merchant, a click (.tx-desc-toggle reveals the raw
-   original below) away. Not on the <td> itself: .tx-desc-original below is a
-   deliberate second line when revealed, not something to clip. */
 .tx-desc-name,
-.tx-desc-plain {
-    display: block;
+.tx-desc-raw {
     overflow: hidden;
+    white-space: nowrap;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
 }
+.tx-desc-raw { font-size: var(--ant-font-size-sm); line-height: var(--ant-line-height-sm); }
+.tx-desc-small { gap: 8px; }
+.tx-desc-small .avatar-circle { width: 22px; height: 22px; font-size: 9px; }
 
-.tx-desc-chevron {
-    width: 14px;
-    height: 14px;
-    flex: none;
-    color: var(--text-secondary);
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-
-.tx-row:hover .tx-desc-chevron,
-.tx-desc-toggle:focus-visible .tx-desc-chevron        { opacity: 1; }
-.tx-desc-toggle[aria-expanded="true"] .tx-desc-chevron { opacity: 1; transform: rotate(180deg); }
-
-/* The revealed raw bank string — quiet second line under the clean name. */
-.tx-desc-original {
-    margin: 2px 0 0;
-    font-size: var(--size-small);
-    color: var(--text-secondary);
-    overflow-wrap: anywhere;
-}
-
-/* Pill-style category badge inside the display-mode row. Neutral surface
-   so it reads as a tag without competing with the description. */
-.tx-category-pill {
-    display: inline-block;
-    /* Names are capped at 18 chars and must never break across lines. */
-    white-space: nowrap;
-    /* Fully rounded — the extra horizontal padding keeps the text off the
-       curve, so the name sits the same optical distance from the edge as it
-       did inside the old rounded rectangle. */
-    padding: 4px 12px;
-    border-radius: 999px;
-    background: var(--surface2);
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    font-weight: var(--weight-medium);
-    letter-spacing: var(--track-normal);
-}
-
-/* Uncategorized stands out like a Type pill, on the warning amber accent, so it
-   reads as "needs review". Applied to
-   every uncategorized row regardless of its backend tx_type — a blank category
-   always reads amber, never a direction tint. */
-.tx-category-pill.tx-category-empty {
-    padding: 3px 11px;
-    font-weight: var(--weight-semibold);
-    background: var(--warning-fill);
-    color: var(--warning);
-}
-
-/* Direction tint for a categorized pill — the old Type column merged into this
-   colour. Income green, expense red, transfer blue: the same
-   --accent-positive / --accent-negative / --accent-info trio the amount uses, so
-   pill colour and amount colour agree on every row. Only the surface + text
-   colour change; padding/weight stay the base pill's so the shape is unchanged. */
-.tx-category-pill.tx-category-income {
-    background: color-mix(in srgb, var(--accent-positive) 15%, transparent);
-    color: var(--accent-positive);
-}
-.tx-category-pill.tx-category-expense {
-    background: color-mix(in srgb, var(--accent-negative) 15%, transparent);
-    color: var(--accent-negative);
-}
-.tx-category-pill.tx-category-transfer {
-    background: color-mix(in srgb, var(--accent-info) 15%, transparent);
-    color: var(--accent-info);
-}
-
-/* Account column — the source account a row was imported from. Rendered as a
-   neutral grey pill (the Category pill now carries a direction tint, so the grey
-   sets Account apart as the plain, non-financial tag).
-   Capped to one nowrap line, ellipsized if the account name is long.
-   Unassigned rows (manual entries, pre-account imports) drop the pill and show a
-   muted dash so an empty cell never looks like a filled tag. */
-.tx-account-tag {
-    display: inline-block;
+.tx-acct-tag,
+.tx-cat-tag {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: bottom;
-    /* Fully rounded to match the Category pill beside it — the extra horizontal
-       padding keeps the text off the curve. */
-    padding: 4px 12px;
-    border-radius: 999px;
-    background: var(--surface2);
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    font-weight: var(--weight-medium);
-    letter-spacing: var(--track-normal);
-}
-
-/* Dark theme steps the tag one ramp rung up. --surface2 is the app's control
-   fill, but on dark it resolves to the same --color-base-900 as --surface1 —
-   which is the table's own background (.tx-wrapper) — so the pill was exactly
-   its backdrop and read as bare text, in dark only. --surface3 (base-800) is
-   the next rung and restores the tag shape. :not() keeps this off the empty
-   dash below, which must stay unfilled. */
-html[data-theme="dark"] .tx-account-tag:not(.tx-account-empty) {
-    background: var(--surface3);
-}
-
-.tx-account-tag.tx-account-empty {
-    padding: 0;
-    background: none;
-    color: var(--text-tertiary);
-}
-
-/* Amount colour follows type, matching each row's Category pill: money in (income)
-   reads green, money out (expense) reads red — the same --accent-positive /
-   --accent-negative pair as the Report Card verdicts. Transfers are money moved,
-   not earned or spent, so they read in the same info-blue as the transfer pill —
-   a distinct signal rather than either gain/loss colour. */
-.tx-row td.tx-amount-income   { color: var(--accent-positive); }
-.tx-row td.tx-amount-expense  { color: var(--accent-negative); }
-.tx-row td.tx-amount-transfer { color: var(--accent-info); }
-
-
-/* ─── 4. Edit-mode + new-row (floating bordered inputs) ──────────────────── */
-/* A row in edit mode (or the just-added "new" row) replaces each text cell
-   with an <input> / <select>. The visual goal is that the input "floats" in
-   the middle of the cell — bordered, rounded, with margin around it. */
-
-/* Edit-mode rows keep the same height — only the horizontal padding shrinks
-   so the bordered inputs have a touch more room. */
-.tx-row.tx-new td {
-    padding-left: 10px;
-    padding-right: 10px;
-}
-
-.tx-input,
-.tx-select {
-    width: 100%;
-    box-sizing: border-box;
-    height: var(--control-height);
-    background: var(--background);
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-body);
-    font-weight: var(--weight-regular);
-    padding: 4px 10px;
-    outline: none;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.tx-input:focus,
-.tx-select:focus {
-    border-color: var(--accent-primary);
-    background: var(--background);
-}
-
-.tx-input::placeholder {
-    color: var(--text-tertiary);
-}
-
-/* Direction comes from the category, so the en-masse control row's Type select
-   locks once a category is picked. Muted rather than faded out: the value it
-   shows is still correct, it is just not editable there.
-   Text stays at --text-secondary because --text-tertiary is the placeholder
-   colour — at tertiary, a locked "Expense" read as an empty field beside the
-   "Keep" next to it. The caret is a sibling element now, not a background
-   layer, so this no longer has to avoid the `background` shorthand to keep the
-   locked field's arrow; .tx-select-wrap mutes it to match this text. */
-.tx-input:disabled,
-.tx-select:disabled {
-    background-color: var(--surface1);
-    color: var(--text-secondary);
-    cursor: default;
-}
-
-/* Number/date/amount inputs use the numeric family + tabular numerals. */
-.tx-input-date,
-.tx-input-amount {
-    font-family: var(--font-numeric);
-    font-variant-numeric: tabular-nums;
-}
-
-.tx-input-amount {
-    text-align: right;
-}
-
-/* Native <select> caret. appearance:none drops the platform arrow; the glyph
-   that replaces it is the same Phosphor caret-down (.picker-caret, ui.css) the
-   report pickers and the group chevrons use, so every caret in the app is one
-   drawing.
-   A <select> cannot hold a child element, so the caret is a sibling inside
-   .tx-select-wrap rather than a background-image on the control. That costs one
-   span + one svg per select; it buys the real glyph instead of a CSS triangle
-   approximating it. */
-.tx-select {
-    appearance: none;
-    -webkit-appearance: none;
-    padding-right: 28px;
-}
-
-/* Positioning context for .picker-caret, which is absolute. display:block and
-   the full width keep the cell layout exactly as it was when the <select> was
-   the td's only child. */
-.tx-select-wrap {
-    position: relative;
-    display: block;
-    width: 100%;
-    color: var(--text-primary);
-}
-
-/* The caret is painted over the control, so it would otherwise eat the click
-   that opens the menu. .picker-caret already sets pointer-events:none; this
-   states the stacking explicitly rather than relying on source order. */
-.tx-select-wrap .picker-caret { z-index: 1; }
-
-/* Track the disabled control's muted text, the way currentColor did when the
-   caret was the select's own background layer. */
-.tx-select-wrap:has(.tx-select:disabled) { color: var(--text-secondary); }
-
-
-/* ─── 5. Selection column + inline add-row actions ───────────────────────── */
-/* The leading select cell is narrow, so trim its horizontal padding (a
-   checkbox doesn't need the 16px gutter the text cells use). */
-.tx-row td.tx-col-select,
-.tx-header-row th.tx-col-select {
-    padding-left: 8px;
-    padding-right: 8px;
-    /* Override the header row's left alignment so the select-all checkbox lines
-       up with the centered checkboxes in the rows below it. */
-    text-align: center;
-}
-
-
-/* ─── 5b. Merchant avatar ─────────────────────────────────────────────────── */
-/* Same narrow treatment as Select — a 28px circle doesn't need the 16px text
-   gutter either. The header cell stays visually empty (no column label),
-   matching how the Select header carries only its checkbox, no "Select" text.
-   The avatar itself (.avatar-circle / .avatar-circle-0..7) is a shared
-   component in ui.css — see avatar.js — so the Recurring page's merchant
-   rows render identically without duplicating the palette here. */
-.tx-row td.tx-col-avatar,
-.tx-header-row th.tx-col-avatar {
-    padding-left: 8px;
-    padding-right: 8px;
-}
-
-.tx-col-avatar .skeleton-circle { width: 28px; height: 28px; }
-
-/* Themed checkbox — tracks the accent colour, sized for comfortable hit area. */
-.tx-checkbox {
-    width: 16px;
-    height: 16px;
-    margin: 0;
-    accent-color: var(--accent-primary);
-    cursor: pointer;
     vertical-align: middle;
 }
 
-/* Selected rows get an accent wash, tuned per theme (style.css/themes.css) and
-   mixed over --surface1 (.tx-wrapper, the card these rows actually sit on).
-   The fill covers the row's :hover frost, so selected rows carry their own
-   hover step — without it a selected row is the one row that stops responding
-   to the pointer. */
-.tx-row.tx-selected td {
-    background: var(--row-selected-bg);
-}
-
-.tx-row.tx-selected:hover td {
-    background: var(--row-selected-bg-hover);
-}
-
-.tx-action-group {
+/* The category tag is the button that changes it. */
+.tx-cat-btn {
     display: inline-flex;
-    gap: 6px;
-    justify-content: center;
-}
-
-/* The add row's Save/Cancel live in the narrow select cell, so stack them
-   vertically as compact buttons to fit the 44px column. */
-.tx-new-actions .tx-action-group {
-    flex-direction: column;
-    gap: 4px;
-}
-
-.tx-new-actions .tx-action-btn {
-    width: 26px;
-    height: 22px;
-}
-
-/* The row's Save / Cancel wear the square icon button (.button-icon,
-   buttons.css); only the glyph size and the Save accent are set here. */
-.tx-action-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
-/* The add row's Save button carries the primary accent; Cancel keeps the gray
-   base treatment. */
-/* --button-text, not --text-primary: this is an accent FILL, and the token for
-   ink on an accent fill is the one that flips with it. --text-primary is the
-   page's ink, which on light resolves to a near-black on mid-green. */
-.tx-action-btn.tx-action-save {
-    background-color: var(--accent-primary);
-    color: var(--button-text);
-}
-
-/* Hover has to LEAVE the resting fill — restating --accent-primary here meant
-   this button had no hover state at all, in either theme. */
-.tx-action-btn.tx-action-save:not(:disabled):hover {
-    background-color: var(--accent-primary-hover);
-    color: var(--button-text);
-}
-
-
-/* ─── 6. Empty-state ─────────────────────────────────────────────────────── */
-/* Holds a centered .empty-state (built by UI.emptyState); the block sets its own
-   padding, so the cell clears the default row padding. */
-.tx-empty-row td {
-    text-align: center;
+    max-width: 100%;
     padding: 0;
-}
-
-
-/* ─── 7. Import modals ───────────────────────────────────────────────────── */
-/* Two-step import flow: (a) column mapping, (b) row preview + commit.
-   Overlays/dialog shell mirrors the .confirm-overlay / .confirm-dialog
-   pattern from tables.css but wider to accommodate preview tables. */
-
-/* Positioning + centering come from the shared overlay rule in style.css §8;
-   only the scrim, stacking order and viewport padding are import-specific. */
-.tx-import-overlay {
-    background: var(--scrim);
-    z-index: 1100;
-    padding: 24px;
-    box-sizing: border-box;
-}
-
-.tx-import-dialog {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    width: 90vw;
-    max-width: 740px;
-    max-height: 88vh;
-    overflow: hidden;
-}
-
-/* Busy variant — the parse/preview-prep wait states. The overlay stays invisible
-   for ~90ms then fades in, so work finishing inside that window never flashes a
-   modal, while anything slower is already under a bar before the delay is
-   noticeable. Opacity animates on the compositor, so the reveal still runs while
-   synchronous parse work blocks the renderer. Timings mirror BUSY_REVEAL_MS in
-   txfileimport.js; the class is omitted entirely when that file requests an
-   instant reveal. */
-.tx-import-overlay--busy {
-    animation: tx-busy-reveal 0.2s ease both;
-}
-
-@keyframes tx-busy-reveal {
-    0%, 45% { opacity: 0; }
-    100%    { opacity: 1; }
-}
-
-/* Just a label and a bar inside — the full 740px preview width would dwarf it. */
-.tx-import-dialog--busy {
-    max-width: 420px;
-}
-
-/* Full row-preview step — the shell hugs the content-fit row table (each column
-   shrinks to its widest value with one uniform gap between them), growing only as
-   wide as it needs to and scrolling if the columns exceed the viewport. */
-.tx-import-dialog--preview {
-    width: fit-content;
-    min-width: 520px;
-    max-width: 92vw;
-}
-
-/* Step 4 — "Success!" in the standard title slot but set large, one line of
-   confirmation below it, and two buttons — so the 740px default shell would
-   dwarf it the same way the busy modal's would. Neither the header's usual
-   rule nor the footer's applies here: the screen reads as one unbroken block
-   instead of the header/body/footer chrome every other import modal needs
-   for a title bar and a scrolling table. */
-.tx-import-dialog--success { max-width: 480px; }
-.tx-import-dialog--success .tx-import-dialog-header {
-    border-bottom: none;
-}
-.tx-import-dialog--success .tx-import-dialog-title {
-    font-family: var(--font-h2);
-    font-size: var(--size-h1);
-    font-weight: var(--weight-semibold);
-}
-.tx-import-dialog--success .tx-import-footer {
-    border-top: none;
-}
-.tx-import-success-sub {
-    margin: 0;
-    color: var(--text-secondary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    line-height: var(--lh-relaxed);
-}
-
-.tx-import-dialog-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 22px 16px;
-    border-bottom: var(--border-width) solid var(--border);
-    flex-shrink: 0;
-}
-
-.tx-import-dialog-title {
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-body);
-    font-weight: var(--weight-semibold);
-}
-
-.tx-import-close {
+    border: 0;
+    border-radius: var(--ant-radius-sm);
     background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: var(--size-h2);
-    line-height: 1;
+    color: inherit;
+    font: inherit;
     cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: color 0.15s ease, background 0.15s ease;
 }
-.tx-import-close:hover { color: var(--text-primary); background: var(--frost-3); }
-
-/* Scrollable content area */
-.tx-import-dialog-body {
-    padding: 20px 22px 6px;
-    overflow-y: auto;
-    flex: 1;
+.tx-cat-btn:hover .tx-cat-tag { filter: brightness(0.96); }
+html[data-theme="dark"] .tx-cat-btn:hover .tx-cat-tag { filter: brightness(1.15); }
+.tx-cat-btn:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
 }
+.tx-col-category .ant-select { width: 100%; }
 
-.tx-import-hint {
-    color: var(--text-secondary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    margin: 0 0 16px;
-    line-height: var(--lh-relaxed);
-}
-
-.tx-import-section-label {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-    margin-top: 18px;
-}
-.tx-import-section-label:first-child { margin-top: 0; }
-
-/* Horizontal scroll wrapper for preview / full-row tables */
-.tx-import-preview-wrap {
-    overflow-x: auto;
-    margin-bottom: 4px;
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-}
-
-/* Preview tables — shared by the column-mapping preview (this section) and the
-   similar-categorize modal (.tx-similar-table, section 8). The base shell,
-   header cells and row dividers/hover are identical; only the th/td cell
-   padding differs, so that stays per-table. */
-.tx-import-preview-table,
-.tx-similar-table {
-    border-collapse: collapse;
-    width: 100%;
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-
-.tx-import-preview-table { min-width: 360px; }
-
-.tx-import-preview-table th,
-.tx-import-preview-table td {
-    padding: 7px 12px;
-    text-align: left;
-    border-bottom: var(--border-width) solid var(--border);
-    white-space: nowrap;
-    color: var(--text-primary);
-}
-
-.tx-import-preview-table thead th,
-.tx-similar-table thead th {
-    color: var(--text-tertiary);
-    font-weight: var(--weight-semibold);
-    font-size: var(--size-micro);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
-    background: var(--frost-2);
-}
-
-.tx-import-preview-table tbody tr:last-child td,
-.tx-similar-table tbody tr:last-child td { border-bottom: none; }
-.tx-import-preview-table tbody tr:hover td,
-.tx-similar-table tbody tr:hover td { background: var(--frost-2); }
-
-/* Map Columns' live preview before enough fields are chosen to parse anything. */
-.tx-import-preview-empty {
-    color: var(--text-tertiary);
-    text-align: center;
-    white-space: normal;
-}
-.tx-import-preview-table tbody tr:has(.tx-import-preview-empty):hover td { background: none; }
-
-/* Full preview table (step 2) — a fixed column layout so every gutter stays even
-   regardless of row content: a long description truncates rather than stretching
-   its column and crowding the amount beside it. The widths sum under the ~850px
-   preview width, leaving the flexible description column the remainder. */
-.tx-import-preview-full { table-layout: auto; width: 100%; min-width: 0; }
-.tx-import-preview-full th,
-.tx-import-preview-full td {
-    padding: 8px 14px;
-    vertical-align: middle;
-}
-.tx-import-preview-full td:first-child,
-.tx-import-preview-full th:first-child { text-align: center; }
-.tx-import-col-amount { font-family: var(--font-numeric); font-variant-numeric: tabular-nums; }
-
-/* Description + Notes are the only unbounded columns, so they carry a cap that
-   truncates with an ellipsis — otherwise a long value would stretch the column
-   and throw off the otherwise-uniform gaps. The cap lives on an inner block
-   (reliable in auto table-layout), so the column still shrinks to fit shorter
-   values. Flex lives on the inner wrapper, NOT the <td> (a display:flex cell
-   drops out of the table's column layout). The "duplicate" badge is a flex
-   sibling that never clips and keeps a steady gap from the text. */
-.tx-import-desc-inner { display: flex; align-items: center; gap: 8px; max-width: 320px; }
-.tx-import-desc-text {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.tx-import-desc-inner .tx-import-dup-badge { flex: 0 0 auto; margin-left: 0; }
-.tx-import-note-text {
-    display: inline-block;
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: middle;
-}
-
-/* Duplicate rows — dimmed + unchecked by default */
-.tx-import-row-dup td { color: var(--text-tertiary); }
-
-.tx-import-dup-badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 7px;
-    border-radius: 20px;
-    background: var(--warning-fill);
-    color: var(--warning);
-    font-size: 10px;
-    font-family: var(--font-menu);
-    font-weight: var(--weight-semibold);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    vertical-align: middle;
-}
-
-/* Column-mapping form: label → select on one line */
-.tx-import-map-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
-.tx-import-map-row  { display: flex; align-items: center; gap: 12px; }
-.tx-import-map-label {
-    flex: 0 0 120px;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-.tx-import-map-select { flex: 1; }
-
-/* Parse-error banner (rows skipped during mapping) */
-.tx-import-errors-banner {
-    background: var(--warning-fill);
-    border: var(--border-width) solid var(--warning-stroke);
-    border-radius: 6px;
-    color: var(--warning);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    padding: 10px 14px;
-    margin-bottom: 14px;
-    line-height: var(--lh-relaxed);
-}
-
-/* Footer — a count/secondary action and a primary action, pinned below the
-   scrollable body; space-between puts exactly two children at opposite edges. */
-.tx-import-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 22px 18px;
-    border-top: var(--border-width) solid var(--border);
-    flex-shrink: 0;
-}
-
-/* The preview modal's footer is appended to the dialog, not the body */
-.tx-import-footer--preview {
-    margin-top: 0;
-}
-
-/* The mapping modal's footer holds a single (primary) action — space-between
-   would otherwise leave it flush against the left edge, breaking from every
-   other modal's right-aligned primary action. */
-.tx-import-footer--mapping {
-    justify-content: flex-end;
-}
-
-.tx-import-row-count {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-
-/* Disabled state for the Import button */
-.tx-import-footer .button-primary:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-}
-
-/* The static bar pinned above the footer, outside the scrolling body: on "Here
-   Is Your Import" it holds the uncategorized callout (.tx-found-note), which
-   stays put while the row table above it scrolls. Absent entirely when there's
-   nothing uncategorized to say. */
-.tx-import-balance-bar {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 12px 22px;
-    border-top: var(--border-width) solid var(--border);
-    flex-shrink: 0;
-}
-/* .tx-found-note's margin-top assumes it follows other content in a scrolling
-   body; here it is the bar's only child, so that gap is unnecessary. */
-.tx-import-balance-bar .tx-found-note { margin-top: 0; }
-
-
-/* ─── 8. Similar-categorize modal ───────────────────────────────────────── */
-/* Shown after saving a categorized transaction when uncategorized rows with
-   the same description exist. Shell mirrors the import modal (section 7). */
-
-/* Positioning + centering come from the shared overlay rule in style.css §8. */
-.tx-similar-overlay {
-    background: var(--scrim);
-    z-index: 1100;
-    padding: 24px;
-    box-sizing: border-box;
-}
-
-.tx-similar-dialog {
-    display: flex;
-    flex-direction: column;
-    width: 90vw;
-    max-width: 600px;
-    max-height: 80vh;
-    overflow: hidden;
-}
-
-.tx-similar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 22px 16px;
-    border-bottom: var(--border-width) solid var(--border);
-    flex-shrink: 0;
-}
-
-.tx-similar-title {
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-body);
-    font-weight: var(--weight-semibold);
-}
-
-.tx-similar-hint {
-    padding: 14px 22px 6px;
-    color: var(--text-secondary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    line-height: var(--lh-relaxed);
-    flex-shrink: 0;
-}
-
-.tx-similar-hint strong,
-.tx-similar-hint em {
-    color: var(--text-primary);
-    font-style: normal;
-}
-
-.tx-similar-body {
-    padding: 10px 22px;
-    overflow-y: auto;
-    flex: 1;
-}
-
-.tx-similar-table-wrap {
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-/* Each matched category is a labelled section, stacked in the dialog body. The
-   header also acts as a per-category select-all. */
-.tx-similar-group + .tx-similar-group { margin-top: 16px; }
-
-.tx-similar-group-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-    cursor: pointer;
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-}
-
-.tx-similar-group-count {
-    margin-left: auto;
-    padding: 1px 8px;
-    border-radius: 20px;
-    background: var(--frost-2);
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Base shell + header cells + row dividers come from the grouped preview-table
-   rules in section 7; this modal's cells use slightly roomier padding. */
-.tx-similar-table th,
-.tx-similar-table td {
-    padding: 8px 12px;
-    text-align: left;
-    border-bottom: var(--border-width) solid var(--border);
-    color: var(--text-primary);
-}
-
-.tx-similar-col-check  { width: 36px; text-align: center; padding-left: 8px; padding-right: 8px; }
-.tx-similar-col-date   { width: 120px; white-space: nowrap; }
-.tx-similar-col-amount {
-    text-align: right;
-    font-family: var(--font-numeric);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.tx-similar-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 14px 22px 18px;
-    border-top: var(--border-width) solid var(--border);
-    flex-shrink: 0;
-}
-
-.tx-similar-apply:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-
-/* ─── 9. Export modal ────────────────────────────────────────────────────── */
-/* Shares the import modal shell (section 7); below are only the pieces the
-   export flow adds — the format picker, the destination row, and the
-   progress bar. The search bar's Export button reuses the Import styling via
-   the shared selectors in section 1, and the Browse… button reuses
-   .button-secondary from buttons.css (loaded on every page). */
-
-.tx-export-dialog {
-    max-width: 560px;
-}
-
-/* Format picker — 2×2 grid of radio cards. */
-.tx-export-formats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 4px;
-}
-
-.tx-export-format {
+/* The note, then Typography's pencil. With no note the pencil waits for the
+   row to be pointed at or focused, so an empty column is not a column of
+   pencils. */
+.tx-notes {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
-    border: var(--border-width) solid var(--border);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease;
+    min-width: 0;
 }
-
-.tx-export-format:hover {
-    background: var(--frost-2);
+.tx-notes-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    cursor: text;
 }
+.tx-notes .ant-typography-edit { flex: none; margin-top: 0; }
+.tx-notes-empty .ant-typography-edit { opacity: 0; }
+.tx-row:hover .tx-notes-empty .ant-typography-edit,
+.tx-notes-empty .ant-typography-edit:focus-visible { opacity: 1; }
 
-.tx-export-format:has(input:checked) {
-    border-color: var(--accent-primary);
-    background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
-}
+/* Nothing to point at in the empty state or the loading rows. */
+.ant-table tbody tr.tx-empty-row:hover > td,
+.ant-table tbody tr.tx-skeleton-row:hover > td { background: transparent; }
+.tx-skeleton-row .tx-desc .skeleton-line { flex: 1; }
 
-.tx-export-format input {
-    margin: 3px 0 0;
-    accent-color: var(--accent-primary);
-    flex-shrink: 0;
-}
 
-.tx-export-format-text {
+/* ─── 4. Amount filter popover ──────────────────────────────────────────────
+   Three quick ranges, a min and a max, then Clear and Apply. */
+.tx-amount-pop {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 10px;
+    width: 240px;
 }
-
-.tx-export-format-name {
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-body);
-    font-weight: var(--weight-semibold);
-}
-
-.tx-export-format-desc {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    line-height: var(--lh-relaxed);
-}
-
-/* Destination row — path input + native Browse… */
-.tx-export-path-row {
+.tx-amount-presets {
     display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.tx-amount-fields {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    margin-bottom: 4px;
+}
+.tx-amount-fields .ant-input { flex: 1; }
+.tx-amount-actions {
+    display: flex;
+    justify-content: space-between;
 }
 
-.tx-export-path-row .tx-input {
-    flex: 1;
+
+/* ─── 5. Add transaction ────────────────────────────────────────────────────
+   Money out / Money in across the top, then the fields, two to a row where
+   they pair. */
+.tx-form-modal .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-top: 8px;
+}
+.ant-segmented-block { display: flex; }
+.ant-segmented-block .ant-segmented-item { flex: 1; }
+.tx-form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+.tx-form-row .ant-form-item { align-self: start; }
+.tx-form-modal textarea.tx-notes-field { resize: none; overflow: hidden; }
+/* "Learned" / "Suggested" after the Category label while the description's
+   category is the one in the field. */
+.tx-suggest-tag {
+    margin-inline-start: 6px;
+    padding-inline: 5px;
+    font-size: 11px;
+    line-height: 16px;
 }
 
-.tx-export-error {
-    color: var(--warning);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    margin: 10px 0 0;
-    line-height: var(--lh-relaxed);
+
+/* ─── 6. Edit wizard ────────────────────────────────────────────────────────
+   Steps over the step's body. Step 1 is the fields over the rows they
+   change; Find similar is the match strength over the rows it found; Review
+   is what will change. The footer holds the cascade box on the left and the
+   buttons on the right. */
+.tx-wizard .ant-modal-footer {
+    justify-content: space-between;
+    flex-wrap: wrap;
 }
 
-/* Progress bar — fill width is driven from txexport.js as chunks land, so
-   it reflects rows actually written rather than an animation. The import
-   flow (txfileimport.js) reuses these styles for its wait states, with the
-   --indeterminate fill below in place of a percentage. */
+.tx-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px 16px;
+    margin-bottom: 16px;
+}
+.tx-edit-wide { grid-column: 1 / -1; }
+
+.tx-edit-preview,
+.tx-match-table {
+    max-height: 260px;
+    overflow: auto;
+    border: var(--ant-line-width) solid var(--ant-color-border-secondary);
+    border-radius: var(--ant-radius-lg);
+}
+.tx-match-table { max-height: 320px; }
+.tx-match-table:has(.ant-empty) { border: 0; }
+.tx-edit-preview .ant-table,
+.tx-match-table .ant-table { min-width: 600px; }
+.tx-edit-preview thead th,
+.tx-match-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-radius: 0;
+}
+.tx-edit-preview tbody tr:last-child > td,
+.tx-match-table tbody tr:last-child > td { border-bottom: 0; }
+/* "Keep current" reads as a placeholder, not as a value. */
+.tx-wizard .ant-select-selector:has(> option[value="__keep"]:checked) { color: var(--ant-color-text-placeholder); }
+.tx-wizard .ant-select-selector option { color: var(--ant-color-text); }
+/* A value the edit will change, in the primary colour. */
+.tx-changed {
+    color: var(--ant-color-primary);
+    font-weight: 500;
+}
+
+.tx-match-strength {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+.tx-match-strength .ant-slider { min-width: 160px; }
+.tx-match-target { margin: 12px 0; }
+.tx-match-target .ant-tag { vertical-align: baseline; }
+.tx-loading { opacity: 0.55; transition: opacity var(--ant-motion-mid); }
+
+.tx-review-note { margin: 12px 0 0; }
+
+/* The similar-transactions notification's bolt. */
+.tx-similar-icon { color: var(--ant-color-primary); }
+
+
+/* ─── 7. Export ─────────────────────────────────────────────────────────────
+   The format (with what it is for) and which transactions as two rows of
+   radio buttons, then where the file goes; while it writes, the progress bar
+   and the count. */
+.tx-export-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.tx-export-choice {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+.tx-export-choice legend {
+    padding: 0;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.tx-export-format-hint { margin: 0; }
+.tx-export-path { display: flex; gap: 8px; }
+.tx-export-path .ant-input { flex: 1; }
 .tx-export-progress {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 22px 2px 16px;
-}
-
-.tx-export-progress-label {
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-body);
-    font-weight: var(--weight-semibold);
-}
-
-.tx-export-progress-track {
-    height: 8px;
-    border: var(--border-width) solid var(--border);
-    border-radius: 999px;
-    background: var(--surface2);
-    overflow: hidden;
-}
-
-.tx-export-progress-fill {
-    height: 100%;
-    width: 0;
-    border-radius: inherit;
-    background: var(--accent-primary);
-    transition: width 0.2s ease;
-}
-
-/* Indeterminate variant — the import flow's wait states (file parse, the single
-   commit POST) have no row counts, so a fixed-width fill sweeps the track
-   instead. transform runs on the compositor, so the sweep continues while parse
-   work blocks the renderer. */
-.tx-export-progress-fill--indeterminate {
-    width: 40%;
-    animation: tx-progress-sweep 1.2s ease-in-out infinite;
-}
-
-@keyframes tx-progress-sweep {
-    from { transform: translateX(-100%); }
-    to   { transform: translateX(250%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .tx-export-progress-fill--indeterminate {
-        animation: none;
-        width: 100%;
-        opacity: 0.55;
-    }
-}
-
-.tx-export-progress-count {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    line-height: var(--lh-relaxed);
-}
-
-/* The destination path on the success screen — breaks anywhere rather than
-   overflowing the dialog. */
-.tx-export-progress-path {
-    display: block;
-    margin-top: 4px;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    word-break: break-all;
-}
-
-/* Close is disabled mid-write, while the chunk loop is appending to the .part
-   file. */
-.tx-import-close:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-}
-
-
-/* ─── 10. Selection-driven action chips ──────────────────────────────────── */
-/* Edit + Delete are action chips in the chip row (section 1b) and stay disabled
-   until a row is selected; the disabled affordance comes from .tx-chip:disabled. */
-
-/* Delete is destructive — red outline that fills in on hover, the page-action
-   counterpart to the red row-delete treatment used elsewhere. */
-.tx-delete-btn:not(:disabled) {
-    color: var(--accent-negative);
-    border-color: var(--accent-negative);
-}
-
-/* --danger-text, not --button-text: --button-text flips to a DARK value on the
-   dark theme (it is sized to the green accent), which put near-black ink on
-   this red fill in exactly one place in the app. */
-.tx-delete-btn:not(:disabled):hover {
-    background: var(--accent-negative);
-    color: var(--danger-text);
-    border-color: var(--accent-negative);
-}
-
-
-/* ─── 11. Edit modal ─────────────────────────────────────────────────────── */
-/* Opened from the header Edit button, in one of two shapes: a single selected
-   transaction is a labelled form, while two or more become an en-masse update —
-   one control row over the rows it will rewrite, whether that's one row or
-   forty. There's one Save-all button. Shell mirrors the similar / import
-   modals. */
-
-/* Positioning + centering come from the shared overlay rule in style.css §8. */
-.tx-edit-overlay {
-    background: var(--scrim);
-    z-index: 1100;
-    padding: 24px;
-    box-sizing: border-box;
-}
-
-.tx-edit-dialog {
-    display: flex;
-    flex-direction: column;
-    width: 94vw;
-    max-width: 1040px;
-    /* Fixed, not content-driven: the wizard's match list grows and shrinks
-       with every slider query, and a height that tracked it would make the
-       whole dialog jump. */
-    height: 82vh;
-    overflow: hidden;
-}
-
-/* …except on the steps whose content is settled the moment they are shown: the
-   edit step (a control row over exactly the rows the user selected) and the
-   review step (a summary of changes already decided). Neither resizes after
-   that, so the dialog takes its height from what it holds instead of standing
-   82vh tall around three preview rows. The fixed height is only for the match
-   step, whose list is the thing that DOES resize under the slider — showStep()
-   owns the swap. */
-.tx-edit-dialog.is-edit-step {
-    height: auto;
-    max-height: 82vh;
-}
-
-/* The edit step needs six columns (Date · Description · Account · Category ·
-   Amount · Notes — the ledger's own set), so it gets the width to hold them: at
-   1040 the date cell clipped its own mm/dd/yyyy mask. Set for the whole flow
-   rather than per step, because a dialog that changed width under the Next
-   button would read as a different dialog — the same reason the width no longer
-   tracks the selection size. A seventh column (Type) was dropped rather than
-   fitted: the direction rule already answers it from Category. */
-.tx-edit-dialog.is-bulk-edit { max-width: 1280px; }
-
-.tx-edit-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 22px 16px;
-    border-bottom: var(--border-width) solid var(--border);
-    flex-shrink: 0;
-}
-
-.tx-edit-title {
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-body);
-    font-weight: var(--weight-semibold);
-}
-
-.tx-edit-body {
-    padding: 16px 22px;
-    overflow: auto;
-    flex: 1;
-}
-
-.tx-edit-table {
-    width: 100%;
-    min-width: 820px;
-    border-collapse: collapse;
-}
-
-.tx-edit-table th {
-    text-align: left;
-    padding: 0 8px 8px;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wider);
-    text-transform: uppercase;
-}
-
-.tx-edit-table td {
-    padding: 4px 8px;
-    vertical-align: middle;
-}
-
-/* ── The edit step (any selection size) ────────────────────────────────────
-   One control row on top, the transactions it will rewrite listed read-only
-   beneath it. A single row once got a labelled two-column form instead; the
-   fork is gone, because both shapes drove the same wizard and the same payload
-   and the modal changing shape with the count read as two different dialogs. Both live in the same scroll container as two separate tables,
-   so the control row can stick to the top of a long selection; a shared
-   <colgroup> + fixed layout is what keeps their columns in lockstep. */
-.tx-bulk-table {
-    table-layout: fixed;
-}
-
-/* The body's top padding would leave a strip where rows show through above the
-   sticky control row, so the sticky block carries that spacing instead. */
-.tx-bulk-body { padding-top: 0; }
-
-/* Sticky so the row doing the editing never scrolls away from the rows it
-   edits. The surface fill is load-bearing — preview rows pass underneath. */
-.tx-bulk-head {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    padding-top: 16px;
-    background: var(--surface1);
-}
-
-/* The two panels: one holds the column headers WITH the control row they label,
-   the other holds the rows that control row rewrites. Grouping the headers into
-   the first panel is what makes the row read as one instrument rather than a
-   strip of controls under a floating set of captions.
-   Raised a shade off the dialog instead of tinted with the accent it used to
-   carry: the accent is now spoken for by the borders on the fields the user has
-   actually set, and a whole panel wearing it competed with them.
-   The horizontal padding is LOAD-BEARING — the two tables only stay in column
-   lockstep while both panels inset by exactly the same amount. */
-.tx-bulk-panel {
-    padding: 12px 10px;
-    /* --surface1, the token .tx-wrapper paints, so the panels inside the dialog
-       read as the table the selection came from. */
-    background: var(--surface1);
-    border-radius: 8px;
-}
-
-/* Only the vertical inset differs: the preview rows already have row padding and
-   would otherwise sit in a panel twice as tall as its contents. */
-.tx-bulk-preview-panel {
-    padding-top: 4px;
-    padding-bottom: 4px;
-}
-
-/* No fill of its own — .tx-bulk-panel above is the surface and holds the headers
-   too, so the row and its captions render as one block. */
-.tx-bulk-apply-row td {
-    padding: 2px 8px 0;
-}
-
-/* Six controls across one dialog still leaves each of them narrow, so the
-   control row trims the gutters the ledger's own edit row can afford — enough
-   to keep a full date mask and a long category name from clipping. */
-.tx-bulk-apply-row .tx-input,
-.tx-bulk-apply-row .tx-select {
-    padding-left: 8px;
-    padding-right: 8px;
-}
-
-.tx-bulk-apply-row .tx-select {
-    padding-right: 22px;
-    background-position: calc(100% - 8px) 50%;
-}
-
-/* A field the user has actually set — the accent border is the link between
-   this control and the struck-through column below it. */
-.tx-bulk-apply-row td.is-set .tx-input,
-.tx-bulk-apply-row td.is-set .tx-select {
-    border-color: var(--accent-primary);
-}
-
-/* An amount that isn't a number. It marks the control that holds the wizard
-   up, which is why the step needs no message to say what's wrong. Listed after
-   (and at the weight of) the .is-set rule above, which would otherwise paint
-   the same border accent — an unusable value must not read as an accepted one. */
-.tx-bulk-apply-row td .tx-input.is-invalid,
-.tx-bulk-apply-row td.is-set .tx-input.is-invalid {
-    border-color: var(--accent-negative);
-}
-
-/* Names the panel beneath it, so the two read as "what to apply" over "what it
-   applies to" without a line of copy saying so. It sits OUTSIDE that panel —
-   a caption for the container, not a row inside it — and stays sticky with the
-   control row, so the label survives a long selection. */
-.tx-bulk-count {
-    padding: 14px 2px 6px;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wider);
-    text-transform: uppercase;
-}
-
-.tx-bulk-preview-table td {
-    padding: 9px 8px;
-    /* One step quieter than the controls above: this list is what the edit acts
-       on, not what the user is filling in, and the cells that DO change lift out
-       of it in the accent (.is-replaced below). */
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    /* One line per transaction: the list can run long, and a wrapping cell
-       would cost more height than the value is worth (title carries the rest). */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tx-bulk-row + .tx-bulk-row td {
-    border-top: var(--border-width) solid var(--border);
-}
-
-.tx-bulk-row td.tx-col-date,
-.tx-bulk-row td.tx-col-amount {
-    font-family: var(--font-numeric);
-    font-variant-numeric: tabular-nums;
-}
-
-.tx-bulk-row td.tx-col-amount { text-align: right; }
-
-/* "No account" / "—" — placeholders, not values. They shared --text-tertiary
-   with the cells around them once those stepped down a rung, so they take their
-   distance in opacity instead; there is no rung below tertiary. */
-.tx-bulk-none {
-    color: var(--text-tertiary);
-    opacity: 0.62;
-}
-
-/* ── The preview list on dark ──────────────────────────────────────────────
-   --text-tertiary is the QUIETER rung in both themes, but quieter is a
-   different direction in each: light steps it lighter (base-700 → 600, away
-   from the near-black text) while dark steps it DARKER (base-300 → 400, back
-   toward the surface). One rung of quiet that cost noticeably more legibility
-   here than the same rung did on light, over a panel that is itself raised —
-   so dark takes its step back and reads the list at --text-secondary. The
-   placeholders keep their distance the same way, just less of it: 0.62 of a
-   dim colour on a dark panel is nearly the panel.
-
-   :not(.is-replaced) is LOAD-BEARING, not decoration: [data-theme] counts as a
-   class, so without it this selector outweighs .tx-bulk-row td.is-replaced and
-   repaints every changed cell grey — the accent that links the two tables
-   vanished on dark and only the category pill (which is styled through its own
-   deeper selector) survived. Excluding them leaves the accent rule unopposed
-   instead of racing it with a heavier one. */
-html[data-theme="dark"] .tx-bulk-preview-table td:not(.is-replaced) {
-    color: var(--text-secondary);
-}
-
-html[data-theme="dark"] .tx-bulk-none { opacity: 0.78; }
-
-/* A cell the control row has claimed. It now holds the NEW value (syncBulkPreview
-   redraws it), so the row reads as it will read after saving rather than as a
-   struck-through record of what it used to be. Marked in the accent the control
-   above it wears — that is the whole link between the two tables, and without it
-   a changed cell would be indistinguishable from one the edit never touched. */
-.tx-bulk-row td.is-replaced {
-    color: var(--accent-primary);
-    font-weight: var(--weight-semibold);
-}
-
-/* The Category cell holds a pill, which sets its own fill and text colour and
-   would otherwise override the rule above, leaving a changed category rendered as
-   unchanged. It uses the accent in the pill's tinted style (15% fill + solid
-   text, the same as the direction variants) and the semibold weight of the other
-   changed cells. The higher specificity is what overrides .tx-category-empty, so
-   a row set back to Uncategorized is also marked as changed. */
-.tx-bulk-row td.is-replaced .tx-category-pill {
-    background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-    color: var(--accent-primary);
-    font-weight: var(--weight-semibold);
-}
-
-.tx-edit-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 14px 22px 18px;
-    border-top: var(--border-width) solid var(--border);
-    flex-shrink: 0;
-}
-
-/* ── Wizard step 1: the cascade checkbox rides the footer's left edge. ── */
-.tx-cascade-toggle {
-    display: flex;
-    align-items: center;
     gap: 8px;
-    margin-right: auto;
-    cursor: pointer;
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    user-select: none;
 }
-
-.tx-cascade-toggle input { flex-shrink: 0; }
-
-/* display:flex would otherwise override the [hidden] UA rule on later steps. */
-.tx-cascade-toggle[hidden] { display: none; }
-
-/* ── Wizard step 2: match-strength slider + live results. ── */
-.tx-match-slider-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding-bottom: 14px;
-}
-
-.tx-match-slider-label {
-    color: var(--text-primary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-}
-
-/* Custom-drawn track/thumb, same recipe as the Preferences sliders: the
-   native track ignores color-scheme under Electron/Chromium. */
-.tx-match-slider {
-    flex: 1;
-    max-width: 280px;
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
-    background: transparent;
-}
-
-.tx-match-slider::-webkit-slider-runnable-track {
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border);
-}
-
-.tx-match-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    margin-top: -5px;
-    border-radius: 50%;
-    background: var(--accent-primary);
-}
-
-.tx-match-slider::-moz-range-track {
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border);
-}
-
-.tx-match-slider::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    border: none;
-    border-radius: 50%;
-    background: var(--accent-primary);
-}
-
-.tx-match-slider:focus-visible { outline: none; }
-
-.tx-match-slider:focus-visible::-webkit-slider-thumb {
-    box-shadow: 0 0 0 3px var(--frost-dim);
-}
-
-.tx-match-slider:focus-visible::-moz-range-thumb {
-    box-shadow: 0 0 0 3px var(--frost-dim);
-}
-
-.tx-match-value {
-    min-width: 44px;
-    text-align: right;
-    color: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: var(--size-small);
-    font-weight: var(--weight-semibold);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Labels for the two ends of the track, placed beside it; the paragraph that
-   previously explained this in prose was removed. */
-.tx-match-end {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wider);
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-/* Re-queries dim the current list in place until the new results land. */
-.tx-match-results { transition: opacity 0.15s ease; }
-.tx-match-results.tx-match-loading { opacity: 0.55; }
-
-/* Placeholder line for empty / searching / no-category states in the match
-   list and the review step. */
-.tx-match-empty {
-    padding: 14px 0;
-    color: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: var(--size-small);
-    line-height: var(--lh-relaxed);
-}
-
-.tx-similar-col-cat { white-space: nowrap; }
-
-/* ── Wizard step 3: the result. ──
-   A table of every transaction the save will touch, drawn the way the LEDGER
-   draws it — direction-tinted Category pill, signed and coloured amount,
-   merchant avatar — so the row reads exactly as it will read afterwards. It
-   deliberately shares nothing with the step-1 preview's palette: that table
-   marks its changed cells in the accent to say what is about to move, and
-   repeating the mark here would point at decisions the user has already made.
-   The panel is the same raised surface the edit step uses, so the two steps
-   read as one dialog. */
-.tx-review-section-title {
-    padding: 4px 0 8px;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wider);
-    text-transform: uppercase;
-}
-
-.tx-review-panel + .tx-review-section-title { margin-top: 18px; }
-
-.tx-review-panel { padding: 10px; }
-
-.tx-review-table {
-    width: 100%;
-    /* Fixed, like the edit step's tables: the columns are percentage tracks and
-       a long merchant name must ellipsise rather than push the amount out. */
-    table-layout: fixed;
-    border-collapse: collapse;
-}
-
-.tx-review-table th {
-    text-align: left;
-    padding: 0 8px 8px;
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-micro);
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-wider);
-    text-transform: uppercase;
-}
-
-/* Full-strength text, unlike the step-1 preview's quieted list: this is the
-   ledger, not the thing an edit is being applied to. */
-.tx-review-table td {
-    padding: 8px;
-    vertical-align: middle;
-    color: var(--text-primary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    /* One line per transaction — the list can run long. */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tx-review-table tbody tr + tr td {
-    border-top: var(--border-width) solid var(--border);
-}
-
-.tx-review-table td.tx-col-date,
-.tx-review-table td.tx-col-amount {
-    font-family: var(--font-numeric);
-    font-variant-numeric: tabular-nums;
-}
-
-.tx-review-table td.tx-col-amount { text-align: right; }
-
-/* The ledger's amount colours are scoped to .tx-row, which these rows are not
-   (they carry none of its hover/selection behaviour). Same three tokens. */
-.tx-review-table td.tx-amount-income   { color: var(--accent-positive); }
-.tx-review-table td.tx-amount-expense  { color: var(--accent-negative); }
-.tx-review-table td.tx-amount-transfer { color: var(--accent-info); }
-
-/* The avatar column is a fixed 44px track in the colgroup; overflow:hidden on
-   the shared td rule would clip the circle at that width. */
-.tx-review-table td.tx-col-avatar {
-    overflow: visible;
-    text-align: center;
-}
-
-
-/* ─── 7. Pagination ──────────────────────────────────────────────────────────
-   The contents of the .tx-footer band (§1): a "Showing X–Y of Z" caption on the
-   left and the prev / numbered / next controls centered. The band is hidden (via
-   the [hidden] attribute, set in JS — nothing here may set `display`, or hidden
-   would stop working) whenever everything fits on one page. */
-
-/* Three columns — info, controls, empty spacer — so the controls stay centered
-   in the band regardless of how wide the "Showing …" caption gets. */
-.tx-pagination {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 12px;
-}
-
-.tx-page-info {
-    color: var(--text-tertiary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-}
-
-.tx-page-controls {
-    grid-column: 2;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.tx-page-btn,
-.tx-page-num {
-    min-width: 32px;
-    height: 32px;
-    padding: 0 8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: var(--border-width) solid var(--border);
-    border-radius: 5px;
-    background: var(--surface1);
-    color: var(--text-secondary);
-    font-family: var(--font-menu);
-    font-size: var(--size-small);
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-
-/* surface3 is the rung that MEANS hover; surface1 → surface2 is a no-op on
-   dark, where both resolve to base-900 (same fix as .p-menu-btn). */
-.tx-page-btn:hover:not(:disabled),
-.tx-page-num:hover:not(.tx-page-current) {
-    background: var(--surface3);
-    color: var(--text-primary);
-}
-
-.tx-page-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-}
-
-.tx-page-current {
-    background: var(--accent-primary);
-    border-color: var(--accent-primary);
-    /* --button-text is the ink-on-accent token; --background happened to be
-       close to it on dark and is the page colour, not a foreground. */
-    color: var(--button-text);
-    font-weight: var(--weight-semibold);
-    cursor: default;
-}
-
-.tx-page-gap {
-    min-width: 20px;
-    text-align: center;
-    color: var(--text-tertiary);
-    user-select: none;
-}
+.tx-export-progress .ant-progress { font-size: var(--ant-font-size); }
+.tx-export-path-text { overflow-wrap: anywhere; }

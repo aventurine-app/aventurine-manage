@@ -2,123 +2,135 @@
 
 (function () {
   // ─── Recurring ──────────────────────────────────────────────────────────────
+  // The month's expected income, bills and transfers on a calendar, with every
+  // schedule listed beside it. Drawn in Ant Design: the components are
+  // static/css/ant.css and static/js/widgets/ant.js, the page layout is
+  // recurring.css.
+  //
   // The calendar IS the page. Every occurrence of an adopted schedule — actual
   // past charges and projected future ones alike — renders as a chip in its
-  // day cell, and the chip is where that schedule's data lives: the merchant,
-  // the amount, and the rest in its tooltip. CLICKING one opens that schedule's
-  // editor — the same dialog a rail row opens, on the surface the schedule
-  // already lives on, so the grid is not a read-only picture of rows that can
-  // only be changed elsewhere. There is no separate table of the same rows to
-  // keep in sync with the grid; the two used to be the same data drawn twice.
+  // day, and the chip is where that schedule's data lives: its name and the
+  // amount, and the rest in its tooltip. CLICKING one opens that schedule's
+  // editor — the same dialog a list row opens, on the surface the schedule
+  // already lives on. Nothing opens on hover: a floating card wide enough to
+  // hold a row covers the days around its chip.
   //
-  // Nothing opens on HOVER. A chip used to open a floating card there, and a
-  // card wide enough to hold a row covers the days around its chip, so crossing
-  // the grid with the pointer kept hiding the part of the month being read. The
-  // card is gone and opening is a click, so there is no half-open card to keep
-  // alive or time out.
-  //
-  // Two panels frame the grid, and both answer questions the grid cannot. They
-  // are scoped differently on purpose. renderSummary totals the DISPLAYED MONTH
-  // by direction — money in, out and moved — which is not readable off 42 cells.
-  // renderRail lists EVERY schedule against its next due date, whatever month
-  // that falls in, so a quarterly bill or an annual renewal is visible from a
-  // month it has nothing in; clicking one takes the calendar to it. The rail
-  // also carries this page's two whole-list buttons at its foot.
+  // Two panels frame the calendar, scoped differently on purpose.
+  // renderSummary totals the DISPLAYED MONTH by direction — money in, out and
+  // moved — which is not readable off 42 cells. renderRail lists EVERY schedule
+  // against its next due date, whatever month that falls in, so a quarterly
+  // bill or an annual renewal is visible from a month it has nothing in. The
+  // list's foot carries the page's two whole-list buttons.
   //
   // EVERY change to a schedule goes through one dialog, openScheduleDialog:
-  // creating and editing, from the rail, from a chip, and from a day cell's +.
-  // A chip and a rail row only decide WHICH schedule; they never hold an
-  // editable copy of one.
+  // creating and editing, from the list, from a chip, and from a day. A chip
+  // and a list row only decide WHICH schedule; they never hold an editable
+  // copy of one.
   //
-  // Detection/cycle-classification/projection is server-side (GET
+  // Detection, cadence classification and projection are server-side (GET
   // /api/recurring?month=YYYY-MM, backed by detectRecurringSeries in
-  // services/predictions.js).
-  //
-  // Cadence is a RULE, not one of five names (services/recurrence.js): every N
-  // weeks on a weekday, or every N months on a date or on an nth weekday, with
-  // an optional end date. ruleLabel/ruleSentence are the two readings of one —
-  // a word where there is room for a word, a line where there is room for a
-  // line.
+  // services/predictions.js). Cadence is a RULE, not one of five names
+  // (services/recurrence.js): every N weeks on a weekday, or every N months on
+  // a date or on an nth weekday, with an optional end date. ruleLabel and
+  // ruleSentence are its two readings — a word where there is room for a
+  // word, a line where there is room for a line.
   //
   // The page starts EMPTY, however much recurring history the ledger holds:
   // detection is heuristic, so it does not populate the calendar on its own.
-  // The user runs it from the rail's "Detect Schedules", ticks the patterns
-  // they recognize in the picker (openDetectDialog → GET
-  // /api/recurring/candidates, POST /api/recurring/adopt), and those appear on
-  // the grid. Schedules are added by hand either from "Create Schedule", which
-  // opens on today, or from the + a day cell reveals on hover, which opens on
-  // that cell's date — the quicker route when the date is the thing being
-  // thought about. Editing is a chip or a rail row, and removing is the Delete
-  // button inside that same editor — the one surface that already names the
-  // schedule and shows what is about to be lost. See "Detect" and
-  // "Add / remove".
+  // The user runs it from the list's "Detect schedules", ticks the series they
+  // recognize (openDetectDialog → GET /api/recurring/candidates, POST
+  // /api/recurring/adopt), and those appear on the calendar. Schedules are
+  // added by hand from "Create schedule", which opens on today, or from a day
+  // of the calendar, which opens on that date.
   //
   // Globals (loaded before this script): apiFetch (api.js), escapeHtml
-  // (escape.js), formatCurrency/applyCurrencyFormat/stripCurrencyValue
-  // (currency.js), merchantAvatarHtml (avatar.js), UI (ui.js).
+  // (escape.js), todayIso/fmtShortDate (format.js), formatCurrency/
+  // applyCurrencyFormat/stripCurrencyValue (currency.js), merchantAvatarHtml
+  // (avatar.js), Ant (widgets/ant.js).
 
-  const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const WEEKDAY_MIN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
   const DIRECTION_LABEL = { income: 'Income', expense: 'Expense', transfer: 'Transfer' };
   const DIRECTION_OPTIONS = Object.keys(DIRECTION_LABEL);
-  // Chips per day before the cell collapses the rest behind a "+n more" the
-  // user can expand. A cap is needed (a busy 1st-of-the-month would otherwise
-  // stretch one row of the grid), but nothing may become unreachable: the
-  // calendar is now the only way to get at a schedule.
-  const MAX_CHIPS_PER_DAY = 3;
-  // Inlined so the day cell's add button does not depend on an icon font or an
-  // external sprite. `plus` is drawn in the same 20-box, 1.5-stroke style the
-  // Transactions ledger uses for its row actions. These glyphs come from UI
-  // (shell/ui.js), shared with the Balance Forecast's pin cards.
-  const ICONS = UI.CARD_ICONS;
+  // Chips a day shows before the rest fold behind a "+n more" the user can
+  // expand. A cap is needed (a busy 1st would otherwise stretch its week), but
+  // nothing may become unreachable, so the fold is a button.
+  const MAX_CHIPS_PER_DAY = 2;
+  // Below this the calendar card cannot fit seven columns wide enough for a
+  // chip's name, and the month is drawn as a list of days instead.
+  const LIST_BELOW_PX = 560;
+  // Ant's 6-week calendar.
+  const CALENDAR_DAYS = 42;
+
+  const pad2 = (n) => String(n).padStart(2, '0');
 
   function currentMonthKey() {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
   }
 
   function addMonthKey(key, n) {
     const [y, m] = key.split('-').map(Number);
     const total = y * 12 + (m - 1) + n;
-    const year = Math.floor(total / 12);
-    const mo = (total % 12) + 1;
-    return `${year}-${String(mo).padStart(2, '0')}`;
+    return `${Math.floor(total / 12)}-${pad2((total % 12) + 1)}`;
+  }
+
+  function monthLabel(key) {
+    const [y, m] = key.split('-').map(Number);
+    return `${MONTHS[m - 1]} ${y}`;
+  }
+
+  function isoOf(d) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  /** 0 = Sunday, read in local time like every other date on this page. */
+  function weekdayOf(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d).getDay();
   }
 
   // Mirror of services/predictions.js's normaliseDesc — used client-side only to
-  // warn the Add-schedule dialog when a name produces no letters in the key. The
-  // backend is authoritative and re-derives this on save.
+  // warn the editor when a name produces no letters in the key. The backend is
+  // authoritative and re-derives this on save.
   function normaliseDesc(desc) {
     return String(desc || '').toLowerCase().replace(/\d+/g, '').replace(/[^a-z]+/g, ' ').trim();
   }
 
   let month = currentMonthKey();
   let data = { series: [], occurrences: [] };
-  // key -> schedule, rebuilt whenever `data` is. Every chip on the grid asks for
-  // its schedule by key (occLabel), so a scan per chip would make one render
-  // cost chips x schedules.
+  // key -> schedule, rebuilt whenever `data` is. Every chip asks for its
+  // schedule by key, so a scan per chip would make one render cost chips x
+  // schedules.
   let seriesByKey = new Map();
-  // The schedule a rail row is being pointed at. Hovering the rail lights that
-  // schedule's chips up on the grid: the rail is for finding a schedule on the
+  // Only the newest load may paint: stepping months quickly can have several
+  // in flight, and a slow early answer must not overwrite a later month.
+  let loadGeneration = 0;
+  // The schedule a list row is being pointed at. Hovering the list lights that
+  // schedule's chips on the calendar: the list is for finding a schedule on the
   // calendar, and the chips are where it is.
   let railHoverKey = null;
-  // The schedule a rail row was CLICKED on, which is the same mark made to stay:
-  // the click takes the calendar to that schedule's month, and the highlight is
-  // then the whole answer — it is what says which of that month's chips is the
-  // one just asked for. It outlives the pointer. Another row, Escape, or
-  // stepping to another month by hand ends it.
+  // The schedule a list row was CLICKED on (or a save landed on), which is the
+  // same mark made to stay: it says which of the month's chips is the one just
+  // asked for. Another row, Escape, or stepping to another month ends it.
   let pickedKey = null;
   // ISO dates whose "+n more" the user expanded, so the extra chips stay put
   // across re-renders within the month.
   const expandedDays = new Set();
-
-  // ─── Calendar ────────────────────────────────────────────────────────────
+  // The calendar is drawn as a list of days while its card is too narrow.
+  let listMode = false;
 
   function seriesFor(key) {
     return seriesByKey.get(key) || {};
+  }
+
+  function labelOf(s) {
+    return s.display_name || s.description || s.key || '';
   }
 
   function occLabel(occ) {
@@ -126,322 +138,35 @@
     return s.display_name || s.description || occ.key;
   }
 
-  /** The schedule marked on both surfaces, from the two things that can name
-   *  one: the rail row under the pointer, and the rail row last clicked (or
-   *  saved). Hover sits above the click deliberately — running the pointer down
-   *  the rail reads each schedule in turn, and the picked row takes the mark
-   *  back when the pointer leaves.
-   *
-   *  The markup builders and applyActiveHighlight both read it, so a re-render
-   *  and a re-mark can never disagree about what is lit. */
+  /** The schedule marked on both surfaces: the list row under the pointer, or
+   *  else the one last clicked (or saved). Hover sits above the click, so
+   *  running the pointer down the list reads each schedule in turn and the
+   *  picked row takes the mark back when the pointer leaves. Both the markup
+   *  builders and applyActiveHighlight read it, so they cannot disagree. */
   function activeKey() {
     return railHoverKey || pickedKey;
   }
 
-  /** One occurrence, as a chip in its day cell: merchant avatar, name, amount.
-   *  This is the schedule's home on the page, so it is also where that schedule
-   *  is opened for editing: a <button>, opening the same dialog the rail row
-   *  does. It spent a while as a plain tile, from when clicking it opened a
-   *  floating card that only re-read the fields the chip already draws; the
-   *  editor is not that — it is the one thing the grid cannot show.
-   *
-   *  `title` carries what a narrow day cell cannot: the name ellipses first, and
-   *  a projected charge has to say that it is one. It stays a tooltip rather
-   *  than a line of text so it takes none of the grid.
-   *
-   *  The avatar is the same deterministic colour+initials circle the ledger uses
-   *  (avatar.js), so a merchant renders identically everywhere. Direction is
-   *  shown by the chip's tint (the rec-occ-<direction> class, recurring.css),
-   *  not by the circle. */
-  function chipHtml(occ) {
-    const label = occLabel(occ);
-    const cls = `rec-occ rec-occ-${occ.direction} rec-occ-${occ.actual ? 'actual' : 'projected'}`
-      + (activeKey() === occ.key ? ' rec-occ-active' : '');
-    const tip = `${label} — ${formatCurrency(occ.amount, true)}${occ.actual ? '' : ' (projected)'}`;
-    return `<button type="button" class="${cls}" aria-haspopup="dialog"
-      data-key="${escapeHtml(occ.key)}" data-date="${escapeHtml(occ.date)}"
-      title="${escapeHtml(tip)}">
-      ${merchantAvatarHtml(label)}
-      <span class="rec-occ-name">${escapeHtml(label)}</span>
-      <span class="rec-occ-amount">${escapeHtml(formatCurrency(occ.amount, true))}</span>
-    </button>`;
-  }
+  /** A request made from `btn`, which shows Ant's loading state while it runs
+   *  so a slow answer cannot be asked for twice. Resolves to the response, or
+   *  to null when the request itself failed; the caller says so either way. */
+  const requestFrom = (btn, url, opts) => Ant.whileLoading(btn, () => apiFetch(url, opts));
+  const isBusy = (btn) => Ant.isLoading(btn);
 
-  function renderCalendar() {
-    const host = document.getElementById('rec-calendar');
-    if (!host) return;
+  /** A JSON POST's fetch options. */
+  const postJson = (body) => ({
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 
-    const [y, m] = month.split('-').map(Number);
-    const daysInMonth = new Date(y, m, 0).getDate();
-    const startWeekday = new Date(y, m - 1, 1).getDay(); // 0=Sun
+  // ─── Cadence, in words ─────────────────────────────────────────────────────
 
-    const byDate = new Map();
-    for (const occ of data.occurrences) {
-      let arr = byDate.get(occ.date);
-      if (!arr) { arr = []; byDate.set(occ.date, arr); }
-      arr.push(occ);
-    }
-
-    const today = todayIso();
-    const cells = [];
-    for (let i = 0; i < startWeekday; i++) cells.push({ outside: true });
-    for (let day = 1; day <= daysInMonth; day++) {
-      const iso = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      cells.push({ day, iso, occs: byDate.get(iso) || [] });
-    }
-    while (cells.length % 7 !== 0) cells.push({ outside: true });
-
-    const cellHtml = cells.map((c) => {
-      if (c.outside) return '<div class="rec-day rec-day-outside"></div>';
-      const expanded = expandedDays.has(c.iso);
-      const shown = expanded ? c.occs : c.occs.slice(0, MAX_CHIPS_PER_DAY);
-      const overflow = c.occs.length - shown.length;
-      const chips = shown.map(chipHtml).join('')
-        + (overflow > 0
-          ? `<button type="button" class="rec-day-more" data-expand="${c.iso}">+${overflow} more</button>`
-          : '')
-        + (expanded && c.occs.length > MAX_CHIPS_PER_DAY
-          ? `<button type="button" class="rec-day-more" data-expand="${c.iso}">Show less</button>`
-          : '');
-      // Add-here button, revealed by hovering the cell (recurring.css). Adding by
-      // hand is anchored to a DATE, so the control is on the day cell and the due
-      // date is the cell the pointer is in, rather than a field in a menu.
-      const add = `<button type="button" class="rec-day-add" data-add="${c.iso}"
-        title="Add a recurring schedule due ${escapeHtml(fmtShortDate(c.iso))}"
-        aria-label="Add a recurring schedule due ${escapeHtml(fmtShortDate(c.iso))}">${ICONS.plus}</button>`;
-      return `<div class="rec-day${c.iso === today ? ' rec-day-today' : ''}">
-        <span class="rec-day-num">${c.day}</span>
-        ${add}
-        <div class="rec-day-occs">${chips}</div>
-      </div>`;
-    }).join('');
-
-    host.innerHTML = `<div class="rec-cal-weekdays">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
-      <div class="rec-cal-grid">${cellHtml}</div>`;
-  }
-
-  // ─── Month totals ────────────────────────────────────────────────────────
-  // The three figures above the grid: what the displayed month is expected to
-  // bring in, pay out and move. They total the OCCURRENCES the calendar is
-  // drawing — recorded charges and projections alike — so the row can never
-  // disagree with the chips underneath it, and stepping to another month
-  // retotals with it.
-  //
-  // Ledger amounts are positive magnitudes (direction carries the sign), so all
-  // three figures are positive and it is the label and the colour that tell
-  // them apart, not a minus sign.
-
-  const SUMMARY_TILES = [
-    ['income', 'Expected income'],
-    ['expense', 'Expected expenses'],
-    ['transfer', 'Expected transfers'],
-  ];
-
-  function monthTotals() {
-    const totals = { income: 0, expense: 0, transfer: 0 };
-    for (const occ of data.occurrences) {
-      if (Object.hasOwn(totals, occ.direction)) totals[occ.direction] += occ.amount;
-    }
-    return totals;
-  }
-
-  function renderSummary() {
-    const host = document.getElementById('rec-summary');
-    if (!host) return;
-    const totals = monthTotals();
-    host.innerHTML = SUMMARY_TILES.map(([direction, label]) => `<div class="rec-sum-tile">
-      <span class="rec-sum-label">${label}</span>
-      <span class="rec-sum-value rec-amount-${direction}">${escapeHtml(formatCurrency(totals[direction], true))}</span>
-    </div>`).join('');
-  }
-
-  // ─── The rail ────────────────────────────────────────────────────────────
-  // EVERY adopted schedule, soonest due first, against the date its next charge
-  // falls on. Deliberately not month-scoped, unlike the totals above it: the
-  // month on screen shows what is due inside it, and the rail answers the other
-  // question, "what is running and what is coming", including a quarterly bill
-  // or an annual renewal that lands nowhere near the month being looked at.
-  //
-  // A row is the EDIT control for its schedule, and its only control: clicking
-  // one opens the editor dialog, and every change to that schedule, deleting it
-  // included, is made in there. A pencil would repeat what the whole row already
-  // does, and the trash can that used to sit at the end took a column of width
-  // off a panel whose one scarce field is the merchant name.
-  //
-  // Hovering still wires the rail to the grid, which is the other half of what
-  // the panel is for: it lights that schedule's chips where the month on screen
-  // has any, so the rail finds a schedule on the calendar without opening
-  // anything. The mark is also what a saved edit leaves behind (goToSchedule),
-  // which is how the editor answers "where did that land".
-
-  /** The row IS the button: it is one control now that the trash can beside it
-   *  is gone, so there is nothing left for a wrapper to hold. It carries the
-   *  schedule's key, and no date — the row is not tied to one occurrence.
-   *
-   *  Three fields: the merchant, the cadence and the next due date. Cadence is
-   *  the one that says whether a date months out is normal or a lapse, so the
-   *  rail answers "what is running, and how often" on its own — a chip's card is
-   *  only needed for the amount. ruleLabel is the short reading; the full
-   *  sentence (interval, day, end date) is the cell's tooltip. */
-  function railRowHtml(s) {
-    const label = s.display_name || s.description || s.key;
-    // The next occurrence on or after today — the backend walks a lapsed
-    // schedule forward (nextDueOnOrAfter). A schedule whose end date has passed
-    // has no next one at all, and says so: it stays listed, greyed, until the
-    // user deletes it, because a row that vanished on its end date would read as
-    // data the app lost.
-    const due = s.ended ? 'Ended' : (s.next_date ? fmtShortDate(s.next_date) : '');
-    const active = activeKey() === s.key;
-    return `<button type="button" aria-haspopup="dialog" title="Edit ${escapeHtml(label)}"
-      class="rec-rail-row${active ? ' rec-rail-active' : ''}${s.ended ? ' rec-rail-ended' : ''}"
-      data-key="${escapeHtml(s.key)}">
-      ${merchantAvatarHtml(label)}
-      <span class="rec-rail-name">${escapeHtml(label)}</span>
-      <span class="rec-rail-cadence" title="${escapeHtml(ruleSentence(s.rule))}">${escapeHtml(ruleLabel(s.rule))}</span>
-      <span class="rec-rail-date">${escapeHtml(due)}</span>
-    </button>`;
-  }
-
-  /** The rail, head to foot. The two buttons at the bottom are the page's only
-   *  whole-list actions, and they sit here rather than in a menu on the toolbar
-   *  because this is the panel the schedules they create land in. Adding from a
-   *  day cell's + is still there, and still the quicker route when the date is
-   *  the thing the user is thinking about. */
-  function renderRail() {
-    const host = document.getElementById('rec-rail');
-    if (!host) return;
-    const body = data.series.length
-      ? `<div class="rec-rail-list">${data.series.map(railRowHtml).join('')}</div>`
-      : '<p class="rec-rail-empty">No schedules yet.</p>';
-    host.innerHTML = `<div class="rec-rail-head">
-        <span class="rec-rail-head-label"></span>
-        <span class="rec-rail-head-label">Schedule</span>
-        <span class="rec-rail-head-label">Cadence</span>
-        <span class="rec-rail-head-label">Next</span>
-      </div>${body}
-      <div class="rec-rail-foot">
-        <button type="button" class="button-primary" data-rail-action="create">Create Schedule</button>
-        <button type="button" class="button-primary" data-rail-action="detect">Detect Schedules</button>
-      </div>`;
-  }
-
-  /** The chip for an occurrence, when the grid is drawing one. */
-  function chipFor(ref) {
-    if (!ref) return null;
-    return document.querySelector(
-      `.rec-occ[data-key="${CSS.escape(ref.key)}"][data-date="${CSS.escape(ref.date)}"]`
-    );
-  }
-
-  function typeOptionsHtml(selected) {
-    return DIRECTION_OPTIONS.map((d) =>
-      `<option value="${d}"${d === selected ? ' selected' : ''}>${DIRECTION_LABEL[d]}</option>`
-    ).join('');
-  }
-
-  /** Light up every chip of the active SCHEDULE — a monthly bill's whole run
-   *  across the grid, not just the one under the pointer — and its rail row with
-   *  them, so pointing at either surface marks the schedule on both. */
-  function applyActiveHighlight() {
-    const key = activeKey();
-    markChips(key);
-    markRailRows(key);
-  }
-
-  /** The grid's half. Class only, no ARIA state — which is why this is not
-   *  UI.markActive: that toggles aria-expanded with the class, and a chip opens
-   *  a modal dialog rather than expanding anything. The mark says which schedule
-   *  the rail is pointing at, not that something is open. */
-  function markChips(key) {
-    document.querySelectorAll('.rec-occ').forEach((chip) => {
-      chip.classList.toggle('rec-occ-active', key != null && chip.dataset.key === key);
-    });
-  }
-
-  /** The rail's half of the same job, and class-only for the same reason. */
-  function markRailRows(key) {
-    document.querySelectorAll('.rec-rail-row').forEach((row) => {
-      row.classList.toggle('rec-rail-active', key != null && row.dataset.key === key);
-    });
-  }
-
-  /** Mark `key` on the month currently on screen, uncollapsing its day if the
-   *  chip is hiding behind a "+n more". False when this month draws nothing for
-   *  it, which is the rail's normal case: it lists every schedule, most of which
-   *  are elsewhere. */
-  function markScheduleInMonth(key) {
-    const occ = data.occurrences.find((o) => o.key === key);
-    if (!occ) return false;
-    revealOccurrence({ key, date: occ.date });
-    pickedKey = key;
-    applyActiveHighlight();
-    return true;
-  }
-
-  /** Follow a schedule to wherever it actually is: the calendar steps to the
-   *  month of its next charge, and its chips there light up. The highlight is
-   *  the whole answer — the grid draws every field a schedule has, so there is
-   *  nothing left for it to open. */
-  async function goToSchedule(key) {
-    if (markScheduleInMonth(key)) return true;
-    const target = seriesFor(key).next_date?.slice(0, 7);
-    if (!target || target === month) return false;
-    month = target;
-    expandedDays.clear();
-    await load();
-    return markScheduleInMonth(key);
-  }
-
-  /** Make sure an occurrence has a chip on the grid before anything points at
-   *  it. A rail row can name one sitting behind its day's "+n more", and a mark
-   *  on a chip that is not drawn is no answer at all — so the day is expanded
-   *  first, which is also what shows the user where the schedule went. */
-  function revealOccurrence(ref) {
-    if (chipFor(ref)) return;
-    expandedDays.add(ref.date);
-    renderCalendar();
-  }
-
-  /** Drop the rail's mark, for Escape. The calendar stays where the click took
-   *  it: the month on screen is where the user asked to be, and only the
-   *  highlight was ever transient. */
-  function clearPick() {
-    pickedKey = null;
-    applyActiveHighlight();
-  }
-
-  // ─── The editor ──────────────────────────────────────────────────────────
-  // ONE dialog for every change a schedule can take, and the only one on the
-  // page. Creating (the rail's Create Schedule, a day cell's +) and editing
-  // (clicking a chip or a rail row) all open it, so there is a single form to
-  // read a schedule in and a single place a change is made.
-  //
-  // It replaced an edit mode inside the chip's card. That card is one row wide,
-  // which was enough for a name, a type, a cadence and an amount and is not
-  // enough for a repeat rule: a frequency, an interval, a day or an nth
-  // weekday, an end date and the amount range. The card is gone, and the chip
-  // that used to open it opens this instead.
-  //
-  // WHAT IS SENT. Editing sends only what the user actually changed (diffPatch).
-  // That matters beyond saving bytes: a null field on a detected schedule means
-  // "follow the ledger", so writing every field back on every save would quietly
-  // pin a schedule's name, amount and cadence the first time someone corrected
-  // its spelling.
-
-  const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const POSITION_LABELS = [[1, 'First'], [2, 'Second'], [3, 'Third'], [4, 'Fourth'], [-1, 'Last']];
-  const REPEAT_MODES = [
-    ['weekly', 'Weekly'],
-    ['monthly-date', 'Monthly (by date)'],
-    ['monthly-day', 'Monthly (by day)'],
-  ];
-  // Matches services/recurrence.js's MAX_INTERVAL. A larger number is a typo
-  // rather than a cadence.
-  const MAX_INTERVAL = 120;
 
   /** The familiar name for a cadence, where one exists, and "every N" where it
    *  does not. Used where there is room for a word and not for a sentence — the
-   *  card's cadence cell and the detection picker's detail line. */
+   *  list's second line and the detection table's Cadence tag. */
   function ruleLabel(rule) {
     if (!rule) return '';
     if (rule.freq === 'weekly') {
@@ -450,8 +175,8 @@
     return { 1: 'Monthly', 3: 'Quarterly', 12: 'Yearly' }[rule.interval] || `Every ${rule.interval} months`;
   }
 
-  /** The whole rule in one line, for the editor's readout and for the tooltip on
-   *  surfaces that only have room for the short label. */
+  /** The whole rule in one line, for the editor's readout and for the tooltips
+   *  on surfaces that only have room for the short label. */
   function ruleSentence(rule) {
     if (!rule) return '';
     const every = rule.freq === 'weekly'
@@ -475,22 +200,342 @@
     return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'}`;
   }
 
-  /** The rule as the form's controls hold it. The three repeat modes are one
-   *  control here and two fields in the rule (freq + month_mode), because
-   *  "monthly by date" and "monthly by day" are one choice to the user. */
-  function ruleToForm(rule) {
-    const base = { mode: 'monthly-date', interval: 1, weekday: 1, day: 1, pos: 1 };
+  // ─── Toolbar ───────────────────────────────────────────────────────────────
+
+  function renderToolbar() {
+    const text = document.getElementById('rec-month-text');
+    if (text) text.textContent = monthLabel(month);
+    // Nothing to go back to while already there — disabled rather than hidden,
+    // so the controls beside it never move under the pointer.
+    const today = document.getElementById('rec-month-today');
+    if (today) today.disabled = month === currentMonthKey();
+  }
+
+  // ─── Month totals ──────────────────────────────────────────────────────────
+  // The three figures above the calendar: what the displayed month is expected
+  // to bring in, pay out and move. They total the OCCURRENCES the calendar
+  // draws — recorded charges and projections alike — so they can never disagree
+  // with the chips under them, and stepping to another month retotals them.
+
+  const SUMMARY_TILES = [
+    ['income', 'Expected income'],
+    ['expense', 'Expected expenses'],
+    ['transfer', 'Expected transfers'],
+  ];
+
+  function monthTotals() {
+    const totals = { income: 0, expense: 0, transfer: 0 };
+    for (const occ of data.occurrences) {
+      if (Object.hasOwn(totals, occ.direction)) totals[occ.direction] += occ.amount;
+    }
+    return totals;
+  }
+
+  function renderSummary() {
+    const host = document.getElementById('rec-summary');
+    if (!host) return;
+    const totals = monthTotals();
+    host.innerHTML = SUMMARY_TILES.map(([direction, label]) => `
+      <div class="ant-card ant-card-small rec-stat rec-stat-${direction}">
+        <div class="ant-card-body">
+          <div class="ant-statistic-title">${label}</div>
+          <div class="ant-statistic-content">${escapeHtml(formatCurrency(totals[direction], true))}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ─── Calendar ──────────────────────────────────────────────────────────────
+
+  /** The 42 days Ant's Calendar draws: six weeks from the Sunday on or before
+   *  the 1st. Days outside the month show their date and hold nothing — the
+   *  occurrences are the displayed month's only. */
+  function calendarDays() {
+    const [y, m] = month.split('-').map(Number);
+    const lead = new Date(y, m - 1, 1).getDay();
+    return Array.from({ length: CALENDAR_DAYS }, (_, i) => {
+      const d = new Date(y, m - 1, 1 - lead + i);
+      return { iso: isoOf(d), day: d.getDate(), inMonth: d.getMonth() === m - 1 };
+    });
+  }
+
+  /** The month's occurrences by date, biggest amount first within a day, so
+   *  the two a day shows before "+n more" are the two that matter most. */
+  function occurrencesByDate() {
+    const byDate = new Map();
+    for (const occ of data.occurrences) {
+      let list = byDate.get(occ.date);
+      if (!list) { list = []; byDate.set(occ.date, list); }
+      list.push(occ);
+    }
+    for (const list of byDate.values()) list.sort((a, b) => b.amount - a.amount);
+    return byDate;
+  }
+
+  /** One occurrence, as a chip: the name over the amount, tinted by direction
+   *  (rec-occ-<direction>, recurring.css). A <button> that opens its schedule's
+   *  editor. The tooltip carries what a narrow day cannot: the full name, the
+   *  rule, and whether the charge is a projection. */
+  function chipHtml(occ) {
+    const label = occLabel(occ);
+    const amount = formatCurrency(occ.amount, true);
+    const projected = occ.actual ? '' : ' (projected)';
+    const tip = [label, amount, ruleSentence(seriesFor(occ.key).rule)].filter(Boolean).join(' · ') + projected;
+    const name = `${label}, ${amount} on ${fmtShortDate(occ.date)}${projected}. Edit schedule`;
+    const cls = `rec-occ rec-occ-${occ.direction} rec-occ-${occ.actual ? 'actual' : 'projected'}`
+      + (activeKey() === occ.key ? ' rec-occ-active' : '');
+    return `<button type="button" class="${cls}" aria-haspopup="dialog"
+      data-key="${escapeHtml(occ.key)}" data-date="${escapeHtml(occ.date)}"
+      aria-label="${escapeHtml(name)}" data-tip="${escapeHtml(tip)}">
+      <span class="rec-occ-name">${escapeHtml(label)}</span>
+      <span class="rec-occ-amount">${escapeHtml(amount)}</span>
+    </button>`;
+  }
+
+  /** One day of the grid: the date at the right of its rule, the + that starts
+   *  a schedule on it, and its chips. */
+  function dayCellHtml(c, byDate, today) {
+    const num = pad2(c.day);
+    if (!c.inMonth) {
+      return `<td class="rec-day rec-day-outside"><div class="rec-day-inner">
+        <div class="rec-day-head"><span class="rec-day-num">${num}</span></div>
+        <div class="rec-day-occs"></div>
+      </div></td>`;
+    }
+    const occs = byDate.get(c.iso) || [];
+    const expanded = expandedDays.has(c.iso);
+    const shown = expanded ? occs : occs.slice(0, MAX_CHIPS_PER_DAY);
+    const folded = occs.length - shown.length;
+    const when = fmtShortDate(c.iso);
+    let toggle = '';
+    if (folded > 0) {
+      toggle = `<button type="button" class="rec-day-more" data-expand="${c.iso}" aria-expanded="false"
+        aria-label="Show ${folded} more on ${escapeHtml(when)}">+${folded} more</button>`;
+    } else if (expanded && occs.length > MAX_CHIPS_PER_DAY) {
+      toggle = `<button type="button" class="rec-day-more" data-expand="${c.iso}" aria-expanded="true">Show less</button>`;
+    }
+    const isToday = c.iso === today;
+    return `<td class="rec-day${isToday ? ' rec-day-today' : ''}" data-day="${c.iso}"${isToday ? ' aria-current="date"' : ''}>
+      <div class="rec-day-inner">
+        <div class="rec-day-head">
+          <button type="button" class="ant-btn ant-btn-text ant-btn-sm ant-btn-icon-only rec-day-add" data-add="${c.iso}"
+            aria-label="Add a schedule due ${escapeHtml(when)}" data-tip="Add a schedule">${Ant.icon('plus')}</button>
+          <span class="rec-day-num">${num}</span>
+        </div>
+        <div class="rec-day-occs">${shown.map(chipHtml).join('')}${toggle}</div>
+      </div>
+    </td>`;
+  }
+
+  function gridHtml(byDate, today) {
+    const days = calendarDays();
+    const weeks = [];
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(`<tr>${days.slice(i, i + 7).map((c) => dayCellHtml(c, byDate, today)).join('')}</tr>`);
+    }
+    return `<table class="rec-cal" aria-label="${escapeHtml(monthLabel(month))}">
+      <thead><tr>${WEEKDAY_MIN.map((w, i) => `<th scope="col" abbr="${WEEKDAY_LABELS[i]}">${w}</th>`).join('')}</tr></thead>
+      <tbody>${weeks.join('')}</tbody>
+    </table>`;
+  }
+
+  /** The narrow form: only the days with something due, each with its chips. */
+  function listHtml(byDate, today) {
+    const dates = [...byDate.keys()].sort();
+    if (!dates.length) return Ant.empty({ title: `Nothing expected in ${monthLabel(month)}`, compact: true });
+    return `<div class="rec-list">${dates.map((iso) => `
+      <div class="rec-list-day">
+        <div class="rec-list-date${iso === today ? ' rec-list-today' : ''}">${escapeHtml(fmtShortDate(iso))} · ${WEEKDAY_SHORT[weekdayOf(iso)]}</div>
+        ${byDate.get(iso).map(chipHtml).join('')}
+      </div>`).join('')}</div>`;
+  }
+
+  function renderCalendar() {
+    const host = document.getElementById('rec-calendar');
+    if (!host) return;
+    const byDate = occurrencesByDate();
+    const today = todayIso();
+    host.innerHTML = `<div class="ant-card-head"><div class="ant-card-head-wrapper">
+        <h2 class="ant-card-head-title">${escapeHtml(monthLabel(month))}</h2>
+      </div></div>
+      <div class="ant-card-body">${listMode ? listHtml(byDate, today) : gridHtml(byDate, today)}</div>`;
+  }
+
+  // ─── The schedule list ─────────────────────────────────────────────────────
+  // EVERY adopted schedule, soonest due first, against the date its next charge
+  // falls on — deliberately not month-scoped, unlike the totals: the month on
+  // screen shows what is due inside it, and the list answers "what is running
+  // and what is coming", including a bill that lands nowhere near this month.
+  //
+  // A row is the EDIT control for its schedule, and its only one: every change,
+  // deleting included, is made in the editor it opens. Hovering a row lights
+  // its chips, which is how the list finds a schedule on the calendar without
+  // opening anything; the mark is also what a saved edit leaves behind
+  // (goToSchedule).
+
+  /** The merchant, its cadence and amount under it, and its next due date with
+   *  a dot in its direction's colour. The rule's full sentence is the tooltip.
+   *  An ended schedule says so in place of a date: it stays listed until the
+   *  user deletes it, because a row that vanished would read as lost data. */
+  function railRowHtml(s) {
+    const label = labelOf(s);
+    let due = '';
+    if (s.ended) due = '<span class="ant-tag">Ended</span>';
+    else if (s.next_date) due = `<span class="rec-rail-date">${escapeHtml(fmtShortDate(s.next_date))}</span>`;
+    const cls = 'rec-rail-row'
+      + (activeKey() === s.key ? ' rec-rail-active' : '')
+      + (s.ended ? ' rec-rail-ended' : '');
+    return `<button type="button" class="${cls}" aria-haspopup="dialog" data-key="${escapeHtml(s.key)}"
+      data-tip="${escapeHtml(ruleSentence(s.rule))}" data-tip-placement="left">
+      ${merchantAvatarHtml(label)}
+      <span class="rec-rail-main">
+        <span class="rec-rail-name">${escapeHtml(label)}</span>
+        <span class="rec-rail-sub">${escapeHtml(ruleLabel(s.rule))} · ${escapeHtml(formatCurrency(s.amount, true))}</span>
+      </span>
+      <span class="rec-rail-next">${due}<span class="rec-dir-dot rec-dir-${s.direction}" role="img"
+        aria-label="${DIRECTION_LABEL[s.direction] || ''}"></span></span>
+    </button>`;
+  }
+
+  /** The card, head to foot. The two buttons at the foot are the page's only
+   *  whole-list actions, under the list the schedules they make land in. */
+  function renderRail() {
+    const host = document.getElementById('rec-rail');
+    if (!host) return;
+    const list = data.series.length
+      ? `<div class="rec-rail-list">${data.series.map(railRowHtml).join('')}</div>`
+      : Ant.empty({ title: 'No schedules yet', desc: 'Create one, or let detection find them in your ledger.' });
+    host.innerHTML = `<div class="ant-card-head"><div class="ant-card-head-wrapper">
+        <h2 class="ant-card-head-title">Schedules</h2>
+        <div class="ant-card-extra"><span class="ant-typography-secondary">${data.series.length}</span></div>
+      </div></div>
+      <div class="ant-card-body">
+        ${list}
+        <div class="rec-rail-foot">
+          <button type="button" class="ant-btn ant-btn-primary ant-btn-block" data-rail-action="create">${Ant.icon('plus')}<span>Create schedule</span></button>
+          <button type="button" class="ant-btn ant-btn-default ant-btn-block" data-rail-action="detect">${Ant.icon('radar-chart')}<span>Detect schedules</span></button>
+        </div>
+      </div>`;
+  }
+
+  // ─── Marking a schedule on both surfaces ───────────────────────────────────
+
+  /** The chip for an occurrence, when the calendar is drawing one. */
+  function chipFor(ref) {
+    if (!ref) return null;
+    return document.querySelector(
+      `.rec-occ[data-key="${CSS.escape(ref.key)}"][data-date="${CSS.escape(ref.date)}"]`
+    );
+  }
+
+  /** Light every chip of the active SCHEDULE — a monthly bill's whole run, not
+   *  just the one under the pointer — and its list row with them. Classes
+   *  only, no re-render: the pointer is sitting on one of these nodes, and
+   *  replacing it mid-hover would restart the mouseover/mouseout cycle. */
+  function applyActiveHighlight() {
+    const key = activeKey();
+    document.querySelectorAll('.rec-occ').forEach((chip) => {
+      chip.classList.toggle('rec-occ-active', key != null && chip.dataset.key === key);
+    });
+    document.querySelectorAll('.rec-rail-row').forEach((row) => {
+      row.classList.toggle('rec-rail-active', key != null && row.dataset.key === key);
+    });
+  }
+
+  /** Mark `key` on the month on screen, unfolding its day if the chip is
+   *  behind a "+n more". False when this month draws nothing for it, which is
+   *  the list's normal case: most schedules are elsewhere. */
+  function markScheduleInMonth(key) {
+    const occ = data.occurrences.find((o) => o.key === key);
+    if (!occ) return false;
+    revealOccurrence({ key, date: occ.date });
+    pickedKey = key;
+    applyActiveHighlight();
+    return true;
+  }
+
+  /** Follow a schedule to wherever it is: the calendar steps to the month of
+   *  its next charge, and its chips there light up. */
+  async function goToSchedule(key) {
+    if (markScheduleInMonth(key)) return true;
+    const target = seriesFor(key).next_date?.slice(0, 7);
+    if (!target || target === month) return false;
+    month = target;
+    expandedDays.clear();
+    await load();
+    return markScheduleInMonth(key);
+  }
+
+  /** Make sure an occurrence has a chip before anything points at it: a mark on
+   *  a chip that is not drawn is no answer at all. Unfolding the day also shows
+   *  the user where the schedule went. */
+  function revealOccurrence(ref) {
+    if (chipFor(ref)) return;
+    expandedDays.add(ref.date);
+    renderCalendar();
+  }
+
+  /** Drop the mark, for Escape. The calendar stays where it is: the month on
+   *  screen is where the user asked to be. */
+  function clearPick() {
+    pickedKey = null;
+    applyActiveHighlight();
+  }
+
+  // ─── The editor ────────────────────────────────────────────────────────────
+  // ONE dialog for every change a schedule can take, and the only one on the
+  // page. Creating (the list's Create schedule, a day of the calendar) and
+  // editing (a chip or a list row) all open it.
+  //
+  // WHAT IS SENT. Editing sends only what the user changed (diffPatch). That
+  // matters beyond saving bytes: a null field on a detected schedule means
+  // "follow the ledger", so writing every field back on every save would
+  // quietly pin a schedule's name, amount and cadence the first time someone
+  // corrected its spelling.
+
+  const REPEAT_MODES = [
+    ['weekly', 'Weekly'],
+    ['monthly-date', 'Monthly (by date)'],
+    ['monthly-day', 'Monthly (by day)'],
+  ];
+  // Matches services/recurrence.js's MAX_INTERVAL. A larger number is a typo
+  // rather than a cadence.
+  const MAX_INTERVAL = 120;
+  // The Name field's merchant suggestions: two characters before the first
+  // lookup (one letter matches most of the lexicon), and a pause long enough
+  // that typing a full name costs one request rather than one per key.
+  const SUGGEST_DELAY_MS = 160;
+  const SUGGEST_MIN_CHARS = 2;
+  // The readout's next dates: asked for once the form stops changing.
+  const PREVIEW_DELAY_MS = 120;
+
+  const dayOptions = Array.from({ length: 31 }, (_, i) => [i + 1, ordinal(i + 1)]);
+  const weekdayOptions = WEEKDAY_LABELS.map((label, i) => [i, label]);
+
+  /** The rule as the form's controls hold it. "Monthly by date" and "monthly
+   *  by day" are one control here and two fields in the rule (freq +
+   *  month_mode), because to the user they are one choice. Whatever the rule
+   *  leaves open comes from `anchorIso`, so a schedule started on the 14th
+   *  repeats on the 14th, and by day on the second of that weekday. A fifth
+   *  weekday reads as the last: rules have no fifth week, since most months
+   *  do not. */
+  function ruleToForm(rule, anchorIso) {
+    const [y, m, d] = anchorIso.split('-').map(Number);
+    const week = Math.ceil(d / 7);
+    const base = {
+      mode: 'monthly-date', interval: 1,
+      weekday: new Date(y, m - 1, d).getDay(), day: d, pos: week > 4 ? -1 : week,
+    };
     if (!rule) return base;
     if (rule.freq === 'weekly') {
-      return { ...base, mode: 'weekly', interval: rule.interval, weekday: rule.weekday ?? 1 };
+      return { ...base, mode: 'weekly', interval: rule.interval, weekday: rule.weekday ?? base.weekday };
     }
     if (rule.month_mode === 'day') {
       return {
         ...base, mode: 'monthly-day', interval: rule.interval,
-        weekday: rule.weekday ?? 1, pos: rule.pos ?? 1,
+        weekday: rule.weekday ?? base.weekday, pos: rule.pos ?? base.pos,
       };
     }
-    return { ...base, mode: 'monthly-date', interval: rule.interval, day: rule.day ?? 1 };
+    return { ...base, mode: 'monthly-date', interval: rule.interval, day: rule.day ?? base.day };
   }
 
   function formToRule(f, until) {
@@ -503,13 +548,16 @@
     return { freq: 'monthly', interval: f.interval, weekday: null, month_mode: 'date', day: f.day, pos: null, until };
   }
 
-  /** A dropdown, drawn the way the rest of the app draws one: the platform
-   *  arrow off (see .rec-select) and the app's own caret over it. A <select>
-   *  cannot hold a child, so the caret is a sibling inside the wrapper — the
-   *  same arrangement the ledger's row selects use (transactions.css
-   *  .tx-select-wrap), and the same Phosphor glyph the report pickers carry. */
+  /** "week" or "weeks", "month" or "months": the unit beside Every. */
+  function unitOf(f) {
+    return (f.mode === 'weekly' ? 'week' : 'month') + (f.interval === 1 ? '' : 's');
+  }
+
+  /** Ant's Select over a native <select>: DownOutlined is a sibling, since a
+   *  <select> cannot hold a child. */
   function selectHtml(attrs, inner) {
-    return `<span class="rec-select-wrap"><select class="rec-select" ${attrs}>${inner}</select>${UI.PICKER_CARET}</span>`;
+    return `<span class="ant-select"><select class="ant-select-selector" ${attrs}>${inner}</select>`
+      + `<span class="ant-select-arrow">${Ant.icon('down')}</span></span>`;
   }
 
   const optionsHtml = (pairs, selected) => pairs
@@ -517,130 +565,104 @@
       `<option value="${escapeHtml(String(value))}"${String(value) === String(selected) ? ' selected' : ''}>${escapeHtml(label)}</option>`)
     .join('');
 
-  // The Name field's merchant suggestions. Two characters before the first
-  // lookup — one letter matches most of the lexicon — and a pause long enough
-  // that typing a full name costs one request rather than one per key.
-  const SUGGEST_DELAY_MS = 160;
-  const SUGGEST_MIN_CHARS = 2;
-
-  const dayOptions = Array.from({ length: 31 }, (_, i) => [i + 1, ordinal(i + 1)]);
-  const weekdayOptions = WEEKDAY_LABELS.map((label, i) => [i, label]);
-
-  /** The repeat block's second row, which is the one that changes with the mode:
-   *  a weekday, a day of the month, or a position and a weekday. */
+  /** The repeat band's changing cell: a weekday, a day of the month, or a
+   *  position and a weekday as one joined control. */
   function repeatDetailHtml(f) {
     if (f.mode === 'weekly') {
-      return `<label class="rec-field">
-        <span class="rec-field-label">On</span>
+      return `<label class="ant-form-item">
+        <span class="ant-form-item-label">On</span>
         ${selectHtml('data-form="weekday"', optionsHtml(weekdayOptions, f.weekday))}
       </label>`;
     }
     if (f.mode === 'monthly-day') {
-      return `<label class="rec-field">
-        <span class="rec-field-label">On the</span>
-        <span class="rec-field-pair">
-          ${selectHtml('data-form="pos"', optionsHtml(POSITION_LABELS, f.pos))}
-          ${selectHtml('data-form="weekday"', optionsHtml(weekdayOptions, f.weekday))}
-        </span>
-      </label>`;
+      return `<div class="ant-form-item">
+        <span class="ant-form-item-label" id="rec-on-label">On the</span>
+        <div class="ant-space-compact ant-space-compact-block" role="group" aria-labelledby="rec-on-label">
+          ${selectHtml('data-form="pos" aria-label="Week of the month"', optionsHtml(POSITION_LABELS, f.pos))}
+          ${selectHtml('data-form="weekday" aria-label="Weekday"', optionsHtml(weekdayOptions, f.weekday))}
+        </div>
+      </div>`;
     }
-    return `<label class="rec-field">
-      <span class="rec-field-label">On the</span>
+    return `<label class="ant-form-item">
+      <span class="ant-form-item-label">On the</span>
       ${selectHtml('data-form="day"', optionsHtml(dayOptions, f.day))}
     </label>`;
   }
 
-  function editorHtml(s, { creating, dateIso }) {
-    const f = ruleToForm(s.rule);
+  function editorBodyHtml(s, f, { creating, nextIso }) {
     const label = s.display_name || s.description || '';
     const until = s.rule && s.rule.until ? s.rule.until : '';
-    const unit = f.mode === 'weekly' ? 'weeks' : 'months';
-    // The anchor is only the user's on a schedule with no transactions behind
-    // it. A detected one takes its dates from the ledger, so there is nothing
-    // here to move.
-    const dateField = creating || s.manual ? `<label class="rec-field">
-        <span class="rec-field-label">Next charge</span>
-        <input type="date" class="rec-dialog-input" data-form="next_date"
-          value="${escapeHtml(creating ? dateIso : (s.next_date || dateIso))}">
+    // A date the user owns only on a schedule with no transactions behind it. A
+    // detected one takes its dates from the ledger, so there is nothing to move.
+    const dateField = creating || s.manual ? `<label class="ant-form-item">
+        <span class="ant-form-item-label">Next charge</span>
+        <input type="date" class="ant-input" data-form="next_date" value="${escapeHtml(nextIso)}">
       </label>` : '';
+    const footnote = !creating && !s.manual
+      ? `<div class="rec-edit-footnote">Detected from ${s.occurrences} transaction${s.occurrences === 1 ? '' : 's'} in your ledger, so its dates follow the ledger.</div>`
+      : '';
 
-    // A rule between the bands and no headings over them: the form asks two
-    // questions (what is it, and how does it repeat), and a rule is enough to
-    // say where one ends. They are drawn edge to edge
-    // (.rec-edit-rule), so each band reads as a strip of the dialog rather than
-    // as a line floating inside it.
-    return `<p class="rec-edit-title"><strong>${creating ? 'New schedule' : 'Edit schedule'}</strong></p>
-      <hr class="rec-edit-rule">
-
-      <div class="rec-edit-grid">
-        <!-- Not a <label> wrapper like the fields below it: the suggestion list
-             is a sibling of the input rather than part of it, and a click
-             anywhere inside a label is forwarded to that label's control. -->
-        <div class="rec-field rec-field-wide rec-name-field">
-          <label class="rec-field-label" for="rec-name-input">Name</label>
+    // Two bands — what it is, then how it repeats — split by a rule. Name is not
+    // a <label> wrapper like the fields after it: its suggestion list is a
+    // sibling of the input, and a click anywhere inside a label is forwarded to
+    // that label's control.
+    return `<div class="rec-edit-grid">
+        <div class="ant-form-item rec-field-wide rec-name-field">
+          <label class="ant-form-item-label" for="rec-name-input">Name</label>
           <div class="rec-name-row">
             <span class="rec-name-avatar" id="rec-name-avatar" aria-hidden="true">${merchantAvatarHtml(label)}</span>
-            <input type="text" class="rec-dialog-input" id="rec-name-input" data-form="display_name" maxlength="100"
+            <input type="text" class="ant-input" id="rec-name-input" data-form="display_name" maxlength="100"
               value="${escapeHtml(label)}" placeholder="e.g. Gym Membership" autocomplete="off"
               role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="rec-name-suggest">
           </div>
           <div class="rec-suggest" id="rec-name-suggest" role="listbox" aria-label="Matching merchants" hidden></div>
         </div>
-        <label class="rec-field">
-          <span class="rec-field-label">Type</span>
-          ${selectHtml('data-form="direction"', typeOptionsHtml(s.direction || 'expense'))}
+        <label class="ant-form-item">
+          <span class="ant-form-item-label">Type</span>
+          ${selectHtml('data-form="direction"', optionsHtml(DIRECTION_OPTIONS.map((d) => [d, DIRECTION_LABEL[d]]), s.direction || 'expense'))}
         </label>
-        <label class="rec-field">
-          <span class="rec-field-label">Amount</span>
-          <input type="text" inputmode="decimal" class="rec-dialog-input rec-input-amount" data-form="amount"
+        <label class="ant-form-item">
+          <span class="ant-form-item-label">Amount</span>
+          <input type="text" inputmode="decimal" class="ant-input rec-input-amount" data-form="amount"
             value="${s.amount == null ? '' : escapeHtml(formatCurrency(s.amount, true, { editable: true }))}"
             placeholder="${escapeHtml(formatCurrency(0, true, { editable: true }))}" autocomplete="off">
         </label>
       </div>
 
-      <hr class="rec-edit-rule">
-      <div class="rec-edit-grid">
-        <label class="rec-field">
-          <span class="rec-field-label">Repeat by</span>
+      <div class="rec-edit-grid rec-edit-band">
+        <label class="ant-form-item">
+          <span class="ant-form-item-label">Repeat by</span>
           ${selectHtml('data-form="mode"', optionsHtml(REPEAT_MODES, f.mode))}
         </label>
-        <label class="rec-field">
-          <span class="rec-field-label">Every</span>
-          <span class="rec-field-pair">
-            <input type="number" class="rec-dialog-input rec-input-interval" data-form="interval"
-              min="1" max="${MAX_INTERVAL}" step="1" value="${f.interval}">
-            <span class="rec-field-unit" data-form="unit">${unit}</span>
-          </span>
-        </label>
+        <div class="ant-form-item">
+          <label class="ant-form-item-label" for="rec-interval">Every</label>
+          <div class="ant-space-compact">
+            <input type="number" class="ant-input rec-input-interval" id="rec-interval" data-form="interval"
+              min="1" max="${MAX_INTERVAL}" step="1" value="${f.interval}" aria-describedby="rec-interval-unit">
+            <span class="ant-input-addon" id="rec-interval-unit" data-form="unit">${unitOf(f)}</span>
+          </div>
+        </div>
         <div class="rec-edit-detail">${repeatDetailHtml(f)}</div>
         ${dateField}
       </div>
 
-      <!-- Most schedules run until they are cancelled, so the end date is not a
-           field by default: it is one tick, and the date appears when it is
-           ticked. A Never/On pair asked every user to answer a question almost
-           none of them have. -->
       <div class="rec-edit-ends">
-        <label class="rec-check">
-          <input type="checkbox" data-form="ends-on"${until ? ' checked' : ''}>
+        <label class="ant-checkbox-wrapper">
+          <input type="checkbox" class="ant-checkbox" data-form="ends-on"${until ? ' checked' : ''}>
           <span>Ends on</span>
         </label>
-        <input type="date" class="rec-dialog-input rec-input-until" data-form="until"
+        <input type="date" class="ant-input" data-form="until" aria-label="End date"
           value="${escapeHtml(until)}"${until ? '' : ' hidden'}>
       </div>
 
-      <p class="rec-edit-readout" id="rec-edit-readout"></p>
-
-      <!-- Delete is here because this is where a schedule is read: the form
-           names it and shows what it repeats. It sits at the far left of the
-           row, the dialog's width away from Save. There is no Cancel button —
-           the x and Escape both back out, and a third button on a row that now
-           holds a destructive one is a third place to misclick. Creating has
-           nothing to delete yet. -->
-      <div class="confirm-actions">
-        ${creating ? '' : '<button class="db-btn db-btn-danger rec-edit-delete" id="rec-edit-delete">Delete</button>'}
-        <button class="button-primary" id="rec-edit-save">${creating ? 'Create' : 'Save'}</button>
-      </div>`;
+      <div class="ant-alert ant-alert-info ant-alert-with-description rec-edit-readout" id="rec-edit-readout" role="status">
+        <div class="ant-alert-content">
+          <div class="ant-alert-message" id="rec-readout-rule"></div>
+          <div class="ant-alert-description" id="rec-readout-next"></div>
+        </div>
+      </div>
+      ${footnote}
+      <div class="rec-edit-error" id="rec-edit-error" role="alert" hidden></div>`;
   }
 
   /** Only what changed, so a detected schedule keeps following the ledger on
@@ -659,22 +681,46 @@
 
   /**
    * The editor. `key` names the schedule to edit; without one it creates,
-   * anchored on `dateIso` (a day cell's date, or today).
+   * starting on `dateIso` (a day's date, or today).
    */
-  async function openScheduleDialog({ key = null, dateIso = null } = {}) {
+  function openScheduleDialog({ key = null, dateIso = null } = {}) {
     const creating = !key;
     const s = creating
       ? { direction: 'expense', amount: null, rule: null, manual: true }
       : seriesFor(key);
     if (!creating && !s.key) return;
-    const anchor = dateIso || todayIso();
+    const start = dateIso || todayIso();
+    const nextIso = creating ? start : (s.next_date || start);
+    const form = ruleToForm(s.rule, s.next_date || s.last_date || start);
+    // The form's two timers, stopped when it closes so nothing answers into a
+    // dialog that is gone.
+    let previewTimer = 0;
+    let suggestTimer = 0;
 
-    const { overlay, close } = UI.dialog(editorHtml(s, { creating, dateIso: anchor }), {
+    const { overlay, close } = Ant.modal({
+      title: creating ? 'New schedule' : 'Edit schedule',
+      width: 560,
       className: 'rec-edit-dialog',
+      body: editorBodyHtml(s, form, { creating, nextIso }),
+      footer: `${creating ? '' : `<button type="button" class="ant-btn ant-btn-default ant-btn-dangerous rec-edit-delete" id="rec-edit-delete">${Ant.icon('delete')}<span>Delete</span></button>`}
+        <button type="button" class="ant-btn ant-btn-primary" id="rec-edit-save">${creating ? 'Create' : 'Save'}</button>`,
+      onClose: () => {
+        clearTimeout(previewTimer);
+        clearTimeout(suggestTimer);
+      },
     });
 
     const el = (sel) => overlay.querySelector(sel);
-    const form = ruleToForm(s.rule);
+    const nameInput = el('#rec-name-input');
+    const amountInput = el('[data-form="amount"]');
+    const dateInput = el('[data-form="next_date"]');
+    const untilInput = el('[data-form="until"]');
+    const endsBox = el('[data-form="ends-on"]');
+    const errorLine = el('#rec-edit-error');
+    // Whether the user has set the day the schedule repeats on. Until they do, a
+    // new schedule's rule follows its date: moving the next charge to the 5th
+    // makes it repeat on the 5th.
+    let ruleTouched = false;
 
     /** Read the controls back into the rule the form describes. */
     function readForm() {
@@ -687,47 +733,98 @@
       form.weekday = pick('weekday', form.weekday);
       form.day = pick('day', form.day);
       form.pos = pick('pos', form.pos);
-      const endsOn = el('[data-form="ends-on"]').checked;
-      const until = endsOn ? el('[data-form="until"]').value : '';
-      return formToRule(form, until || null);
+      return formToRule(form, endsBox.checked && untilInput.value ? untilInput.value : null);
+    }
+
+    // ── The readout: the rule in a sentence, and its next three dates ────────
+    // The dates come from the backend (GET /api/recurring/preview), which runs
+    // the same rule code the calendar is drawn with, so the readout never
+    // promises a date the calendar then puts elsewhere. Its anchor is the one
+    // a save would use: a detected schedule's last recorded charge, otherwise
+    // the date the schedule starts. Only the newest answer may paint.
+    let previewGeneration = 0;
+
+    function previewAnchor() {
+      if (!creating && !s.manual) return { anchor: s.last_date, afterAnchor: true };
+      // An untouched date on an existing hand-made schedule is not sent on save
+      // (diffPatch), so its stored anchor still rules.
+      if (!creating && dateInput.value === nextIso) return { anchor: s.last_date, afterAnchor: false };
+      return { anchor: dateInput.value, afterAnchor: false };
+    }
+
+    async function showNextDates(rule) {
+      const mine = ++previewGeneration;
+      const out = el('#rec-readout-next');
+      const { anchor, afterAnchor } = previewAnchor();
+      if (!anchor) { out.textContent = ''; return; }
+      const params = new URLSearchParams({ anchor, freq: rule.freq, interval: String(rule.interval) });
+      for (const field of ['weekday', 'month_mode', 'day', 'pos', 'until']) {
+        if (rule[field] != null) params.set(field, String(rule[field]));
+      }
+      if (afterAnchor) params.set('after_anchor', '1');
+      let body = null;
+      try {
+        const res = await apiFetch(`/api/recurring/preview?${params}`);
+        if (res.ok) body = await res.json();
+      } catch (err) {
+        console.error('[recurring] preview failed:', err);
+      }
+      if (mine !== previewGeneration || !overlay.isConnected) return;
+      const dates = body && Array.isArray(body.dates) ? body.dates : null;
+      if (!dates) out.textContent = '';
+      else if (!dates.length) out.textContent = 'No dates left before it ends.';
+      else out.textContent = `Next: ${dates.map(fmtShortDate).join(', ')}`;
     }
 
     function syncReadout() {
-      el('#rec-edit-readout').textContent = ruleSentence(readForm());
+      const rule = readForm();
+      el('#rec-readout-rule').textContent = `${ruleSentence(rule)}.`;
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(() => showNextDates(rule), PREVIEW_DELAY_MS);
     }
 
-    /** The mode control changes which fields exist, so its row is redrawn. */
+    /** Redraw the repeat band's mode-dependent cell from `form`. */
     function redrawDetail() {
-      readForm();
       el('.rec-edit-detail').innerHTML = repeatDetailHtml(form);
-      el('[data-form="unit"]').textContent = form.mode === 'weekly' ? 'weeks' : 'months';
+      el('[data-form="unit"]').textContent = unitOf(form);
       syncReadout();
     }
 
-    // ── Name: avatar, and the merchants the lexicon knows ──────────────────
+    // ── Errors ───────────────────────────────────────────────────────────────
+    // A field that fails is marked and the first problem is said in words, so
+    // the red border is never the only thing saying what is wrong. Saving never
+    // stores a value the user did not type.
+    function showError(text) {
+      errorLine.textContent = text;
+      errorLine.hidden = !text;
+    }
+
+    function clearInvalid(node) {
+      if (!node.hasAttribute('aria-invalid')) return;
+      node.removeAttribute('aria-invalid');
+      if (!overlay.querySelector('[aria-invalid="true"]')) showError('');
+    }
+
+    // ── Name: avatar, and the merchants the lexicon knows ────────────────────
     // Typing a name offers matching merchants (GET /api/recurring/brands, the
-    // bundled lexicon rather than the ledger). Picking one writes the merchant's
-    // canonical spelling, and that spelling is what draws the brand avatar —
-    // avatar.js slugs the label and looks it up in the icon manifest the same
-    // lexicon generated.
+    // bundled lexicon rather than the ledger). Picking one writes the
+    // merchant's canonical spelling, and that spelling is what draws the brand
+    // avatar — avatar.js slugs the label and looks it up in the icon manifest
+    // the same lexicon generated.
     //
-    // It claims NOTHING. No transaction, no alias, no history: a suggestion
-    // fills in one field the user can immediately overwrite. A schedule is
-    // still joined to the ledger by its key alone, exactly as before.
-    const nameInput = el('#rec-name-input');
+    // It claims NOTHING. No transaction, no alias, no history: a suggestion fills
+    // in one field the user can immediately overwrite. A schedule is still joined
+    // to the ledger by its key alone.
     const avatarBox = el('#rec-name-avatar');
     const suggestBox = el('#rec-name-suggest');
-    const typeSelect = el('[data-form="direction"]');
 
     let suggestions = [];
     let suggestIndex = -1;   // -1 = nothing highlighted; Enter then saves nothing
-    let suggestTimer = null;
     let suggestGeneration = 0;
     let avatarFor = null;    // the label the avatar currently draws
 
-    /** Keep the avatar showing the name as typed. Re-rendered only when the
-     *  name actually changed, so holding a key down does not rebuild it per
-     *  keystroke. */
+    /** Keep the avatar showing the name as typed, rebuilt only when the name
+     *  actually changed so a held key does not rebuild it per repeat. */
     function syncAvatar() {
       const label = nameInput.value.trim();
       if (label === avatarFor) return;
@@ -741,13 +838,14 @@
       suggestBox.hidden = true;
       suggestBox.innerHTML = '';
       nameInput.setAttribute('aria-expanded', 'false');
+      nameInput.removeAttribute('aria-activedescendant');
     }
 
     function suggestRowHtml(b, i) {
       // tabindex="-1": the arrow keys walk the list, Tab leaves it. A row that
       // took a Tab stop would put eight of them between Name and Type.
-      return `<button type="button" class="rec-suggest-row" role="option" tabindex="-1" data-index="${i}"
-        aria-selected="${i === suggestIndex}">
+      return `<button type="button" class="rec-suggest-row" id="rec-suggest-${i}" role="option" tabindex="-1"
+        data-index="${i}" aria-selected="false">
         ${merchantAvatarHtml(b.name)}
         <span class="rec-suggest-name">${escapeHtml(b.name)}</span>
       </button>`;
@@ -768,17 +866,17 @@
         row.classList.toggle('rec-suggest-active', i === suggestIndex);
         row.setAttribute('aria-selected', String(i === suggestIndex));
       });
+      nameInput.setAttribute('aria-activedescendant', `rec-suggest-${suggestIndex}`);
       suggestBox.children[suggestIndex].scrollIntoView({ block: 'nearest' });
     }
 
-    /** Take a suggestion: its name, and nothing else. The type, the amount and
-     *  the cadence are left alone — the lexicon knows what a merchant is called,
-     *  not what they charge this user. */
+    /** Take a suggestion: its name, and nothing else. The lexicon knows what a
+     *  merchant is called, not what they charge this user. */
     function applySuggestion(i) {
       const brand = suggestions[i];
       if (!brand) return;
       nameInput.value = brand.name;
-      nameInput.classList.remove('invalid');
+      clearInvalid(nameInput);
       closeSuggest();
       syncAvatar();
       nameInput.focus();
@@ -787,8 +885,8 @@
     async function searchBrands() {
       const q = nameInput.value.trim();
       if (q.length < SUGGEST_MIN_CHARS) { closeSuggest(); return; }
-      // Every keystroke can outrun the one before it; only the newest answer may
-      // paint, or a slow early response overwrites a fast later one.
+      // Every keystroke can outrun the one before it; only the newest answer
+      // may paint, or a slow early response overwrites a fast later one.
       const mine = ++suggestGeneration;
       const res = await apiFetch(`/api/recurring/brands?q=${encodeURIComponent(q)}`);
       if (mine !== suggestGeneration || !res.ok) return;
@@ -804,6 +902,12 @@
     function queueSuggest() {
       clearTimeout(suggestTimer);
       suggestTimer = setTimeout(searchBrands, SUGGEST_DELAY_MS);
+    }
+
+    function dropSuggest() {
+      clearTimeout(suggestTimer);
+      suggestGeneration++;
+      closeSuggest();
     }
 
     // mousedown, not click: it fires before the input loses focus, so picking a
@@ -827,91 +931,138 @@
         applySuggestion(suggestIndex);
         return;
       }
-      // Dismiss the list, not the dialog: the editor's Escape listener is on the
-      // document, so stopping here is what keeps an open list from closing the
-      // form the user is still filling in.
+      // Dismiss the list, not the dialog: the dialog's Escape listener is on
+      // the document, so stopping here keeps an open list from closing the form
+      // the user is still filling in.
       if (e.key === 'Escape' && !suggestBox.hidden) {
         e.stopPropagation();
-        clearTimeout(suggestTimer);
-        suggestGeneration++;
-        closeSuggest();
+        dropSuggest();
       }
     });
 
     el('.rec-name-field').addEventListener('focusout', (e) => {
       if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
-      clearTimeout(suggestTimer);
-      suggestGeneration++;
-      closeSuggest();
+      dropSuggest();
     });
 
-    syncReadout();
-    syncAvatar();
-    nameInput.focus();
-    nameInput.select();
-
+    // ── Form events ──────────────────────────────────────────────────────────
     overlay.addEventListener('change', (e) => {
-      if (e.target.matches('[data-form="mode"]')) { redrawDetail(); return; }
-      if (e.target.matches('[data-form="ends-on"]')) {
-        const on = e.target.checked;
-        const date = el('[data-form="until"]');
-        date.hidden = !on;
-        // An end date with nothing in it is not an end date. Offering the day
-        // the schedule next falls on is the only guess that is never wrong by a
-        // cycle, and it is one the user is about to move anyway.
-        if (on && !date.value) date.value = s.next_date || anchor;
-        if (on) date.focus();
+      const t = e.target;
+      clearInvalid(t);
+      if (t.matches('[data-form="mode"]')) {
+        ruleTouched = true;
+        readForm();
+        redrawDetail();
+        return;
+      }
+      if (t.matches('[data-form="weekday"], [data-form="day"], [data-form="pos"]')) ruleTouched = true;
+      if (t === dateInput && creating && !ruleTouched && t.value) {
+        const fromDate = ruleToForm(null, t.value);
+        Object.assign(form, { weekday: fromDate.weekday, day: fromDate.day, pos: fromDate.pos });
+        redrawDetail();
+        return;
+      }
+      if (t === endsBox) {
+        untilInput.hidden = !t.checked;
+        clearInvalid(untilInput);
+        // An end date with nothing in it is not an end date. A year out is a
+        // guess the user is about to move anyway, and never one that ends the
+        // schedule before its next charge.
+        if (t.checked && !untilInput.value) {
+          const d = new Date();
+          untilInput.value = isoOf(new Date(d.getFullYear() + 1, d.getMonth(), d.getDate()));
+        }
+        if (t.checked) untilInput.focus();
       }
       syncReadout();
     });
+
     overlay.addEventListener('input', (e) => {
-      if (e.target === nameInput) { syncAvatar(); queueSuggest(); }
-      if (e.target.classList.contains('rec-input-amount')) applyCurrencyFormat(e.target);
-      if (e.target.matches('[data-form="interval"], [data-form="until"]')) syncReadout();
-      e.target.classList.remove('invalid');
+      const t = e.target;
+      if (t.matches('select, [type="date"], [type="checkbox"]')) return;   // 'change' has these
+      clearInvalid(t);
+      if (t === nameInput) { syncAvatar(); queueSuggest(); }
+      if (t === amountInput) applyCurrencyFormat(t);
+      if (t.matches('[data-form="interval"]')) {
+        readForm();
+        el('[data-form="unit"]').textContent = unitOf(form);
+        syncReadout();
+      }
     });
-    // Backing out of the confirm returns to the form with everything still in
-    // it, so a mis-hit Delete costs nothing that was typed.
-    el('#rec-edit-delete')?.addEventListener('click', async () => {
-      if (!await confirmRemoveSchedule(s.key)) return;
+
+    // ── Delete ───────────────────────────────────────────────────────────────
+    // Here because this is where a schedule is read: the form names it and shows
+    // what it repeats. Ant's Popconfirm asks above the button rather than a
+    // second dialog stacking on this one, and the wording names what is lost:
+    // the schedule, never the transactions it was detected from.
+    el('#rec-edit-delete')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (isBusy(btn)) return;
+      const label = labelOf(s);
+      const ok = await Ant.popconfirm(btn, {
+        title: `Delete ${label}?`,
+        desc: s.manual
+          ? 'It leaves the calendar. Nothing in your ledger changes.'
+          : 'It leaves the calendar. Its transactions stay in your ledger, and Detect schedules can offer it again.',
+        okText: 'Delete',
+        danger: true,
+      });
+      if (!ok) return;
+      const res = await requestFrom(btn, `/api/recurring/schedule/${encodeURIComponent(s.key)}`, { method: 'DELETE' });
+      if (!res?.ok) {
+        Ant.message.error("Couldn't delete it — try again.");
+        return;
+      }
+      if (pickedKey === s.key) pickedKey = null;
       close();
       await load();
+      Ant.message.success(`Deleted ${label}`);
     });
 
-    el('#rec-edit-save').addEventListener('click', async () => {
+    // ── Save ─────────────────────────────────────────────────────────────────
+    el('#rec-edit-save').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (isBusy(btn)) return;
       const name = nameInput.value.trim();
-      const amount = parseFloat(stripCurrencyValue(el('[data-form="amount"]').value));
+      const amount = parseFloat(stripCurrencyValue(amountInput.value));
       const rule = readForm();
-      const dateNode = el('[data-form="next_date"]');
 
-      // Marked rather than corrected: saving must never store a value the user
-      // did not type.
-      const mark = (node, ok) => { if (node) node.classList.toggle('invalid', !ok); return ok; };
-      let valid = mark(nameInput, !!name && !!normaliseDesc(name));
-      valid = mark(el('[data-form="amount"]'), amount > 0) && valid;
-      valid = mark(dateNode, !dateNode || !!dateNode.value) && valid;
-      valid = mark(el('[data-form="until"]'), !rule.until || rule.until >= (dateNode ? dateNode.value : rule.until)) && valid;
-      if (!valid) return;
+      const problems = [];
+      const check = (node, ok, text) => {
+        if (!node || ok) return;
+        node.setAttribute('aria-invalid', 'true');
+        problems.push({ node, text });
+      };
+      check(nameInput, !!name, 'Give the schedule a name.');
+      check(nameInput, !name || !!normaliseDesc(name), 'The name needs at least one letter.');
+      check(amountInput, amount > 0, 'Enter an amount above zero.');
+      check(dateInput, !dateInput || !!dateInput.value, 'Pick the date of the next charge.');
+      if (endsBox.checked) {
+        check(untilInput, !!untilInput.value, 'Pick the date it ends, or untick Ends on.');
+        check(untilInput, !untilInput.value || !dateInput || !dateInput.value || untilInput.value >= dateInput.value,
+          'The end date is before the next charge.');
+      }
+      if (problems.length) {
+        showError(problems[0].text);
+        problems[0].node.focus();
+        return;
+      }
 
       let res;
       if (creating) {
-        res = await apiFetch('/api/recurring/schedule', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            display_name: name, direction: typeSelect.value,
-            amount, next_date: dateNode.value, rule, until: rule.until,
-          }),
-        });
+        res = await requestFrom(btn, '/api/recurring/schedule', postJson({
+          display_name: name, direction: el('[data-form="direction"]').value,
+          amount, next_date: dateInput.value, rule, until: rule.until,
+        }));
       } else {
         const after = {
           display_name: name,
-          direction: typeSelect.value,
+          direction: el('[data-form="direction"]').value,
           amount,
           rule: { ...rule, until: null },
           until: rule.until,
         };
-        if (dateNode) after.next_date = dateNode.value;
+        if (dateInput) after.next_date = dateInput.value;
 
         const patch = diffPatch({
           display_name: s.display_name || s.description,
@@ -922,170 +1073,162 @@
           next_date: s.next_date,
         }, after);
         if (!Object.keys(patch).length) { close(); return; }
-        res = await apiFetch('/api/recurring/override', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: s.key, ...patch }),
-        });
+        res = await requestFrom(btn, '/api/recurring/override', postJson({ key: s.key, ...patch }));
       }
 
-      if (!res.ok) {
-        window.UI?.toast?.("Couldn't save your change — it hasn't been stored.", { type: 'error' });
+      if (!res?.ok) {
+        Ant.message.error("Couldn't save your change — it hasn't been stored.");
         return;
       }
       const saved = creating ? (await res.json()).key : s.key;
       close();
       await load();
       goToSchedule(saved);
+      Ant.message.success(`${creating ? 'Created' : 'Saved'} ${name}`);
     });
+
+    syncReadout();
+    syncAvatar();
+    nameInput.focus();
+    nameInput.select();
   }
 
   /** The schedule's rule in the same shape readForm produces, so the two can be
    *  compared field by field without one carrying nulls the other omits. */
   function ruleFromFormState(s) {
-    return formToRule(ruleToForm(s.rule), null);
+    return formToRule(ruleToForm(s.rule, s.next_date || s.last_date || todayIso()), null);
   }
 
-  // ─── Detect ──────────────────────────────────────────────────────────────
-  // Detection runs only on request. The picker lists what the backend found that
-  // is not yet adopted (GET /api/recurring/candidates), and adopting the ticked
-  // ones (POST /api/recurring/adopt) puts them on the calendar. Opening the
-  // dialog writes nothing, so cancelling leaves the database unchanged.
+  // ─── Detect ────────────────────────────────────────────────────────────────
+  // Detection runs only on request. The table lists what the backend found that
+  // is not adopted yet (GET /api/recurring/candidates), and adopting the ticked
+  // ones (POST /api/recurring/adopt) puts them on the calendar. Opening it
+  // writes nothing, so cancelling leaves the database unchanged.
   //
   // Nothing starts ticked. Detection is a heuristic reading of the ledger, so
-  // every row here is a guess the user is being asked about — and a pre-ticked
-  // list answers for them: the fast path becomes "Add", which adopts whatever
-  // the guess happened to include. Starting empty makes each schedule on the
-  // calendar one the user actually chose, and "Select all" is one click away
-  // for the run where the guess is right.
+  // every row is a guess the user is being asked about — and a pre-ticked list
+  // answers for them: the fast path becomes "Add", which adopts whatever the
+  // guess happened to include. Starting empty makes each schedule on the
+  // calendar one the user chose, and the header box ticks them all in one go.
 
-  function candidateRowHtml(s, i) {
-    const label = s.display_name || s.description;
-    const detail = [
-      ruleLabel(s.rule),
-      `${s.occurrences} charge${s.occurrences === 1 ? '' : 's'}`,
-      `next ${fmtShortDate(s.next_date)}`,
-    ].join(' · ');
-    return `<label class="pick-row">
-      <input type="checkbox" class="pick-cb" data-key="${escapeHtml(s.key)}" data-index="${i}">
-      ${merchantAvatarHtml(label)}
-      <span class="pick-text">
-        <span class="pick-name">${escapeHtml(label)}</span>
-        <span class="pick-detail">${escapeHtml(detail)}</span>
-      </span>
-      <span class="pick-amount rec-amount-${s.direction}">${escapeHtml(formatCurrency(s.amount, true))}</span>
-    </label>`;
+  function candidateRowHtml(c) {
+    const label = c.display_name || c.description;
+    const confidence = Math.round((c.confidence || 0) * 100);
+    return `<tr>
+      <td class="ant-table-selection-column">
+        <input type="checkbox" class="ant-checkbox rec-cand-cb" data-key="${escapeHtml(c.key)}" aria-label="Keep ${escapeHtml(label)}">
+      </td>
+      <td><div class="rec-cand-name">${merchantAvatarHtml(label)}<span class="rec-cand-label">${escapeHtml(label)}</span></div></td>
+      <td><span class="ant-tag" data-tip="${escapeHtml(ruleSentence(c.rule))}">${escapeHtml(ruleLabel(c.rule))}</span></td>
+      <td class="ant-table-cell-end rec-cand-amount rec-amount-${c.direction}">
+        <span class="ant-visually-hidden">${DIRECTION_LABEL[c.direction] || ''} </span>${escapeHtml(formatCurrency(c.amount, true))}
+      </td>
+      <td class="rec-cand-next">${escapeHtml(fmtShortDate(c.next_date))}</td>
+      <td>
+        <div class="ant-progress" role="progressbar" aria-label="Confidence"
+          aria-valuemin="0" aria-valuemax="100" aria-valuenow="${confidence}">
+          <div class="ant-progress-outer"><div class="ant-progress-inner"><div class="ant-progress-bg" style="width: ${confidence}%"></div></div></div>
+          <span class="ant-progress-text">${confidence}%</span>
+        </div>
+      </td>
+    </tr>`;
   }
 
-  async function openDetectDialog() {
-    const res = await apiFetch('/api/recurring/candidates');
-    if (!res.ok) {
-      window.UI?.toast?.("Couldn't scan your transactions — try again.", { type: 'error' });
+  async function openDetectDialog(trigger) {
+    if (isBusy(trigger)) return;
+    const res = await requestFrom(trigger, '/api/recurring/candidates');
+    if (!res?.ok) {
+      Ant.message.error("Couldn't scan your transactions — try again.");
       return;
     }
     const { candidates } = await res.json();
 
     if (!candidates.length) {
-      UI.dialog(`
-        <p><strong>No new recurring schedules found</strong></p>
-        <p class="pick-note">A pattern needs a few charges at a steady interval before it can be spotted. Import more history, or add a schedule by hand with the + on the day it falls on.</p>
-        <div class="confirm-actions">
-          <button class="button-secondary confirm-cancel">Close</button>
-        </div>`, { className: 'pick-dialog' });
+      const { overlay } = Ant.modal({
+        title: 'Detect schedules',
+        className: 'rec-detect-dialog',
+        body: Ant.empty({
+          title: 'Nothing new found',
+          desc: 'A pattern needs a few charges at a steady interval before it can be spotted. Import more history, or add a schedule by hand from its day on the calendar.',
+        }),
+        footer: '<button type="button" class="ant-btn ant-btn-default confirm-cancel">Close</button>',
+      });
+      overlay.querySelector('.confirm-cancel').focus();
       return;
     }
 
-    const { overlay, close } = UI.dialog(`
-      <p><strong>Recurring schedules found</strong></p>
-      <p class="pick-note">These transactions look like they repeat. Keep the ones you want to track — you can correct any detail afterwards.</p>
-      <label class="pick-all">
-        <input type="checkbox" id="rec-cand-all">
-        <span>Select all (${candidates.length})</span>
-      </label>
-      <div class="pick-list">${candidates.map(candidateRowHtml).join('')}</div>
-      <div class="confirm-actions">
-        <button class="button-secondary confirm-cancel">Cancel</button>
-        <button class="button-primary confirm-add" id="rec-cand-ok">Add selected</button>
-      </div>`, { className: 'pick-dialog' });
+    const { overlay, close } = Ant.modal({
+      title: 'Detect schedules',
+      width: 760,
+      className: 'rec-detect-dialog',
+      body: `<div class="ant-typography-secondary">Series that repeat in your ledger and are not on the calendar yet. Tick the ones to keep — you can correct any detail afterwards.</div>
+        <div class="ant-table-wrapper">
+          <table class="ant-table">
+            <thead><tr>
+              <th scope="col" class="ant-table-selection-column"><input type="checkbox" class="ant-checkbox" id="rec-cand-all" aria-label="Select all"></th>
+              <th scope="col">Schedule</th>
+              <th scope="col" class="rec-col-cadence">Cadence</th>
+              <th scope="col" class="rec-col-amount ant-table-cell-end">Amount</th>
+              <th scope="col" class="rec-col-next">Next</th>
+              <th scope="col" class="rec-col-confidence">Confidence</th>
+            </tr></thead>
+            <tbody>${candidates.map(candidateRowHtml).join('')}</tbody>
+          </table>
+        </div>`,
+      footer: `<button type="button" class="ant-btn ant-btn-default confirm-cancel">Cancel</button>
+        <button type="button" class="ant-btn ant-btn-primary" id="rec-cand-ok">Add selected</button>`,
+    });
 
     const allBox = overlay.querySelector('#rec-cand-all');
-    const boxes = [...overlay.querySelectorAll('.pick-cb')];
+    const boxes = [...overlay.querySelectorAll('.rec-cand-cb')];
     const okBtn = overlay.querySelector('#rec-cand-ok');
-    const checked = () => boxes.filter((b) => b.checked);
+    const ticked = () => boxes.filter((b) => b.checked);
 
-    // "Add selected" with nothing selected has nothing to do, and the backend
-    // rejects an empty list — so the button reflects that rather than
-    // producing an error the user can't act on.
+    // "Add" with nothing ticked has nothing to do, and the backend rejects an
+    // empty list, so the button says so instead of producing an error.
     function syncState() {
-      const n = checked().length;
+      const n = ticked().length;
       allBox.checked = n === boxes.length;
       allBox.indeterminate = n > 0 && n < boxes.length;
       okBtn.disabled = n === 0;
       okBtn.textContent = n ? `Add ${n} schedule${n === 1 ? '' : 's'}` : 'Add selected';
+      boxes.forEach((b) => b.closest('tr').classList.toggle('ant-table-row-selected', b.checked));
     }
-    syncState();
 
     allBox.addEventListener('change', () => {
       boxes.forEach((b) => { b.checked = allBox.checked; });
       syncState();
     });
-    overlay.querySelector('.pick-list').addEventListener('change', syncState);
+    const tbody = overlay.querySelector('tbody');
+    tbody.addEventListener('change', syncState);
+    // A press anywhere on a row ticks it, the way the whole row was the label
+    // in the picker this table replaced.
+    tbody.addEventListener('click', (e) => {
+      if (e.target.closest('input')) return;
+      const box = e.target.closest('tr')?.querySelector('.rec-cand-cb');
+      if (!box) return;
+      box.checked = !box.checked;
+      syncState();
+    });
 
     okBtn.addEventListener('click', async () => {
-      const keys = checked().map((b) => b.dataset.key);
-      if (!keys.length) return;
-      const adopt = await apiFetch('/api/recurring/adopt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keys }),
-      });
-      if (!adopt.ok) {
-        window.UI?.toast?.("Couldn't add those schedules — try again.", { type: 'error' });
+      const keys = ticked().map((b) => b.dataset.key);
+      if (!keys.length || isBusy(okBtn)) return;
+      const adopt = await requestFrom(okBtn, '/api/recurring/adopt', postJson({ keys }));
+      if (!adopt?.ok) {
+        Ant.message.error("Couldn't add those schedules — try again.");
         return;
       }
       close();
       await load();
+      Ant.message.success(`Added ${keys.length} schedule${keys.length === 1 ? '' : 's'}`);
     });
+
+    syncState();
+    allBox.focus();
   }
 
-  // ─── Add / remove ─────────────────────────────────────────────────────────
-
-  /** Confirm, then delete. Same .confirm-* shell the rest of the app uses for
-   *  destructive prompts, stacked over the editor it is called from. The
-   *  wording names what is actually lost: the schedule, not the transactions it
-   *  was detected from.
-   *
-   *  Returns true once the schedule is gone. Reloading is the caller's, so the
-   *  editor can close before the rail redraws without the row it was editing. */
-  async function confirmRemoveSchedule(key) {
-    const s = seriesFor(key);
-    const label = s.display_name || s.description || key;
-    const ok = await UI.confirm({
-      message: `
-      <p>Delete the <strong>${escapeHtml(label)}</strong> schedule?</p>
-      <p class="pick-note">Its transactions stay in your ledger, and detection can offer it again later.</p>`,
-    });
-    if (!ok) return false;
-    const res = await apiFetch(`/api/recurring/schedule/${encodeURIComponent(key)}`, { method: 'DELETE' });
-    if (!res.ok) {
-      window.UI?.toast?.("Couldn't delete it — try again.", { type: 'error' });
-      return false;
-    }
-    if (pickedKey === key) pickedKey = null;
-    return true;
-  }
-
-  // ─── Toolbar ─────────────────────────────────────────────────────────────
-
-  function renderToolbar() {
-    const [y, m] = month.split('-').map(Number);
-    const label = document.getElementById('rec-month-label');
-    if (label) UI.setPickerLabel(label, `${MONTHS[m - 1]} ${y}`);
-    // Nothing to go back to while we're already there — disabled rather than
-    // hidden, so the stepper's controls never move under the pointer.
-    const today = document.getElementById('rec-month-today');
-    if (today) today.disabled = month === currentMonthKey();
-  }
+  // ─── Load and render ───────────────────────────────────────────────────────
 
   function render() {
     renderToolbar();
@@ -1095,9 +1238,23 @@
   }
 
   async function load() {
-    const res = await apiFetch(`/api/recurring?month=${encodeURIComponent(month)}`);
-    if (!res.ok) return;
-    data = await res.json();
+    const mine = ++loadGeneration;
+    let res = null;
+    try {
+      res = await apiFetch(`/api/recurring?month=${encodeURIComponent(month)}`);
+    } catch (err) {
+      console.error('[recurring] could not load', err);
+    }
+    if (mine !== loadGeneration) return;
+    if (!res?.ok) {
+      // A locked database (423) is the shell's to handle: it puts its own
+      // prompt over the page.
+      if (res?.status !== 423) Ant.message.error("Couldn't load your schedules — try again.");
+      return;
+    }
+    const body = await res.json();
+    if (mine !== loadGeneration) return;
+    data = body;
     seriesByKey = new Map(data.series.map((s) => [s.key, s]));
     render();
   }
@@ -1106,76 +1263,68 @@
     month = key;
     pickedKey = null;
     expandedDays.clear();
+    renderToolbar();
     load();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    renderToolbar();
+
     document.getElementById('rec-month-prev').addEventListener('click', () => goToMonth(addMonthKey(month, -1)));
     document.getElementById('rec-month-next').addEventListener('click', () => goToMonth(addMonthKey(month, 1)));
-
-    // One hop home from anywhere — the arrows reach past either end of the
-    // picker's window, so a user can be years out with no short way back.
+    // One hop home from anywhere, since the arrows and the panel can take the
+    // calendar years out.
     document.getElementById('rec-month-today').addEventListener('click', () => {
       const key = currentMonthKey();
       if (key !== month) goToMonth(key);
     });
-
-    // The label is a picker, like Dashboard's month stepper — .stepper-label draws a
-    // caret and a pointer cursor, so it has to open something. The window runs
-    // a few months ahead of today rather than stopping there the way Dashboard's
-    // does: this report projects upcoming charges. The arrows still reach past
-    // either end.
-    // Same static width as Dashboard's stepper: the label is pinned to the
-    // widest month name it can carry, so walking the calendar leaves the arrows
-    // and the picker under them exactly where they were. Any 4-digit year
-    // measures the same (tabular-nums), so today's stands in for all of them.
-    window.UI?.lockPickerWidth?.(
-      document.getElementById('rec-month-label'),
-      MONTHS.map((m) => `${m} ${new Date().getFullYear()}`),
-    );
-
+    // The month opens Ant's month panel, any month of any year.
     document.getElementById('rec-month-label').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const items = [];
-      for (let i = 3; i > -9; i--) {
-        const key = addMonthKey(currentMonthKey(), i);
-        const [y, m] = key.split('-').map(Number);
-        items.push({
-          label: `${MONTHS[m - 1]} ${y}`,
-          selected: key === month,
-          action: () => goToMonth(key),
-        });
-      }
-      UI.openMenu(e.currentTarget, items);
+      Ant.monthPicker(e.currentTarget, {
+        value: month,
+        onPick: (key) => { if (key !== month) goToMonth(key); },
+      });
     });
 
+    // ── The calendar's controls ──
+    // Delegated, so one listener covers every day across every re-render.
     const calendar = document.getElementById('rec-calendar');
-
-    // ── The grid's own three controls ──
-    // A chip, a day's + and a day's "+n more", delegated so one listener covers
-    // every cell across every re-render.
     calendar.addEventListener('click', (e) => {
-      // The day's + — the schedule being added is due on that day, so the
-      // dialog opens with the date already filled in.
       const add = e.target.closest('[data-add]');
       if (add) { openScheduleDialog({ dateIso: add.dataset.add }); return; }
-      // A chip opens its own schedule's editor. Which occurrence was clicked
-      // does not matter: a schedule's fields belong to the whole series, so the
-      // dialog is keyed by the schedule, not by the date under the pointer.
+      // Which occurrence was clicked does not matter: a schedule's fields
+      // belong to the whole series, so the editor is keyed by the schedule.
       const chip = e.target.closest('.rec-occ');
       if (chip) { openScheduleDialog({ key: chip.dataset.key }); return; }
       const expand = e.target.closest('[data-expand]');
-      if (!expand) return;
-      const iso = expand.dataset.expand;
-      if (expandedDays.has(iso)) expandedDays.delete(iso); else expandedDays.add(iso);
-      renderCalendar();
+      if (expand) {
+        const iso = expand.dataset.expand;
+        if (expandedDays.has(iso)) expandedDays.delete(iso); else expandedDays.add(iso);
+        renderCalendar();
+        calendar.querySelector(`[data-expand="${CSS.escape(iso)}"]`)?.focus();
+        return;
+      }
+      // A day's empty space starts a schedule on that day, as a press on a day
+      // of Ant's Calendar selects it.
+      const day = e.target.closest('[data-day]');
+      if (day) openScheduleDialog({ dateIso: day.dataset.day });
     });
 
-    // ── Rail → grid ──
-    // Hover marks the schedule wherever the month on screen draws it; the click
-    // does the same and makes it stay, following the schedule to another month
-    // if that is where it lives. Same delegation as the chip above: listeners
-    // that outlive every re-render.
+    // Seven columns while the card is wide enough for a chip's name, a list of
+    // days below that. Measured on the card rather than the window, since the
+    // sidebar and the zoom level decide its width as much as the window does.
+    // The redraw waits a frame: drawing inside the observer would resize what
+    // it is observing in the same pass.
+    new ResizeObserver(([entry]) => {
+      const narrow = entry.contentRect.width < LIST_BELOW_PX;
+      if (narrow === listMode) return;
+      listMode = narrow;
+      requestAnimationFrame(renderCalendar);
+    }).observe(calendar);
+
+    // ── List → calendar ──
+    // Hover marks the schedule wherever the month on screen draws it. Delegated
+    // like the calendar's, so the listeners outlive every re-render.
     const rail = document.getElementById('rec-rail');
 
     function markRailHover(e) {
@@ -1198,20 +1347,18 @@
     rail.addEventListener('click', (e) => {
       const foot = e.target.closest('[data-rail-action]');
       if (foot) {
-        // A schedule created from here has no day cell behind it, so it opens on
+        // A schedule created from here has no day behind it, so it opens on
         // today and the user moves the date if it belongs elsewhere.
         if (foot.dataset.railAction === 'create') openScheduleDialog({});
-        else openDetectDialog();
+        else openDetectDialog(foot);
         return;
       }
-
-      // A row has one reading: it opens that schedule's editor.
       const row = e.target.closest('.rec-rail-row');
       if (row) openScheduleDialog({ key: row.dataset.key });
     });
 
-    // The rail's mark is the page's one piece of transient state, so Escape
-    // drops it. A dialog on top handles its own Escape first.
+    // The mark is the page's one piece of transient state, so Escape drops it.
+    // A dialog on top handles its own Escape first.
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || document.querySelector('.confirm-overlay')) return;
       if (pickedKey) clearPick();

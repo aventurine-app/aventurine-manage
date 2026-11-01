@@ -136,6 +136,26 @@ test('new category lands at the end of its own type block, not the global end', 
   );
 });
 
+test('categories ?counts=true counts ledger rows, uncategorized ones by direction', (t) => {
+  const c = makeClient(t);
+  const cat = makeCategory(c, 'Counted');
+  createTx(c, 'one', { catId: cat });
+  createTx(c, 'two', { catId: cat });
+  createTx(c, 'stray spend');                                 // → uncat_expense
+  createTx(c, 'stray pay', { txType: 'income' });             // → uncat_income
+  createTx(c, 'stray move', { txType: 'transfer' });          // → no bucket
+
+  const plain = c.get('/api/categories').body.categories;
+  assert.ok(plain.every((x) => !('transactions' in x)), 'counts are opt-in');
+
+  const counted = c.get('/api/categories?counts=true').body.categories;
+  const byKey = Object.fromEntries(counted.map((x) => [x.key, x.transactions]));
+  assert.equal(counted.find((x) => x.id === cat).transactions, 2);
+  assert.equal(byKey.uncat_expense, 1);
+  assert.equal(byKey.uncat_income, 1);
+  assert.equal(counted.reduce((s, x) => s + x.transactions, 0), 4);
+});
+
 test('category retype updates transactions', (t) => {
   const c = makeClient(t);
   const cat = firstCat(c, 'expense');
@@ -597,6 +617,96 @@ test('import dry_run reports the categorization digest without persisting anythi
   // And, decisively, no row was written and no account was adopted.
   assert.equal(txByDesc(c, 'NETFLIX.COM').length, 0);
   assert.equal(getCategories(c).find((x) => x.key === 'entertainment').id, catId('entertainment'));
+});
+
+test('import dry_run says, row by row, what each row would get', (t) => {
+  const c = makeClient(t);
+  const catId = (key) => getCategories(c).find((x) => x.key === key).id;
+  const gym = makeCategory(c, 'Rows Gym');
+  createTx(c, 'IRONWORKS GYM', { catId: gym });   // teaches a rule
+
+  const rows = [
+    { date: '2026-06-05', description: 'NETFLIX.COM', tx_type: 'expense', amount: 15 },
+    { date: 'not a date', description: 'broken', tx_type: 'expense', amount: 1 },
+    { date: '2026-06-06', description: 'IRONWORKS GYM', tx_type: 'expense', amount: 40 },
+    { date: '2026-06-07', description: 'ZZZ Unknown Corner Store', tx_type: 'expense', amount: 20 },
+  ];
+  const r = c.post('/api/transactions/import', { rows, dry_run: true });
+  assert.equal(r.status, 200);
+  // The unreadable row is skipped, so `row` maps each answer back to its index.
+  assert.deepEqual(r.body.rows.map((x) => [x.row, x.category_id, x.how]), [
+    [0, catId('entertainment'), 'builtin'],
+    [2, gym, 'rule'],
+    [3, null, null],
+  ]);
+  assert.equal(r.body.rows[0].display_name, 'Netflix');
+
+  // A real commit does not carry the per-row list.
+  const real = c.post('/api/transactions/import', { rows: [rows[0]] });
+  assert.equal(real.body.rows, undefined);
+});
+
+test('import keeps a category the user chose, including none, and remembers it', (t) => {
+  const c = makeClient(t);
+  const travel = getCategories(c).find((x) => x.key === 'travel').id;
+  const rows = [
+    // Chosen: overrides the lexicon's Entertainment.
+    { date: '2026-06-05', description: 'NETFLIX.COM', tx_type: 'expense', amount: 15, category_id: travel },
+    // Chosen as none: stays blank instead of being filled back in.
+    { date: '2026-06-05', description: 'SHELL OIL 4411', tx_type: 'expense', amount: 30, category_id: null },
+  ];
+  const dry = c.post('/api/transactions/import', { rows, dry_run: true });
+  assert.deepEqual(dry.body.rows.map((x) => [x.category_id, x.how]), [[travel, 'chosen'], [null, 'chosen']]);
+  assert.equal(dry.body.auto_categorized, 0);
+
+  const r = c.post('/api/transactions/import', { rows });
+  assert.equal(r.status, 200);
+  assert.equal(txByDesc(c, 'NETFLIX.COM')[0].category_id, travel);
+  assert.equal(txByDesc(c, 'SHELL OIL 4411')[0].category_id, null);
+
+  // The pick became a rule: the same description now arrives as Travel.
+  importRows(c, ['NETFLIX.COM']);
+  assert.ok(txByDesc(c, 'NETFLIX.COM').every((x) => x.category_id === travel));
+});
+
+test('suggest: a taught rule first, then the lexicon, only on the chosen side', (t) => {
+  const c = makeClient(t);
+  const catId = (key) => getCategories(c).find((x) => x.key === key).id;
+  const ask = (description, flow) =>
+    c.get(`/api/transactions/suggest?description=${encodeURIComponent(description)}&flow=${flow}`).body.suggestion;
+
+  // The lexicon, for money out.
+  assert.deepEqual(ask('NETFLIX.COM', 'out'), { category_id: catId('entertainment'), how: 'builtin' });
+  // Nothing for money in: an expense category would flip the direction.
+  assert.equal(ask('NETFLIX.COM', 'in'), null);
+  assert.equal(ask('ZZZ Unknown Corner Store', 'out'), null);
+  assert.equal(ask('', 'out'), null);
+
+  // A rule the user taught wins over the lexicon, and near-identical text finds it.
+  const travel = catId('travel');
+  createTx(c, 'NETFLIX.COM', { catId: travel });
+  assert.deepEqual(ask('netflix.com', 'out'), { category_id: travel, how: 'rule' });
+  assert.deepEqual(ask('NETFLIX.COM.', 'out'), { category_id: travel, how: 'rule' });
+
+  // An income rule answers money in only.
+  createTx(c, 'ACME PAYROLL', { catId: catId('income'), txType: 'income' });
+  assert.deepEqual(ask('ACME PAYROLL', 'in'), { category_id: catId('income'), how: 'rule' });
+  assert.equal(ask('ACME PAYROLL', 'out'), null);
+
+  // Off with auto-matching.
+  setSetting(c, 'tx_auto_match', 'off');
+  assert.equal(ask('ACME PAYROLL', 'in'), null);
+});
+
+test('similar: every hit carries its score', (t) => {
+  const c = makeClient(t);
+  createTx(c, 'acme grocery mart');
+  createTx(c, 'acme grocery store');
+  const needle = encodeURIComponent('acme grocery store');
+  const r = c.get(`/api/transactions/similar?description=${needle}&threshold=0.5`);
+  const score = (d) => r.body.transactions.find((x) => x.description === d).score;
+  assert.equal(score('acme grocery store'), 1);
+  assert.ok(score('acme grocery mart') >= 0.5 && score('acme grocery mart') < 1);
 });
 
 test('built-in categorization respects the direction guard and the on/off setting', (t) => {

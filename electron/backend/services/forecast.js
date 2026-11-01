@@ -9,26 +9,29 @@
 // There is no golden fixture for this; it
 // is pinned by ordinary deterministic unit tests in __tests__/forecast.test.js.
 //
-// HYBRID model — each week's net is the sum of:
+// HYBRID model — the TOTAL comes from history, the TIMING from the patterns:
 //
-//   1. A SMOOTH baseline of the user's *irregular* spending and income: the
-//      trailing-average monthly total of everything that is NOT a detected
-//      recurring pattern, converted to a per-day rate and spread evenly across
-//      the weeks. This keeps the long-run slope accurate, since it includes
-//      one-off and lumpy spending the way the old monthly model did.
+//   1. The TYPICAL MONTH is the trailing average of everything the account took
+//      in and paid out (windowAverages), income and expense separately. That is
+//      the long-run slope, and it is the figure the summary reports.
 //   2. DATED recurring flows — subscriptions, rent, paychecks the detector
-//      matches — projected forward and placed in the specific week they fall in.
-//      These are subtracted from the smooth baseline above so they are not
-//      counted twice; moving them from "smooth" to "dated" is what gives the
-//      line its within-month shape.
-//   3. User-entered PLANNED items, placed in the week they fall in.
+//      matches — are projected forward and placed in the specific week they fall
+//      in. This is what gives the line its within-month shape.
+//   3. A SMOOTH baseline makes up the difference: typical month MINUS the monthly
+//      rate of the dated flows, spread evenly across the weeks. So the dated
+//      flows redistribute money within the month; they never add to the total.
+//   4. User-entered PLANNED items are placed in the week they fall in.
+//   5. A RANGE around the line widens with the square root of the horizon, from
+//      how far the account's monthly net has strayed from its own average.
 //
-// (An earlier version projected ONLY auto-detected recurring charges. That
-// covered nearly all income but only the few expenses that repeat on a fixed
-// merchant+cadence, so it overstated the balance. A later version used a single
-// flat monthly average, which had the correct total but no intra-month detail.
-// The hybrid keeps the average's total and restores the timing detail of the
-// recurring projection.)
+// (Why step 3 subtracts the dated rate rather than removing the recurring rows
+// from history, which an earlier version did: a paycheck imported under three
+// different descriptions is detected as recurring under only the newest one. The
+// two older spellings stayed in the "irregular" history, so a single paycheck was
+// projected twice — once dated, once in the baseline — and a Checking account
+// that lost $1,100 a month was forecast to GAIN money. Anchoring the total to
+// the average makes that impossible: however the rows are grouped, the total
+// is what the account actually did.)
 //
 // The HORIZON (how far ahead to draw) and the trailing-average WINDOW (how much
 // history to estimate from) are separate inputs — see HISTORY_MONTHS. So is
@@ -51,7 +54,7 @@ const MONTHS_SHORT = [
 const MIN_OCCURRENCES = 3;
 const MIN_REGULARITY = 0.7;
 
-// How much history the smooth baseline is averaged over, in COMPLETE calendar
+// How much history the typical month is averaged over, in COMPLETE calendar
 // months. Independent of the horizon: how far ahead the chart draws is separate
 // from how much history the estimate uses. (It used to be the same number, so
 // switching the range picker from 3 months to 6 re-estimated the slope with no
@@ -62,6 +65,16 @@ const HISTORY_MONTHS = 6;
 // Average calendar days per month, used to turn a monthly average into the
 // per-day rate the smooth baseline is spread by (365.25 / 12).
 const DAYS_PER_MONTH = 365.25 / 12;
+
+// The range drawn around the projection is the middle half of outcomes: the
+// 25th–75th percentile of a normal distribution sits at ±0.6745 standard
+// deviations. Narrower than the usual 90% so it reads as "where this probably
+// lands" rather than a span too wide to act on.
+const BAND_Z = 0.6745;
+
+// A spread needs a few months to mean anything: with fewer, one month's swing
+// would stand in for the account's whole character.
+const MIN_MONTHS_FOR_BAND = 3;
 
 // ── Month-key helpers (keys are 'YYYY-MM', dates are 'YYYY-MM-DD'; both sort
 //    lexicographically in chronological order). addMonthKey is also imported
@@ -97,15 +110,13 @@ function monthlyTotals(income, expense) {
 }
 
 /**
- * Average two parallel sets of monthly totals over the SAME month span: the
- * full history (`totalsAll`, → the summary's "typical month") and the
- * irregular-only history (`totalsIrreg`, recurring patterns removed → the
- * smooth-baseline slope). Pinning both to one span keeps the smooth + dated
- * decomposition adding back up to the full average.
- *
- * The span is the trailing `window` of COMPLETE calendar months (the current,
- * part-way month is excluded), starting no earlier than the user's first month
- * of data so a new user isn't divided by months that predate them.
+ * Average the monthly totals over the trailing `window` of COMPLETE calendar
+ * months (the current, part-way month is excluded), starting no earlier than the
+ * user's first month of data so a new user isn't divided by months that predate
+ * them. Returns the typical month's income and expense, plus `netSd` — the
+ * sample standard deviation of the months' net (income − expense), the measure of
+ * how far a month strays from that average. It is null with fewer than
+ * MIN_MONTHS_FOR_BAND months, where a spread would be one month's accident.
  *
  * Months the ledger holds NO transaction for are skipped entirely rather than
  * averaged in as zeros — `activeMonths` (a Set of 'YYYY-MM' the caller has rows
@@ -113,18 +124,16 @@ function monthlyTotals(income, expense) {
  * imported". Counting the latter as a real zero lowered the baseline with no
  * indication: a ledger with a two-month gap in an otherwise steady $3,000/mo
  * reported a typical month of $2,000. Omitted ⇒ fall back to the months
- * `totalsAll` itself has, which is the same rule for every caller that already
+ * `totals` itself has, which is the same rule for every caller that already
  * passes complete data.
  */
-function windowAverages(totalsAll, totalsIrreg, { today, window, activeMonths = null }) {
-  const empty = {
-    avgIncome: 0, avgExpense: 0, avgIrregIncome: 0, avgIrregExpense: 0, monthsUsed: 0,
-  };
+function windowAverages(totals, { today, window, activeMonths = null }) {
+  const empty = { avgIncome: 0, avgExpense: 0, netSd: null, monthsUsed: 0 };
   const current = monthKey(today);
   const lastComplete = addMonthKey(current, -1);
   const desiredStart = addMonthKey(current, -window);
 
-  const active = activeMonths || new Set(Object.keys(totalsAll));
+  const active = activeMonths || new Set(Object.keys(totals));
   const dataMonths = [...active].filter((m) => m <= lastComplete);
   if (!dataMonths.length) return empty;
 
@@ -134,32 +143,31 @@ function windowAverages(totalsAll, totalsIrreg, { today, window, activeMonths = 
 
   let sI = 0;
   let sE = 0;
-  let gI = 0;
-  let gE = 0;
-  let n = 0;
+  const nets = [];
   for (let m = start; m <= lastComplete; m = addMonthKey(m, 1)) {
     if (!active.has(m)) continue;
-    const a = totalsAll[m];
-    if (a) { sI += a.income; sE += a.expense; }
-    const g = totalsIrreg[m];
-    if (g) { gI += g.income; gE += g.expense; }
-    n += 1;
+    const a = totals[m] || { income: 0, expense: 0 };
+    sI += a.income;
+    sE += a.expense;
+    nets.push(a.income - a.expense);
   }
+  const n = nets.length;
   if (!n) return empty;
-  return {
-    avgIncome: sI / n, avgExpense: sE / n,
-    avgIrregIncome: gI / n, avgIrregExpense: gE / n,
-    monthsUsed: n,
-  };
+
+  const meanNet = (sI - sE) / n;
+  const netSd = n >= MIN_MONTHS_FOR_BAND
+    ? Math.sqrt(nets.reduce((acc, v) => acc + (v - meanNet) ** 2, 0) / (n - 1))
+    : null;
+  return { avgIncome: sI / n, avgExpense: sE / n, netSd, monthsUsed: n };
 }
 
 // ── Recurring-pattern detection (for the dated layer) ────────────────────────
 // A trimmed-down version of predictions.js's detectRecurringSeries: same
-// grouping/cycle/regularity rules, returning only what the forecast uses — the normalised key
-// (to mark which history rows to remove from the smooth baseline) and the cycle
-// + predicted amount + last charge (to project occurrences forward). Works for
-// either direction's rows; recurring income (paychecks) produces the upward
-// steps in the line.
+// grouping/cycle/regularity rules, returning only what the forecast uses — the
+// cycle + predicted amount + last charge (to project occurrences forward, and to
+// size how much of the typical month they account for). Works for either
+// direction's rows; recurring income (paychecks) produces the upward steps in
+// the line.
 
 /** One cycle step forward from an ISO date. Calendar cycles step by month so a
  *  bill anchored to the 31st clamps month-end correctly; the rest step by days. */
@@ -172,8 +180,8 @@ function stepDate(iso, name, days) {
  * [{ key, name, days, amount, last }] — `key` is the normalised merchant string,
  * `amount` the predicted per-charge amount, `last` the most recent charge date.
  * A pattern is dropped if its next projected charge is already overdue beyond
- * the cycle tolerance (treated as cancelled), so it is neither removed from the
- * smooth baseline nor projected forward.
+ * the cycle tolerance (treated as cancelled), so it is neither projected forward
+ * nor counted toward the dated share of the typical month.
  */
 function recurringPatterns(rows, todayIso) {
   const groups = new Map();
@@ -242,6 +250,25 @@ function placeRecurring(patterns, todayIso, endIso, { catchUpOverdue = false } =
     }
   }
   return occ;
+}
+
+/**
+ * What the patterns amount to in an average month: each pattern's per-charge
+ * amount times how many charges a month holds. Calendar cycles (monthly,
+ * quarterly, yearly) are exact; day cycles use the average month length, so a
+ * biweekly paycheck is 26/12 charges a month rather than a flat 2. Computed
+ * from the patterns rather than by counting the occurrences in a given horizon,
+ * which would make the baseline wobble with where a short horizon happens to
+ * start and end.
+ */
+function recurringMonthlyRate(patterns) {
+  let rate = 0;
+  for (const p of patterns) {
+    rate += p.name in CYCLE_MONTHS
+      ? p.amount / CYCLE_MONTHS[p.name]
+      : (p.amount * DAYS_PER_MONTH) / p.days;
+  }
+  return rate;
 }
 
 // ── Weekly horizon helpers ───────────────────────────────────────────────────
@@ -334,9 +361,11 @@ function historySeries({ endBalance, income, expense, spanDays, today }) {
  * is the Set of 'YYYY-MM' the ledger holds any row for (see windowAverages).
  * `today` defaults to the local date. Returns:
  *   { anchor: { date, balance },
- *     series: [{ weekStart, weekEnd, label, income, expense, net, balance }],
+ *     series: [{ weekStart, weekEnd, label, income, expense, net, balance,
+ *                low, high }],   // low/high: the range, null without enough months
  *     summary: { endBalance, endDate, lowest: { weekStart, label, balance },
- *                belowZero, avgIncome, avgExpense, monthsUsed, window } }
+ *                belowZero, avgIncome, avgExpense, recurringIncome,
+ *                recurringExpense, netSd, monthsUsed, window } }
  *
  * `anchor` is where the line STARTS — today, at the starting balance, before any
  * projected flow. The series' first entry is already a week of flows in, so a
@@ -353,23 +382,21 @@ function forecast({
   const endIso = horizonEnd(todayIso, months);
   const nWeeks = weekCount(todayIso, endIso);
 
-  // Recurring decomposition: mark the recurring rows so they are excluded from
-  // the smooth baseline, and average the irregular remainder over the same span
-  // as the full history (which feeds the summary's "typical month").
+  // The typical month, from everything the account did over the window.
   const incPatterns = recurringPatterns(income, todayIso);
   const expPatterns = recurringPatterns(expense, todayIso);
-  const incKeys = new Set(incPatterns.map((p) => p.key));
-  const expKeys = new Set(expPatterns.map((p) => p.key));
+  const avg = windowAverages(monthlyTotals(income, expense), {
+    today: todayIso, window, activeMonths,
+  });
 
-  const totalsAll = monthlyTotals(income, expense);
-  const totalsIrreg = monthlyTotals(
-    income.filter((t) => !incKeys.has(normaliseDesc(t.description))),
-    expense.filter((t) => !expKeys.has(normaliseDesc(t.description)))
-  );
-  const avg = windowAverages(totalsAll, totalsIrreg, { today: todayIso, window, activeMonths });
-
-  const perDayInc = avg.avgIrregIncome / DAYS_PER_MONTH;
-  const perDayExp = avg.avgIrregExpense / DAYS_PER_MONTH;
+  // The dated flows carry their share of the typical month; the smooth baseline
+  // carries the rest. Clamped at zero: patterns that already outrun the average
+  // (a raise, a new subscription the window has barely seen) are the better
+  // evidence, and a negative baseline would invent income or refunds.
+  const recurringIncome = recurringMonthlyRate(incPatterns);
+  const recurringExpense = recurringMonthlyRate(expPatterns);
+  const perDayInc = Math.max(0, avg.avgIncome - recurringIncome) / DAYS_PER_MONTH;
+  const perDayExp = Math.max(0, avg.avgExpense - recurringExpense) / DAYS_PER_MONTH;
 
   // Place the dated flows (recurring + planned) into their weekly buckets.
   const incBuckets = new Array(nWeeks).fill(0);
@@ -408,8 +435,20 @@ function forecast({
     if (!lowest || balance < lowest.balance) {
       lowest = { weekStart, label: weekLabel(weekStart), balance };
     }
+    // Uncertainty compounds like independent monthly surprises: it grows with
+    // the square root of the months elapsed, measured to the END of the week —
+    // the point the balance describes.
+    let low = null;
+    let high = null;
+    if (avg.netSd != null) {
+      const months = (daysBetween(todayIso, weekEnd) + 1) / DAYS_PER_MONTH;
+      const half = BAND_Z * avg.netSd * Math.sqrt(months);
+      low = round2(balance - half);
+      high = round2(balance + half);
+    }
     series.push({
       weekStart, weekEnd, label: weekLabel(weekStart), income: inc, expense: exp, net, balance,
+      low, high,
     });
   }
 
@@ -437,6 +476,11 @@ function forecast({
       belowZero,
       avgIncome: round2(avg.avgIncome),
       avgExpense: round2(avg.avgExpense),
+      // How much of the typical month is dated (the rest is spread evenly), and
+      // the month-to-month spread the range is drawn from.
+      recurringIncome: round2(recurringIncome),
+      recurringExpense: round2(recurringExpense),
+      netSd: avg.netSd == null ? null : round2(avg.netSd),
       monthsUsed: avg.monthsUsed,
       window,
     },
@@ -449,6 +493,7 @@ module.exports = {
   historySeries,
   windowAverages,
   recurringPatterns,
+  recurringMonthlyRate,
   placeRecurring,
   addMonthKey,
   horizonEnd,

@@ -55,8 +55,11 @@
 // backend sends no debt for a month rather than measuring it against a twelfth
 // of the income servicing it.
 //
+// Drawn in Ant Design like the rest of the page: the figures are Statistics
+// with a sparkline and a caret change line, the two sections are inner Cards.
+//
 // Globals (loaded before this script): apiFetch (api.js), escapeHtml
-// (escape.js), formatCurrency (currency.js), UI.emptyState (ui.js).
+// (escape.js), formatCurrency (currency.js), UI (ui.js), Ant (ant.js).
 
 (function () {
   // Sparkline padding, as a percent of the chart box. The line is drawn in a
@@ -122,16 +125,10 @@
   /** A 0..1 ratio as a position along the gauge track, in percent. */
   const clampPct = (r) => Math.max(0, Math.min(1, r)) * 100;
 
-  /** A signed percentage change ("+8%", "−3%"); null → "—". */
-  function fmtSignedPct(frac) {
-    if (frac == null || !Number.isFinite(frac)) return '—';
-    const pct = Math.round(Math.abs(frac) * 100);
-    return `${frac < 0 ? '−' : '+'}${pct}%`;
-  }
-
+  /** InfoCircleOutlined carrying `tip` as a Tooltip. */
   function infoIcon(tip) {
     const t = escapeHtml(tip);
-    return `<span class="fc-info" tabindex="0" role="note" aria-label="${t}" data-tip="${t}">i</span>`;
+    return `<span class="ant-info-tip" tabindex="0" role="note" aria-label="${t}" data-tip="${t}">${Ant.icon('info-circle-outlined')}</span>`;
   }
 
   // ─── Sparkline ─────────────────────────────────────────────────────────────
@@ -188,8 +185,9 @@
   // ─── Pieces ────────────────────────────────────────────────────────────────
 
   /**
-   * A year-over-year change pill under a headline figure. `goodWhenUp` colours
-   * an increase green (income) or red (expenses).
+   * A year-over-year change line under a headline figure: Ant's caret and the
+   * percentage, in the success or error colour. `goodWhenUp` colours an
+   * increase green (income) or red (expenses).
    *
    * Growth from a non-positive prior year has no finite percentage, so the pill
    * falls back to the ABSOLUTE change rather than a special word: it is still a
@@ -205,23 +203,31 @@
     const epsilon = usePct ? 0.0005 : 0.005;
     const up = delta > epsilon;
     const down = delta < -epsilon;
-    const arrow = up ? '▲' : down ? '▼' : '■';
+    // A flat year has no direction to point, so it carries no caret.
+    const caret = up ? Ant.icon('caret-up') : down ? Ant.icon('caret-down') : '';
     const good = up ? goodWhenUp : down ? !goodWhenUp : null;
     // Adverse, but barely: the same amber a gauge's caution range uses. Only
     // on the percentage form — NEAR_TREND is a share, and the
     // fallback below is money, which has no comparable band.
     const near = good === false && usePct && Math.abs(change.pct) <= NEAR_TREND;
     const tone = good === null ? 'flat' : good ? 'good' : near ? 'near' : 'bad';
-    const text = usePct ? fmtSignedPct(change.pct) : fmtMoney(Math.abs(change.abs));
-    return `<span class="met-change met-change-${tone}">${arrow} ${escapeHtml(text)} YoY</span>`;
+    // Unsigned: the caret carries the direction.
+    const text = usePct ? fmtPct(Math.abs(change.pct)) : fmtMoney(Math.abs(change.abs));
+    // The caret is a picture of the direction; the words say it for a screen
+    // reader, since the sign of the figure is dropped beside the caret.
+    const word = up ? 'up ' : down ? 'down ' : '';
+    return `<span class="met-change met-change-${tone}">${caret}<span class="ant-visually-hidden">${word}</span>${escapeHtml(text)}<span class="met-change-suffix">YoY</span></span>`;
   }
 
+  /** One headline figure as Ant's Statistic: the title, the value, the change
+   *  line, then the sparkline. The tile's class (met-figure-<field>) picks the
+   *  sparkline's colour (metrics.css). */
   function figure(label, value, change, goodWhenUp, field) {
     const neg = Number.isFinite(value) && value < 0 ? ' met-figure-negative' : '';
     const s = seriesFor(field);
-    return `<div class="met-figure${neg}">
-    <span class="met-figure-label">${escapeHtml(label)}</span>
-    <span class="met-figure-value">${escapeHtml(fmtMoney(value))}</span>
+    return `<div class="met-figure met-figure-${field}${neg}">
+    <div class="ant-statistic-title">${escapeHtml(label)}</div>
+    <div class="ant-statistic-content met-figure-value">${escapeHtml(fmtMoney(value))}</div>
     ${changePill(change, goodWhenUp)}
     ${sparkline(s.values, s.idx)}
   </div>`;
@@ -358,16 +364,16 @@
   function vitalsBody(y) {
     return `<div class="met-metrics">
       ${metric('Expense-to-Income', y.metrics.expenseToIncome,
-        'Total expenses divided by total income. Lower is better — under 70% earns full marks.',
+        'Total expenses divided by total income.',
         { key: 'expenseToIncome' })}
       ${metric('Debt-to-Income', y.metrics.debtToIncome,
-        'Total debt from your Balance Sheet (latest month this year) divided by the year’s income. Shows N/A when you track no debt. Under 25% earns full marks.',
+        'Total debt from your Balance Sheet (latest month this year) divided by the year’s income.',
         { key: 'debtToIncome' })}
       ${metric('Savings Rate', y.metrics.savingsRate,
-        'The share of income you moved into your own savings or brokerage accounts, across every transfer category. 20% or more earns full marks.',
+        'The share of income you moved into your own savings or brokerage accounts, across every transfer category.',
         { key: 'savingsRate' })}
       ${metric('Investing Rate', y.metrics.investedRate,
-        'The share of income that went to the Investing category specifically. Money moved to any other transfer category counts towards the savings rate, not this one. 15% to 40% is the healthy range.',
+        'The share of income that went to the Investing category specifically. Money moved to any other transfer category counts towards the savings rate, not this one.',
         { key: 'investedRate' })}
     </div>`;
   }
@@ -385,11 +391,10 @@
     // empty frames.
     if (vitals) vitals.hidden = !y;
     if (!y) {
-      host.innerHTML = UI.emptyState({
-        icon: 'target',
+      host.innerHTML = Ant.empty({
         title: 'No metrics yet',
         desc: 'Add a year of income and expenses and Aventurine Manage works out the ratios behind it, and grades the year against six money goals.',
-        action: { label: 'Add transactions', href: '/transactions', primary: true },
+        action: { label: 'Add transactions', href: '/transactions' },
       });
       return;
     }

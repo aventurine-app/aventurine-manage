@@ -690,6 +690,87 @@ test('recurring brands: suggesting is read-only — no schedule, no transaction,
   assert.equal(c.conn.db().prepare('SELECT COUNT(*) AS n FROM recurring_overrides').get().n, 0);
 });
 
+// ─── Preview (the editor's readout) ───────────────────────────────────────────
+// GET /api/recurring/preview answers "when would this rule charge next?" for
+// the editor's unsaved fields. It runs the rule code the listing runs, so the
+// dates the editor promises are the ones the calendar then draws.
+
+function previewUrl(params) {
+  return `/api/recurring/preview?${new URLSearchParams(params)}`;
+}
+
+test('recurring preview: a hand-made schedule charges on its own date first, then repeats', (t) => {
+  const c = makeClient(t);
+  const start = daysAgoIso(-10);
+  const res = c.get(previewUrl({
+    anchor: start, freq: 'monthly', interval: '1', month_mode: 'date', day: String(Number(start.slice(8, 10))),
+  }));
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const { dates } = res.body;
+  assert.equal(dates.length, 3, 'the readout shows three dates');
+  assert.equal(dates[0], start, 'the date the user entered is the first charge');
+  const first = start.slice(0, 7);
+  assert.deepStrictEqual(dates.map((d) => d.slice(0, 7)), [first, addMonthKey(first, 1), addMonthKey(first, 2)]);
+  assert.equal(c.conn.db().prepare('SELECT COUNT(*) AS n FROM recurring_overrides').get().n, 0,
+    'previewing writes nothing');
+});
+
+test('recurring preview: after_anchor reads the anchor as a charge already made', (t) => {
+  const c = makeClient(t);
+  const today = daysAgoIso(0);
+  const weekday = String(new Date(`${today}T00:00:00Z`).getUTCDay());
+  const rule = { anchor: today, freq: 'weekly', interval: '1', weekday };
+  assert.equal(c.get(previewUrl(rule)).body.dates[0], today, 'a hand-made schedule due today is due today');
+  assert.equal(c.get(previewUrl({ ...rule, after_anchor: '1' })).body.dates[0], daysAgoIso(-7),
+    "a detected one charged today is next due a week out");
+});
+
+test("recurring preview: a detected schedule's next date matches the listing's", (t) => {
+  const c = makeClient(t);
+  const key = adoptMonthly(c);
+  const s = c.get('/api/recurring').body.series.find((x) => x.key === key);
+  const { dates } = c.get(previewUrl({
+    anchor: s.last_date, freq: s.rule.freq, interval: String(s.rule.interval),
+    month_mode: s.rule.month_mode, day: String(s.rule.day), after_anchor: '1',
+  })).body;
+  assert.equal(dates[0], s.next_date);
+
+  // And for a cadence the user is only considering: the readout's dates are the
+  // ones the calendar draws once it is saved.
+  const nthWeekday = { freq: 'monthly', interval: 1, month_mode: 'day', pos: 3, weekday: 5 };
+  const promised = c.get(previewUrl({
+    anchor: s.last_date, after_anchor: '1', ...Object.fromEntries(Object.entries(nthWeekday).map(([k, v]) => [k, String(v)])),
+  })).body.dates;
+  c.post('/api/recurring/override', { key, rule: nthWeekday });
+  const month = promised[1].slice(0, 7);
+  const drawn = c.get(`/api/recurring?month=${month}`).body.occurrences
+    .filter((o) => o.key === key).map((o) => o.date);
+  assert.deepStrictEqual(drawn, [promised[1]]);
+});
+
+test('recurring preview: an end date cuts the dates short', (t) => {
+  const c = makeClient(t);
+  const start = daysAgoIso(-10);
+  const day = String(Number(start.slice(8, 10)));
+  const rule = { anchor: start, freq: 'monthly', interval: '1', month_mode: 'date', day };
+  assert.deepStrictEqual(c.get(previewUrl({ ...rule, until: start })).body.dates, [start]);
+  assert.deepStrictEqual(c.get(previewUrl({ ...rule, until: daysAgoIso(1) })).body.dates, [],
+    'ended before it starts: nothing left');
+});
+
+test('recurring preview: an invalid anchor or rule is refused', (t) => {
+  const c = makeClient(t);
+  const today = daysAgoIso(0);
+  assert.equal(c.get(previewUrl({ freq: 'monthly' })).status, 400, 'no anchor');
+  assert.equal(c.get(previewUrl({ anchor: '2026-02-30', freq: 'monthly' })).status, 400, 'no such day');
+  assert.equal(c.get(previewUrl({ anchor: today })).status, 400, 'no frequency');
+  assert.equal(c.get(previewUrl({ anchor: today, freq: 'yearly' })).status, 400, 'not a frequency');
+  assert.equal(c.get(previewUrl({ anchor: today, freq: 'weekly', interval: '0' })).status, 400, 'every 0 weeks');
+  assert.equal(c.get(previewUrl({ anchor: today, freq: 'monthly', month_mode: 'day', pos: '5' })).status, 400,
+    'there is no fifth week');
+  assert.equal(c.get(previewUrl({ anchor: today, freq: 'monthly', until: '2026-13-01' })).status, 400, 'bad end date');
+});
+
 // ─── Detection / adoption (the mini-onboarding) ───────────────────────────────
 
 test('recurring detect: history alone shows nothing until the user adopts a candidate', (t) => {
