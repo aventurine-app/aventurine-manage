@@ -1,6 +1,6 @@
 {
   "name": "aventurine-manage",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Aventurine Manage desktop app — Electron shell + in-process Node backend (electron/backend/).",
   "main": "main.js",
   "private": true,
