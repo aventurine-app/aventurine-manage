@@ -291,7 +291,7 @@
     --sw-split: linear-gradient(105deg, var(--sw-light) 0 50%, var(--sw-dark) 50% 100%);
     background: var(--sw-split);
     background-size: 76px 46px;
-    --sw-light: #f2f3f2;
+    --sw-light: #ffffff;
     --sw-dark:  #191a19;
 }
 
@@ -302,7 +302,7 @@
 }
 
 .settings-theme-swatch-system::before {
-    background-image: linear-gradient(105deg, #e5e6e5 0 50%, #0c0d0d 50% 100%);
+    background-image: linear-gradient(105deg, #f5f5f5 0 50%, #0c0d0d 50% 100%);
     background-position: top left;
 }
 

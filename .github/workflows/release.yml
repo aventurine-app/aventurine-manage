@@ -9,7 +9,7 @@ name: release
 # HISTORY — releases used to ship source only, with the compiled installers
 # kept as private workflow artifacts, because the official binary was fenced
 # behind the old licensing model. That model is gone: the app is GPL v3, so the
-# binary is now part of the public release. aventurine-app.com/budget.html#download
+# binary is now part of the public release. aventurine-app.com/aventurine-manage.html#download
 # links straight at these asset URLs, and those links 404 until the release is
 # published with the files attached.
 #
