@@ -51,9 +51,7 @@ OS-appropriate userData directory:
 | Windows | `%APPDATA%\aventurine-manage\data\`                     |
 
 The folder is named after package.json `"name"`. (Packaged builds; `npm start`
-uses a separate `aventurine-manage-dev` profile — see main.js. Profiles from the
-app's earlier names, `lodestar`, `aventurine` and `oliv`, are migrated on first
-launch.)
+uses a separate `aventurine-manage-dev` profile — see main.js.)
 First launch creates this directory and seeds a fresh DB.
 `AVENTURINE_DB_PATH` overrides the DB path and suppresses pointer writes
 (the test suite uses it).

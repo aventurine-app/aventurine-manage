@@ -124,12 +124,19 @@
         return `<span class="tx-amount tx-amount-${esc(t.tx_type)}">${esc(flowMoney(t))}</span>`;
     }
 
-    /** A category as a tag in its hue; no category is the warning tag. */
+    // A category tag wears its side of the ledger: expenses red, income green,
+    // transfers blue (income and transfers match their amounts' colours).
+    const TYPE_HUES = {
+        expense: 'var(--ant-color-error)',
+        income: 'var(--ant-color-success)',
+        transfer: 'var(--ant-color-info-text)',
+    };
+
+    /** A category as a tag in its type's hue; no category is the warning tag. */
     function categoryTag(catId) {
         const c = catId == null ? null : catById(catId);
         if (!c || c.locked) return '<span class="ant-tag ant-tag-warning tx-cat-tag">Uncategorized</span>';
-        // Ant.categoryHue: a category wears one colour on every page.
-        const hue = Ant.categoryHue(c.key);
+        const hue = TYPE_HUES[c.cat_type] ?? Ant.categoryHue(c.key);
         return `<span class="ant-tag ant-tag-hue tx-cat-tag" style="--ant-tag-hue: ${hue}">${esc(c.name)}</span>`;
     }
 

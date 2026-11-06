@@ -6,12 +6,9 @@ name: release
 # This builds the Linux, Windows and macOS installers and ATTACHES them to the
 # GitHub Release alongside GitHub's auto-generated source archives.
 #
-# HISTORY — releases used to ship source only, with the compiled installers
-# kept as private workflow artifacts, because the official binary was fenced
-# behind the old licensing model. That model is gone: the app is GPL v3, so the
-# binary is now part of the public release. aventurine-app.com/aventurine-manage.html#download
-# links straight at these asset URLs, and those links 404 until the release is
-# published with the files attached.
+# aventurine-app.com/aventurine-manage.html#download links straight at these
+# asset URLs, and those links 404 until the release is published with the files
+# attached.
 #
 # THREE jobs. `build` and `build-mac` compile and hand their output up as
 # workflow artifacts; `release` collects both and creates the release. macOS is
