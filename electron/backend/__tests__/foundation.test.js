@@ -357,8 +357,8 @@ test('migration ladder: SCHEMA_VERSION is the top of it, with no gaps', () => {
 // comment-only edit.) Then bump SCHEMA_VERSION, add the migration, and update
 // the hash below in the same commit.
 test('baseline schema is pinned: changing it requires a migration', () => {
-  const EXPECTED_SCHEMA_VERSION = 21;
-  const EXPECTED_DDL_HASH = '7361035a7bc907aadd7badf9224b8dd4ec5b5ad8776019eaf4d3b22973b70358';
+  const EXPECTED_SCHEMA_VERSION = 22;
+  const EXPECTED_DDL_HASH = '4a29554419cd2a6ddf5219874a6288a71031eee1b123726e9496376f6eff7bed';
 
   const actual = crypto.createHash('sha256').update(DDL.join('\n')).digest('hex');
   assert.equal(
@@ -429,6 +429,8 @@ test('a migrated database matches a fresh one', () => {
     },
     // v20 — before saved Dashboard layouts (climbs v21 alone).
     20: (db) => db.exec('DROP TABLE dashboard_layouts'),
+    // v21 — before Aventurine Planner's plans moved into the database (climbs v22 alone).
+    21: (db) => db.exec('DROP TABLE plans'),
   };
 
   for (const [version, rewind] of Object.entries(cases)) {

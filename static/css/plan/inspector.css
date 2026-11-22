@@ -1,0 +1,289 @@
+/* ============================================================================
+   inspector.css — the card floating over the canvas's right side, between the
+   module library and the scrubber, as an Ant card. It edits whatever is
+   selected: a module (its fields, its links, its outlook), a link (its rule,
+   written as a sentence), or, with nothing selected, the plan itself.
+   ============================================================================ */
+
+/* Inset from the canvas's edges as far as the toolbars are (canvas.css). */
+.inspector {
+    position: relative;
+    z-index: 6;
+    justify-self: end;
+    width: var(--inspector-width);
+    margin: var(--space-16);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--color-bg-container);
+    border: var(--line-width) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--box-shadow-tertiary);
+}
+.inspector[data-collapsed="true"] { display: none; }
+
+.insp-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+}
+
+/* The icon spans the title block: its top meets the top of the name, its
+   bottom the bottom of the tag. 32px name + 4px gap + 22px tag. */
+.insp-header {
+    --insp-tile: 58px;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-12);
+    padding: var(--space-16) var(--space-20);
+}
+.insp-header .role-tile--lg { width: var(--insp-tile); height: var(--insp-tile); border-radius: var(--border-radius-lg); }
+.insp-header .role-tile--lg .icon { width: 28px; height: 28px; }
+/* The plan's watermark: a notebook a shade off the panel, large, run off the panel's
+   bottom-right corner under its content, as a module's icon is on its canvas
+   card (canvas.css, .node-wm). */
+.insp-wm {
+    position: absolute;
+    right: -28px;
+    bottom: -36px;
+    color: var(--color-fill-tertiary);
+    pointer-events: none;
+}
+.insp-wm .icon { display: block; width: 180px; height: 180px; }
+.insp-wm + .insp-scroll { position: relative; }
+
+/* A module's identity and settings, held together at the top of the panel. */
+.insp-card { overflow: hidden; }
+/* A link's card: its sections run together. */
+.insp-card--link { --tile: var(--link-line); }
+.insp-card--link > .insp-section + .insp-section { border-top: 0; padding-top: 0; }
+/* Issues sit right under the settings, lined up with their edges. */
+[data-issues] > .insp-section { padding-top: 0; border-top: 0; }
+
+.insp-titles {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+/* The tag under a module's name: its kind. */
+.insp-tags { display: flex; gap: var(--space-4); min-width: 0; }
+
+/* The name, as an editable title (Ant's Typography editable): plain text
+   that shows a field's edge under the pointer and edits in place. */
+.insp-name {
+    width: 100%;
+    height: 32px;
+    margin-left: -8px;
+    padding: 0 7px;
+    border: var(--line-width) solid transparent;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-strong);
+    outline: none;
+    transition: border-color var(--motion-duration-mid), background-color var(--motion-duration-mid), box-shadow var(--motion-duration-mid);
+}
+.insp-name:hover { border-color: var(--color-border); }
+.insp-name:focus { background: var(--color-bg-container); border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--control-outline); }
+div.insp-name { display: flex; align-items: center; }
+div.insp-name:hover { border-color: transparent; }
+/* The plan's own header: just its name, a size up from a module's. */
+.insp-name--plan { height: 40px; font-size: var(--font-size-heading-3); }
+
+.insp-section {
+    padding: var(--space-16) var(--space-20);
+    border-top: var(--line-width) solid var(--color-split);
+}
+.insp-section > .eyebrow { margin-bottom: var(--space-12); }
+/* A foldable section (a module's Settings, Inflows, Outflows, Details): its
+   eyebrow is a caret button. */
+.insp-fold {
+    display: flex; align-items: center; gap: var(--space-4);
+    width: 100%; padding: 0;
+    background: none; border: 0; cursor: pointer; text-align: left;
+}
+.insp-fold:hover { color: var(--color-text-secondary); }
+.insp-fold:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 2px; }
+.insp-fold-caret { width: 12px; height: 12px; flex: none; transition: transform 0.15s ease; }
+.insp-fold[aria-expanded="false"] { margin-bottom: 0; }
+.insp-fold[aria-expanded="false"] .insp-fold-caret { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) { .insp-fold-caret { transition: none; } }
+/* A link's direction, One-way or Two-way, across the top of its card. */
+.insp-direction { display: flex; width: 100%; }
+.insp-direction > .ant-segmented-item { flex: 1; min-width: 0; }
+
+/* Label column + control column, as a horizontal Ant form. */
+.insp-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+    align-items: center;
+    gap: var(--space-12);
+}
+.insp-label {
+    color: var(--color-text);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+}
+.insp-control { display: flex; gap: var(--space-4); min-width: 0; }
+.insp-static { align-self: center; color: var(--color-text); font-size: var(--font-size); font-weight: var(--font-weight-medium); }
+.insp-control > .field-input,
+.insp-control > .field-select,
+.insp-control > .field-affix { flex: 1; width: 100%; }
+
+/* A row whose control needs the panel's full width (the Send modes, up to
+   five of them): the label sits above it. */
+.insp-label--wide,
+.insp-control--wide { grid-column: 1 / -1; }
+.insp-label--wide { margin-bottom: calc(var(--space-4) - var(--space-12)); }
+.insp-control--wide > .ant-segmented { flex: 1; min-width: 0; }
+.insp-control > .ant-segmented { flex: 1; min-width: 0; }
+.insp-control > .ant-segmented .ant-segmented-item { flex: 1; min-width: 0; padding: 0 var(--space-4); }
+
+/* ── The rule sentence (links) ──────────────────────────────────────────── */
+.sentence {
+    margin: 0;
+    padding: var(--space-12) var(--space-16);
+    border: var(--line-width) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-lg);
+    background: var(--color-fill-alter);
+    color: var(--color-text);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+}
+.sentence b { color: var(--color-text); font-weight: var(--font-weight-strong); }
+
+.link-ends {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+    min-width: 0;
+}
+.link-ends-arrow {
+    display: flex;
+    width: 28px;
+    justify-content: center;
+    color: var(--color-text-quaternary);
+}
+.link-ends-arrow .icon { width: 14px; height: 14px; transform: rotate(90deg); }
+.link-end {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-12);
+    max-width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    font-size: var(--font-size);
+    font-weight: var(--font-weight-strong);
+    cursor: pointer;
+}
+.link-end span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-end:hover span:last-child { color: var(--color-primary-hover); }
+.link-end:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; border-radius: var(--border-radius); }
+
+/* ── Link lists (Inflows / Outflows): Ant's List ─────────────────────────── */
+.insp-links { display: flex; flex-direction: column; gap: 2px; margin: 0 calc(-1 * var(--space-8)); padding: 0; list-style: none; }
+.insp-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-4) var(--space-8);
+    border: 0;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--motion-duration-mid);
+}
+.insp-link:hover { background: var(--control-item-bg-hover); }
+.insp-link:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: -4px; }
+.insp-link-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.insp-link-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.insp-link-amount {
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.insp-link .icon-caret { width: 12px; height: 12px; color: var(--color-text-quaternary); }
+.insp-none { margin: 0; color: var(--color-text-tertiary); font-size: var(--font-size); }
+
+/* ── Figures: Ant's vertical Descriptions ───────────────────────────────── */
+.insp-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-12) var(--space-16);
+}
+.stat-label {
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size);
+}
+.stat-value {
+    color: var(--color-text);
+    font-size: var(--font-size);
+    font-weight: var(--font-weight-medium);
+    font-variant-numeric: tabular-nums;
+}
+.stat-value.is-up { color: var(--color-success-text); }
+.stat-value.is-down { color: var(--color-error-text); }
+.stat-value.is-warn { color: var(--color-warning-text); }
+.stat-wide { grid-column: 1 / -1; }
+
+/* A goal's outlook: the solver's answer follows the figures. */
+.insp-stats + .sentence { margin-top: var(--space-12); }
+.sentence.is-pending { color: var(--color-text-tertiary); }
+
+/* ── Issues: Ant's Alert ────────────────────────────────────────────────── */
+.issues { display: flex; flex-direction: column; gap: var(--space-8); margin: 0; padding: 0; list-style: none; }
+.issue {
+    display: flex;
+    gap: var(--space-8);
+    align-items: flex-start;
+    padding: var(--space-8) var(--space-12);
+    border: var(--line-width) solid var(--color-warning-border);
+    border-radius: var(--border-radius-lg);
+    background: var(--color-warning-bg);
+    color: var(--color-text);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+}
+.issue .icon { width: 16px; height: 16px; margin-top: 3px; flex: none; color: var(--color-warning); }
+.issue--info { background: var(--color-fill-alter); border-color: var(--color-border-secondary); }
+.issue--info .icon { color: var(--color-text-tertiary); }
+.issue--notice { background: var(--color-info-bg); border-color: var(--color-info-border); }
+.issue--notice .icon { color: var(--color-info); }
+button.issue { width: 100%; text-align: left; cursor: pointer; transition: box-shadow var(--motion-duration-mid); }
+button.issue:hover { box-shadow: 0 0 0 2px var(--color-warning-outline); }
+button.issue:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; }
+
+/* ── Module counts: role-coloured tags ──────────────────────────────────── */
+.role-counts { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.role-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 var(--space-8) 0 3px;
+    border: var(--line-width) solid color-mix(in srgb, var(--tile) 35%, transparent);
+    border-radius: var(--border-radius-sm);
+    background: color-mix(in srgb, var(--tile) 8%, transparent);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+}
+.role-count .role-tile { width: 18px; height: 18px; border-radius: 3px; background: transparent; }
+.role-count .role-tile .icon { width: 13px; height: 13px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .insp-name, .insp-link, button.issue { transition: none; }
+}

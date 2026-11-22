@@ -58,7 +58,7 @@
 }
 /* Net is the one figure that can be negative, and a minus sign in a column of
    money is easy to miss — so it carries the error colour too. */
-.met-figure-negative .ant-statistic-content { color: var(--ant-color-error); }
+.met-figure-negative .ant-statistic-content { color: var(--ant-color-error-text); }
 
 /* Each figure's colour, for its sparkline: money in green, money out red, the
    rest in the chart palette — the pairing the Cash Flow card uses. */
@@ -80,12 +80,12 @@
 }
 .met-change .anticon { font-size: var(--ant-font-size-sm); }
 .met-change-suffix { color: var(--ant-color-text-tertiary); }
-.met-change-good { color: var(--ant-color-success); }
+.met-change-good { color: var(--ant-color-success-text); }
 /* A move the wrong way, but a small one — the warning colour a gauge's caution
    range uses. Same three-level scale, said on the change line because the two
    trend goals have no tile of their own. */
-.met-change-near { color: var(--ant-color-warning); }
-.met-change-bad  { color: var(--ant-color-error); }
+.met-change-near { color: var(--ant-color-warning-text); }
+.met-change-bad  { color: var(--ant-color-error-text); }
 .met-change-flat { color: var(--ant-color-text-tertiary); }
 .met-change-none { color: var(--ant-color-text-tertiary); }
 

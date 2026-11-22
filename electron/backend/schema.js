@@ -17,7 +17,7 @@
 //   - the v_* views pre-join the normalized tables into human-readable,
 //     chronologically-sortable shapes for ad-hoc querying.
 
-const SCHEMA_VERSION = 21;
+const SCHEMA_VERSION = 22;
 
 // Months persist as 1-12 integers so `ORDER BY year, month` sorts
 // chronologically (the app translates to/from English names at its API
@@ -270,6 +270,17 @@ const DDL = [
      name VARCHAR(32) NOT NULL,
      position INTEGER NOT NULL,
      cards TEXT DEFAULT '[]' NOT NULL CHECK (json_valid(cards)),
+     PRIMARY KEY (id)
+   )`,
+  `CREATE TABLE plans (
+     -- Aventurine Planner's plans (the sidebar's Plan section): one row per
+     -- plan, kept in this file so they are encrypted, locked and backed up with
+     -- the rest of it. body is the plan document as JSON, whose shape the
+     -- Planner owns and validates when it loads one. Their order in the plan
+     -- list and the goals every plan is measured against are in app_settings
+     -- (plan_tabs, plan_goals). handlers/plans.js stores and reads them.
+     id VARCHAR(40) NOT NULL,
+     body TEXT NOT NULL CHECK (json_valid(body)),
      PRIMARY KEY (id)
    )`,
   `CREATE INDEX ix_balance_entries_year ON balance_entries (year)`,

@@ -385,4 +385,11 @@
     window.setNegativeStyle = setNegativeStyle;
     window.setNumberFormat = setNumberFormat;
     window.setDateFormat = setDateFormat;
+    // The live choices, for formatters of their own (the Plan section's
+    // whole-unit projections, static/js/plan/format.js). group/decimal are the
+    // separators NUMBER_FORMAT names.
+    window.currencyFormat = () => ({
+        symbol: CURRENCY_SYMBOL, position: SYMBOL_POSITION, numberFormat: NUMBER_FORMAT_KEY,
+        group: NUMBER_FORMAT.group, decimal: NUMBER_FORMAT.decimal,
+    });
 }());

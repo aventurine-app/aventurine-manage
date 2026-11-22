@@ -49,8 +49,8 @@
 
     // Which surfaces exist and what the defaults are both live in
     // shell/theme-init.js (window.appTheme), which also paints pre-load. This
-    // file only handles the picker: 'colorful' is light with an accent sidebar,
-    // '' is plain light, 'dark' is dark, 'system' follows the OS.
+    // file only handles the picker: '' is Light, 'dark' is Dark, 'system'
+    // follows the OS (the Aventurine theme's two faces, static/css/theme.css).
 
     // Switching the theme swaps tokens on <html>, so everything painted by CSS
     // updates immediately. Only the charts go stale, since they write
@@ -164,6 +164,12 @@
     wirePrefRadios('symbol_position', 'symbol_position', 'prefix', (v) => setSymbolPosition(v));
     wirePrefRadios('hide_cents', 'hide_cents', '', (v) => setHideCents(v === '1'));
     wirePrefRadios('negative_style', 'negative_style', 'minus', (v) => setNegativeStyle(v));
+    // The dots that run along a plan's links on the Plan page, which follows
+    // a change through 'flowmotionchange' (static/js/plan/main.js).
+    wirePrefRadios('flow-motion', 'flow-motion', 'on', (v) => {
+        localStorage.setItem('flow-motion', v);
+        window.dispatchEvent(new Event('flowmotionchange'));
+    });
     // Read at use time by the Transactions date-filter quick ranges ("This week").
     wirePrefRadios('week_start', 'week_start', 'sunday', (v) => localStorage.setItem('week_start', v));
 
@@ -235,7 +241,7 @@
     const PREF_KEYS = [
         'color-theme', 'graph-theme', 'ui-density', 'merchant_icons', 'currency_symbol', 'number_format',
         'symbol_position', 'hide_cents', 'negative_style', 'date_format', 'week_start',
-        'zoom_level',
+        'zoom_level', 'flow-motion',
     ];
 
     async function restoreDefaults() {
@@ -480,6 +486,9 @@
     // tabindex + arrow-key navigation follow the WAI-ARIA tabs pattern. Controls in
     // hidden panels stay in the DOM, so the class-based wiring above is unaffected.
 
+    // Each wired modal's tab switcher, by modal, for openPreferences below.
+    const tabSwitchers = new Map();
+
     function wireSettingsTabs(tabBar) {
         const tabs = Array.from(tabBar.querySelectorAll('.settings-tab'));
         const modal = tabBar.closest('.settings-modal');
@@ -512,14 +521,34 @@
                 if (next) { e.preventDefault(); activate(next, true); }
             });
         });
+        if (modal) {
+            tabSwitchers.set(modal, (name) => {
+                const tab = tabs.find(t => t.dataset.tab === name);
+                if (tab) activate(tab);
+            });
+        }
     }
 
     document.querySelectorAll('.settings-tabs').forEach(wireSettingsTabs);
 
 
+    // ── Open ───────────────────────────────────────────────────────────────────
+    // The sidebar's Settings button opens Preferences where it was left; the
+    // Plan page opens it with Ctrl+, (static/js/plan/main.js). A named tab
+    // opens on that tab; an unknown one is ignored.
+
+    function openPreferences(tab) {
+        const modal = document.querySelector('[data-modal="preferences"]');
+        if (!modal) return;
+        if (tab) tabSwitchers.get(modal.querySelector('.settings-modal'))?.(tab);
+        modal.hidden = false;
+    }
+
+    window.openPreferences = openPreferences;
+
+
     // ── Modal close ────────────────────────────────────────────────────────────
-    // The sidebar's Settings button opens the Preferences modal (nav.js). Every
-    // settings modal closes on its × button, a backdrop click, or Escape.
+    // Every settings modal closes on its × button, a backdrop click, or Escape.
 
     document.querySelectorAll('.settings-modal-overlay').forEach(modal => {
         const close = () => { modal.hidden = true; };

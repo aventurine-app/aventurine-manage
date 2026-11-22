@@ -218,7 +218,7 @@
     outline-offset: -2px;
 }
 .rep-reports .p-dropdown-item-danger,
-.rep-reports .p-dropdown-item-danger:hover { color: var(--ant-color-error); }
+.rep-reports .p-dropdown-item-danger:hover { color: var(--ant-color-error-text); }
 .rep-reports .p-dropdown-item-danger:hover { background: var(--ant-color-error-bg); }
 
 @keyframes rep-drop-in {
@@ -434,7 +434,7 @@
    prose. */
 .fc-lead-value { font-weight: var(--ant-font-weight-strong); }
 .fc-lead-money { font-variant-numeric: tabular-nums; }
-.fc-lead-value.fc-neg { color: var(--ant-color-error); }
+.fc-lead-value.fc-neg { color: var(--ant-color-error-text); }
 
 /* Shown only when the projection runs out of money, as an error Alert. A dip
    that stays above zero gets no line: on a rising line the lowest point is week
@@ -452,7 +452,7 @@
    link to where it is fixed. */
 .fc-note-warn { color: var(--ant-color-text-secondary); }
 .fc-note-warn a {
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     text-decoration: none;
 }
 .fc-note-warn a:hover { color: var(--ant-color-primary-hover); }
@@ -735,8 +735,8 @@
 
 /* Which way the money goes. With no legend, this pairing is what carries it,
    alongside the sign in front of the figure. */
-.fc-amount-expense { color: var(--ant-color-error); }
-.fc-amount-income  { color: var(--ant-color-success); }
+.fc-amount-expense { color: var(--ant-color-error-text); }
+.fc-amount-income  { color: var(--ant-color-success-text); }
 
 /* Edit mode stacks: the description gets a full row, the three controls and the
    ✓/✗ share the one below. */

@@ -3,15 +3,93 @@
 // Highlights the current page's link in the shared sidebar. The sidebar is one
 // partial served to every route (pages/partials/sidebar.html), so the .active
 // class can no longer be baked into per-page markup — derive it from the URL.
+//
+// The Plan page's links differ only by hash (/plan#goals names a Planner
+// workspace), so on /plan the hash is part of the match, and it is matched
+// again whenever it changes (static/js/plan/main.js changes it without a reload).
 (function () {
-  let p = location.pathname;
-  // Plain-browser mode: a page opened straight from pages/ — map
-  // ".../pages/dashboard.html" back to its app:// route shape.
-  const m = p.match(/\/pages\/([\w-]+)\.html$/);
-  if (m) p = m[1] === 'dashboard' ? '/' : `/${m[1]}`;
-  document.querySelectorAll('.menu .nav a[href]').forEach((a) => {
-    a.classList.toggle('active', a.getAttribute('href') === p);
-  });
+  function currentRoute() {
+    let p = location.pathname;
+    // Plain-browser mode: a page opened straight from pages/ — map
+    // ".../pages/dashboard.html" back to its app:// route shape.
+    const m = p.match(/\/pages\/([\w-]+)\.html$/);
+    if (m) p = m[1] === 'dashboard' ? '/' : `/${m[1]}`;
+    if (p === '/plan') p += `#${location.hash.slice(1) || 'plans'}`;
+    return p;
+  }
+
+  function markActive() {
+    const p = currentRoute();
+    document.querySelectorAll('.menu .nav a[href]').forEach((a) => {
+      a.classList.toggle('active', a.getAttribute('href') === p);
+    });
+  }
+
+  markActive();
+  window.addEventListener('hashchange', markActive);
+}());
+
+// ── Sections: Manage and Plan ────────────────────────────────────────────
+// Each header folds its links away, accordion-style: at most one section is
+// open, so opening one folds all the others (folding the open one leaves
+// none open). The folded ones are kept as one space-separated list
+// ('nav-closed' in localStorage), which theme-init.js puts on
+// <html data-nav-closed> before first paint; nav.css reads it from there, so
+// this file only rewrites the list and keeps aria-expanded and inert in step
+// with it.
+(function () {
+  const KEY = 'nav-closed';
+  const root = document.documentElement;
+  const toggles = [...document.querySelectorAll('.nav-section-toggle[data-section]')];
+  if (!toggles.length) return;
+
+  const closedSet = () => new Set((root.dataset.navClosed || '').split(' ').filter(Boolean));
+
+  function sync() {
+    const closed = closedSet();
+    for (const btn of toggles) {
+      const open = !closed.has(btn.dataset.section);
+      btn.setAttribute('aria-expanded', String(open));
+      const items = document.getElementById(btn.getAttribute('aria-controls'));
+      // A folded section's links are clipped to nothing; inert keeps them
+      // out of the Tab order and the accessibility tree too.
+      if (items) items.inert = !open;
+    }
+  }
+
+  const sections = toggles.map((btn) => btn.dataset.section);
+
+  // Open `section` and fold every other one; null folds them all.
+  function openOnly(section) {
+    const value = sections.filter((s) => s !== section).join(' ');
+    if (value) root.dataset.navClosed = value;
+    else delete root.dataset.navClosed;
+    try { localStorage.setItem(KEY, value); } catch { /* storage blocked: the fold lasts this page */ }
+    sync();
+  }
+
+  function toggle(section) {
+    openOnly(closedSet().has(section) ? section : null);
+  }
+
+  // The section holding the current page's link, if any.
+  function activeSection() {
+    const btn = toggles.find((b) =>
+      document.getElementById(b.getAttribute('aria-controls'))?.querySelector('a.active'));
+    return btn ? btn.dataset.section : null;
+  }
+
+  // A list saved before the accordion (or none, on first run) can leave
+  // several sections open; keep only the current page's one (else the first).
+  const closed = closedSet();
+  const open = sections.filter((s) => !closed.has(s));
+  if (open.length > 1) {
+    const active = activeSection();
+    openOnly(open.includes(active) ? active : open[0]);
+  }
+
+  for (const btn of toggles) btn.addEventListener('click', () => toggle(btn.dataset.section));
+  sync();
 }());
 
 // ── File and Settings (foot of the sidebar) ──────────────────────────────
@@ -55,8 +133,7 @@
   }
 
   document.querySelector('.nav-footer [data-action="open-settings"]')?.addEventListener('click', () => {
-    const modal = document.querySelector('[data-modal="preferences"]');
-    if (modal) modal.hidden = false;
+    openPreferences();
   });
 }());
 

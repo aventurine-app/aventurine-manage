@@ -396,7 +396,7 @@ html[data-theme="dark"] .avatar-circle-9 { background: #351b02; color: #f2b664; 
        the frame's height for the fill to reach the edges. */
     display: inline-flex;
     align-items: center;
-    color: var(--accent-primary);
+    color: var(--accent-primary-text);
     font-family: var(--font-menu);
     font-size: var(--size-micro);
     font-weight: var(--weight-superbold);
@@ -678,7 +678,7 @@ html[data-theme="dark"] .avatar-circle-9 { background: #351b02; color: #f2b664; 
     padding: 0;
     border: 0;
     background: none;
-    color: var(--accent-primary);
+    color: var(--accent-primary-text);
     font-family: var(--font-menu);
     font-size: var(--size-small);
     font-weight: var(--weight-semibold);

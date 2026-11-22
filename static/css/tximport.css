@@ -32,7 +32,7 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
-.tx-amount-income { color: var(--ant-color-success); }
+.tx-amount-income { color: var(--ant-color-success-text); }
 .tx-amount-transfer { color: var(--ant-color-info-text); }
 .tx-review-list { margin: 4px 0 0; padding-inline-start: 18px; }
 .tx-review-list li { list-style: disc; }
@@ -62,7 +62,6 @@
     border-radius: var(--ant-radius-lg);
 }
 .tx-import-body .ant-table { min-width: 560px; }
-.tx-import-body .ant-table thead th { border-radius: 0; }
 .tx-import-body .ant-table tbody tr:last-child > td { border-bottom: 0; }
 
 
@@ -147,7 +146,7 @@
 .tx-import-auto {
     display: inline-flex;
     flex: none;
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     border-radius: var(--ant-radius-sm);
 }
 .tx-import-auto:focus-visible {
@@ -168,7 +167,7 @@
     text-align: center;
 }
 .tx-import-done-icon {
-    color: var(--ant-color-success);
+    color: var(--ant-color-success-text);
     font-size: 72px;
     line-height: 1;
 }

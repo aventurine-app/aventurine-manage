@@ -6,12 +6,10 @@
    than imported. ant.js holds the interactive halves: Modal, Tooltip,
    Popconfirm, the month picker and message toasts.
 
-   COLOUR COMES FROM THE APP THEME. Every token below is a mapping onto the app's
-   own (style.css, themes.css): Ant's container is --surface1, its primary is
-   --accent-primary, its fills are the text colour at Ant's alphas. So a page
-   drawn in Ant Design still follows the theme picker — light, dark, warm, the
-   tints and the accent — instead of carrying Ant's white-and-blue into a pink
-   or a warm-dark window. Shape, type and motion are Ant's own.
+   COLOUR COMES FROM THE AVENTURINE THEME (theme.css, shared with Aventurine
+   Planner). Every colour token below is the theme token of the same meaning,
+   so a page drawn here paints exactly as the Planner does, light or dark.
+   Shape, type and motion are Ant's own.
 
    Loaded per page, like any page-only stylesheet, by the pages drawn in it
    (Recurring, Portfolio, Reports, Budgets, Statements, Transactions and the
@@ -81,72 +79,84 @@
     --ant-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
     --ant-ease-out-circ: cubic-bezier(0.08, 0.82, 0.17, 1);
 
-    /* Text. Ant's tertiary is 45% black (3.4:1); the app's tertiary clears AA,
-       so it is what Ant's descriptions and statistic titles read here. */
-    --ant-color-text: var(--text-primary);
-    --ant-color-text-secondary: var(--text-secondary);
-    --ant-color-text-tertiary: var(--text-tertiary);
-    --ant-color-text-placeholder: color-mix(in srgb, var(--text-primary) 35%, transparent);
-    --ant-color-text-disabled: color-mix(in srgb, var(--text-primary) 30%, transparent);
-    /* Text on a primary fill: the app's own button ink, which flips per theme
-       to stay legible on the accent. */
-    --ant-color-text-on-primary: var(--button-text);
-    --ant-color-icon: var(--text-tertiary);
-    --ant-color-icon-hover: var(--text-primary);
+    /* Colour: Ant's map tokens are the Aventurine theme's own (theme.css,
+       shared with Aventurine Planner), under this sheet's --ant-* names. The
+       theme already carries Ant's light and dark algorithms, so nothing here is
+       mixed or restated per theme. */
+    --ant-color-text: var(--color-text);
+    --ant-color-text-secondary: var(--color-text-secondary);
+    --ant-color-text-tertiary: var(--color-text-tertiary);
+    --ant-color-text-quaternary: var(--color-text-quaternary);
+    --ant-color-text-placeholder: var(--color-text-quaternary);
+    --ant-color-text-disabled: var(--color-text-disabled);
+    --ant-color-text-on-primary: var(--color-text-light-solid);
+    --ant-color-icon: var(--color-icon);
+    --ant-color-icon-hover: var(--color-icon-hover);
 
-    /* Surfaces: the page, cards, and what floats over them. */
-    --ant-color-bg-layout: var(--background);
-    --ant-color-bg-container: var(--surface1);
-    --ant-color-bg-elevated: var(--surface1);
-    --ant-color-bg-mask: rgba(0, 0, 0, 0.45);
-    --ant-color-bg-spotlight: rgba(0, 0, 0, 0.85);
+    --ant-color-bg-layout: var(--color-bg-layout);
+    --ant-color-bg-container: var(--color-bg-container);
+    --ant-color-bg-elevated: var(--color-bg-elevated);
+    --ant-color-bg-mask: var(--color-bg-mask);
+    --ant-color-bg-spotlight: var(--color-bg-spotlight);
 
-    /* Lines and fills. Controls take the app's border, which is darker than
-       Ant's #d9d9d9 and so actually reads as a field edge; dividers take a
-       half step of it. Fills are the text colour at Ant's alphas, so they tint
-       toward black on light and toward white on dark, as Ant's do. */
-    --ant-color-border: var(--border);
-    --ant-color-border-secondary: color-mix(in srgb, var(--border) 50%, var(--surface1));
-    --ant-color-split: var(--ant-color-border-secondary);
-    --ant-color-fill: color-mix(in srgb, var(--text-primary) 15%, transparent);
-    --ant-color-fill-secondary: color-mix(in srgb, var(--text-primary) 6%, transparent);
-    --ant-color-fill-tertiary: color-mix(in srgb, var(--text-primary) 4%, transparent);
-    --ant-color-fill-quaternary: color-mix(in srgb, var(--text-primary) 2%, transparent);
-    --ant-table-header-bg: color-mix(in srgb, var(--text-primary) 3%, var(--surface1));
+    --ant-color-border: var(--color-border);
+    --ant-color-border-secondary: var(--color-border-secondary);
+    --ant-color-split: var(--color-split);
+    --ant-color-fill: var(--color-fill);
+    --ant-color-fill-secondary: var(--color-fill-secondary);
+    --ant-color-fill-tertiary: var(--color-fill-tertiary);
+    --ant-color-fill-quaternary: var(--color-fill-quaternary);
+    --ant-table-header-bg: var(--table-header-bg);
+    /* Ant rounds the header's end cells; here every table sits flush in a card
+       or inside a scroll box that clips to its own corners, so the header
+       fill runs square and the container supplies any rounding. */
+    --ant-table-header-border-radius: 0;
+    /* Vertical cell padding for each table size (small, middle, large). Every
+       table's row height derives from these, so the Compact density setting
+       (style.css) can tighten them all at once. */
+    --ant-table-pad-y-sm: 8px;
+    --ant-table-pad-y-md: 12px;
+    --ant-table-pad-y-lg: 16px;
 
-    /* Primary: the app accent and its hover step, with Ant's tints mixed from
-       it so a user-picked accent carries through every selected state. */
-    --ant-color-primary: var(--accent-primary);
-    --ant-color-primary-hover: var(--accent-primary-hover);
-    --ant-color-primary-active: color-mix(in srgb, var(--accent-primary) 80%, #000);
-    --ant-color-primary-bg: color-mix(in srgb, var(--accent-primary) 12%, var(--surface1));
-    --ant-color-primary-bg-hover: color-mix(in srgb, var(--accent-primary) 20%, var(--surface1));
-    --ant-color-primary-border: color-mix(in srgb, var(--accent-primary) 40%, var(--surface1));
-    --ant-control-outline: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+    --ant-color-primary: var(--color-primary);
+    --ant-color-primary-hover: var(--color-primary-hover);
+    --ant-color-primary-active: var(--color-primary-active);
+    --ant-color-primary-bg: var(--color-primary-bg);
+    --ant-color-primary-bg-hover: var(--color-primary-bg-hover);
+    --ant-color-primary-border: var(--color-primary-border);
+    /* Text in the accent: the same charcoal on light, a light step on dark,
+       where the solid accent is too dark to read as text. */
+    --ant-color-primary-text: var(--color-primary-text);
+    --ant-control-outline: var(--control-outline);
 
-    /* Status: the app's gain green, loss red and info blue. */
-    --ant-color-success: var(--accent-positive);
-    --ant-color-success-bg: color-mix(in srgb, var(--accent-positive) 8%, var(--surface1));
-    --ant-color-success-border: color-mix(in srgb, var(--accent-positive) 35%, var(--surface1));
-    --ant-color-warning: var(--warning);
-    --ant-color-warning-bg: color-mix(in srgb, var(--warning) 10%, var(--surface1));
-    --ant-color-warning-border: color-mix(in srgb, var(--warning) 40%, var(--surface1));
-    --ant-color-error: var(--accent-negative);
-    --ant-color-error-hover: color-mix(in srgb, var(--accent-negative) 80%, #fff);
-    --ant-color-error-active: color-mix(in srgb, var(--accent-negative) 80%, #000);
-    --ant-color-error-bg: color-mix(in srgb, var(--accent-negative) 8%, var(--surface1));
-    --ant-color-error-outline: color-mix(in srgb, var(--accent-negative) 15%, transparent);
-    --ant-color-info: var(--accent-info-light);
-    --ant-color-info-text: var(--accent-info);
-    --ant-color-info-bg: color-mix(in srgb, var(--accent-info-light) 9%, var(--surface1));
-    --ant-color-info-border: color-mix(in srgb, var(--accent-info-light) 35%, var(--surface1));
+    /* Each status has a fill step (icons, bars, borders) and a darker text
+       step that clears 4.5:1 on the cards: text in a status colour reads the
+       *-text token, as the Planner's does. */
+    --ant-color-success-text: var(--color-success-text);
+    --ant-color-warning-text: var(--color-warning-text);
+    --ant-color-error-text: var(--color-error-text);
+    --ant-color-success: var(--color-success);
+    --ant-color-success-bg: var(--color-success-bg);
+    --ant-color-success-border: var(--color-success-border);
+    --ant-color-warning: var(--color-warning);
+    --ant-color-warning-bg: var(--color-warning-bg);
+    --ant-color-warning-border: var(--color-warning-border);
+    --ant-color-error: var(--color-error);
+    --ant-color-error-hover: var(--color-error-hover);
+    --ant-color-error-active: var(--color-error-active);
+    --ant-color-error-bg: var(--color-error-bg);
+    --ant-color-error-outline: var(--color-error-outline);
+    --ant-color-info: var(--color-info);
+    --ant-color-info-text: var(--color-info-text);
+    --ant-color-info-bg: var(--color-info-bg);
+    --ant-color-info-border: var(--color-info-border);
 
-    /* Elevation: Ant's boxShadow (pop-ups) and its buttons' 2px drop. */
+    /* Elevation: Ant's boxShadow (pop-ups) and its buttons' 2px drops. */
     --ant-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12),
         0 9px 28px 8px rgba(0, 0, 0, 0.05);
-    --ant-shadow-button: 0 2px 0 rgba(0, 0, 0, 0.02);
-    --ant-shadow-button-primary: 0 2px 0 color-mix(in srgb, var(--accent-primary) 10%, transparent);
-    --ant-shadow-button-danger: 0 2px 0 color-mix(in srgb, var(--accent-negative) 6%, transparent);
+    --ant-shadow-button: var(--button-shadow);
+    --ant-shadow-button-primary: var(--button-primary-shadow);
+    --ant-shadow-button-danger: var(--button-danger-shadow);
 
     /* Stacking: above the app's dialogs (1000), below its toast (1400). */
     --ant-z-popup: 1200;
@@ -200,7 +210,7 @@
     /* The category colours that are not AntV's: a second income (Ant's green-4)
        and Uncategorized, a quiet grey. Both a step darker on dark, below. */
     --ant-chart-income-2: #95de64;
-    --ant-chart-neutral: #b8bcbb;
+    --ant-chart-neutral: #c9c2b3;   /* the theme's charcoal-3, a quiet warm grey */
 
     /* Ant's purple-6 and volcano-6 and green-6: Investing, and the two outflow
        bands and the hub that the Sankey cannot take from the ten above. */
@@ -276,34 +286,14 @@
 }
 
 
-/* Ant's dark algorithm: fills at its dark alphas, pop-ups a step lighter than
-   the cards they float over, and stronger shadows, which barely show on a dark
-   page at the light values. */
+/* Dark: the theme carries Ant's dark algorithm, so only what is not colour
+   theme is restated: stronger pop-up shadows (the light ones barely show on a
+   dark page), and the chart steps that darken to sit on the dark card. */
 html[data-theme="dark"] {
-    --ant-color-bg-elevated: color-mix(in srgb, var(--surface1) 92%, var(--text-primary));
-    --ant-color-bg-spotlight: #424242;
-    --ant-color-border-secondary: color-mix(in srgb, var(--border) 70%, var(--surface1));
-    --ant-color-fill: color-mix(in srgb, var(--text-primary) 18%, transparent);
-    --ant-color-fill-secondary: color-mix(in srgb, var(--text-primary) 12%, transparent);
-    --ant-color-fill-tertiary: color-mix(in srgb, var(--text-primary) 8%, transparent);
-    --ant-color-fill-quaternary: color-mix(in srgb, var(--text-primary) 4%, transparent);
-    --ant-table-header-bg: color-mix(in srgb, var(--text-primary) 5%, var(--surface1));
-    --ant-color-primary-active: color-mix(in srgb, var(--accent-primary) 85%, #000);
-    --ant-color-primary-bg: color-mix(in srgb, var(--accent-primary) 20%, var(--surface1));
-    --ant-color-primary-bg-hover: color-mix(in srgb, var(--accent-primary) 28%, var(--surface1));
-    --ant-color-primary-border: color-mix(in srgb, var(--accent-primary) 50%, var(--surface1));
-    --ant-control-outline: color-mix(in srgb, var(--accent-primary) 30%, transparent);
-    --ant-color-info-bg: color-mix(in srgb, var(--accent-info-light) 16%, var(--surface1));
-    --ant-color-info-border: color-mix(in srgb, var(--accent-info-light) 45%, var(--surface1));
-    --ant-color-error-bg: color-mix(in srgb, var(--accent-negative) 16%, var(--surface1));
-    --ant-color-success-bg: color-mix(in srgb, var(--accent-positive) 14%, var(--surface1));
-    --ant-color-success-border: color-mix(in srgb, var(--accent-positive) 45%, var(--surface1));
-    --ant-color-warning-bg: color-mix(in srgb, var(--warning) 14%, var(--surface1));
-    --ant-color-warning-border: color-mix(in srgb, var(--warning) 45%, var(--surface1));
     --ant-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.32), 0 3px 6px -4px rgba(0, 0, 0, 0.48),
         0 9px 28px 8px rgba(0, 0, 0, 0.2);
     --ant-chart-income-2: #7bc96f;
-    --ant-chart-neutral: #6b6f6e;
+    --ant-chart-neutral: #6f695f;
 }
 
 
@@ -428,7 +418,7 @@ a.ant-btn { text-decoration: none; }
 
 .ant-btn-default.ant-btn-dangerous {
     border-color: var(--ant-color-error);
-    color: var(--ant-color-error);
+    color: var(--ant-color-error-text);
     box-shadow: var(--ant-shadow-button-danger);
 }
 .ant-btn-default.ant-btn-dangerous:not(:disabled):hover {
@@ -451,7 +441,7 @@ a.ant-btn { text-decoration: none; }
 .ant-btn-text:not(:disabled):hover { background: var(--ant-color-fill-secondary); }
 .ant-btn-text:not(:disabled):active { background: var(--ant-color-fill); }
 
-.ant-btn-text.ant-btn-dangerous { color: var(--ant-color-error); }
+.ant-btn-text.ant-btn-dangerous { color: var(--ant-color-error-text); }
 .ant-btn-text.ant-btn-dangerous:not(:disabled):hover {
     background: var(--ant-color-error-bg);
     color: var(--ant-color-error-hover);
@@ -831,7 +821,7 @@ a.ant-btn { text-decoration: none; }
     min-width: 0;
 }
 .ant-form-item-label { color: var(--ant-color-text-secondary); }
-.ant-form-item-explain { color: var(--ant-color-error); }
+.ant-form-item-explain { color: var(--ant-color-error-text); }
 .ant-form-item-explain:empty { display: none; }
 
 
@@ -951,7 +941,7 @@ a.ant-btn { text-decoration: none; }
 .ant-tabs-tab:hover { color: var(--ant-color-primary-hover); }
 .ant-tabs-tab:active { color: var(--ant-color-primary-active); }
 .ant-tabs-tab[aria-selected="true"] {
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     text-shadow: 0 0 0.25px currentColor;
 }
 .ant-tabs-tab::after {
@@ -1109,8 +1099,8 @@ a.ant-btn { text-decoration: none; }
 .ant-progress-status-exception .ant-progress-bg { background: var(--ant-color-error); }
 /* status="success": the bar in the success green, the figure a tick. */
 .ant-progress-status-success .ant-progress-bg { background: var(--ant-color-success); }
-.ant-progress-status-success .ant-progress-text { color: var(--ant-color-success); }
-.ant-progress-status-exception .ant-progress-text { color: var(--ant-color-error); }
+.ant-progress-status-success .ant-progress-text { color: var(--ant-color-success-text); }
+.ant-progress-status-exception .ant-progress-text { color: var(--ant-color-error-text); }
 
 /* Empty, with Ant's simple image. Its three tones are Ant's fills made opaque
    against the card, which is how Ant draws the image too. */
@@ -1204,7 +1194,7 @@ a.ant-btn { text-decoration: none; }
     border: 0;
     border-radius: var(--ant-radius-sm);
     background: transparent;
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     font-size: var(--ant-font-size);
     vertical-align: middle;
     cursor: pointer;
@@ -1238,7 +1228,7 @@ a.ant-btn { text-decoration: none; }
 }
 .ant-table th,
 .ant-table td {
-    padding: 8px;
+    padding: var(--ant-table-pad-y-sm) 8px;
     border-bottom: var(--ant-line-width) solid var(--ant-color-border-secondary);
     overflow-wrap: break-word;
     text-align: start;
@@ -1249,8 +1239,8 @@ a.ant-btn { text-decoration: none; }
     background: var(--ant-table-header-bg);
     font-weight: var(--ant-font-weight-strong);
 }
-.ant-table thead th:first-child { border-start-start-radius: var(--ant-radius-lg); }
-.ant-table thead th:last-child { border-start-end-radius: var(--ant-radius-lg); }
+.ant-table thead th:first-child { border-start-start-radius: var(--ant-table-header-border-radius); }
+.ant-table thead th:last-child { border-start-end-radius: var(--ant-table-header-border-radius); }
 .ant-table thead th:not(:last-child):not(.ant-table-selection-column)::before {
     content: '';
     position: absolute;
@@ -1273,7 +1263,7 @@ a.ant-btn { text-decoration: none; }
 /* size="large", Ant's default: 16px cells, for a table that is a page's main
    content rather than a dense grid inside a card. */
 .ant-table-large th,
-.ant-table-large td { padding: 16px; }
+.ant-table-large td { padding: var(--ant-table-pad-y-lg) 16px; }
 
 /* Table.Summary: the totals row under the rows it totals, on the header's tint. */
 .ant-table tfoot td {
@@ -1645,6 +1635,7 @@ a.ant-btn { text-decoration: none; }
 .ant-message-success .anticon { color: var(--ant-color-success); }
 .ant-message-error .anticon { color: var(--ant-color-error); }
 .ant-message-info .anticon { color: var(--ant-color-info); }
+.ant-message-warning .anticon { color: var(--ant-color-warning); }
 
 
 /* ─── 13. Motion ──────────────────────────────────────────────────────────── */
@@ -1678,7 +1669,7 @@ a.ant-btn { text-decoration: none; }
  * Link is primary text with no box. A primary ghost is the primary colour as
  * an outline, for a control whose value is set. */
 .ant-btn-link {
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     box-shadow: none;
 }
 .ant-btn-link:not(:disabled):hover { color: var(--ant-color-primary-hover); }
@@ -1691,7 +1682,7 @@ a.ant-btn { text-decoration: none; }
 .ant-btn-primary.ant-btn-background-ghost {
     border-color: var(--ant-color-primary);
     background: transparent;
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     box-shadow: none;
 }
 .ant-btn-primary.ant-btn-background-ghost:not(:disabled):hover {
@@ -1920,7 +1911,7 @@ textarea.ant-input {
 }
 .ant-select-item-option-state {
     display: inline-flex;
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     visibility: hidden;
 }
 .ant-select-item-option-selected .ant-select-item-option-state { visibility: visible; }
@@ -2224,7 +2215,7 @@ textarea.ant-input {
 .ant-radio-button-wrapper:has(> input:checked) {
     z-index: 1;
     border-color: var(--ant-color-primary);
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
 }
 .ant-radio-button-wrapper:has(> input:checked)::before { background: var(--ant-color-primary); }
 .ant-radio-button-wrapper:has(> input:focus-visible) {
@@ -2338,7 +2329,7 @@ textarea.ant-input {
 .ant-steps-item-process .ant-steps-item-title { color: var(--ant-color-text); }
 .ant-steps-item-finish .ant-steps-item-icon {
     background: var(--ant-color-primary-bg);
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
 }
 .ant-steps-item-finish .ant-steps-item-title { color: var(--ant-color-text); }
 .ant-steps-item-finish .ant-steps-item-title::after { background: var(--ant-color-primary); }
@@ -2385,7 +2376,7 @@ textarea.ant-input {
 .ant-pagination-item-active {
     border-color: var(--ant-color-primary);
     background: var(--ant-color-bg-container);
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     font-weight: var(--ant-font-weight-strong);
 }
 .ant-pagination-item-active:hover {
@@ -2399,7 +2390,7 @@ textarea.ant-input {
 }
 /* « • • • »: the dots, turning into the double arrow under the pointer. */
 .ant-pagination-jump { color: var(--ant-color-text-disabled); letter-spacing: 2px; }
-.ant-pagination-jump .anticon { display: none; color: var(--ant-color-primary); }
+.ant-pagination-jump .anticon { display: none; color: var(--ant-color-primary-text); }
 .ant-pagination-jump:hover .anticon,
 .ant-pagination-jump:focus-visible .anticon { display: inline-flex; }
 .ant-pagination-jump:hover .ant-pagination-jump-dots,
@@ -2418,7 +2409,7 @@ textarea.ant-input {
  * sorts by is tinted under the header and down every row. Ellipsis cells cut
  * to one line inside a fixed layout. */
 .ant-table-middle th,
-.ant-table-middle td { padding: 12px 8px; }
+.ant-table-middle td { padding: var(--ant-table-pad-y-md) 8px; }
 .ant-table-fixed { table-layout: fixed; }
 
 .ant-table thead th.ant-table-column-has-sorters {
@@ -2436,7 +2427,7 @@ textarea.ant-input {
     gap: 4px;
     width: 100%;
     box-sizing: border-box;
-    padding: 12px 8px;
+    padding: var(--ant-table-pad-y-md) 8px;
     border: 0;
     background: transparent;
     color: inherit;
@@ -2444,7 +2435,7 @@ textarea.ant-input {
     text-align: inherit;
     cursor: pointer;
 }
-.ant-table-large .ant-table-column-sorters { padding: 16px; }
+.ant-table-large .ant-table-column-sorters { padding: var(--ant-table-pad-y-lg) 16px; }
 .ant-table-column-sorters:focus-visible {
     outline: 2px solid var(--ant-color-primary);
     outline-offset: -2px;
@@ -2464,7 +2455,7 @@ textarea.ant-input {
 }
 .ant-table-column-sorter > span { display: inline-flex; line-height: 0; }
 .ant-table-column-sorter > span + span { margin-top: -0.3em; }
-.ant-table-column-sorter > .ant-table-column-sorter-on { color: var(--ant-color-primary); }
+.ant-table-column-sorter > .ant-table-column-sorter-on { color: var(--ant-color-primary-text); }
 
 .ant-table-cell-ellipsis {
     overflow: hidden;
@@ -2539,7 +2530,7 @@ html[data-theme="dark"] .ant-tag-hue {
 }
 .ant-upload-drag-icon {
     margin: 0 0 16px;
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     font-size: 48px;
     line-height: 1;
 }
@@ -2560,7 +2551,7 @@ html[data-theme="dark"] .ant-tag-hue {
     align-items: center;
     gap: 12px;
     padding: 32px 0;
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
 }
 .ant-spin-dot {
     position: relative;
@@ -2741,7 +2732,7 @@ html[data-theme="dark"] .ant-tag-hue {
     color: var(--ant-color-text-disabled);
     cursor: not-allowed;
 }
-.ant-dropdown-menu-item-danger:not(:disabled) { color: var(--ant-color-error); }
+.ant-dropdown-menu-item-danger:not(:disabled) { color: var(--ant-color-error-text); }
 .ant-dropdown-menu-item-danger:not(:disabled):hover,
 .ant-dropdown-menu-item-danger:focus-visible {
     background: var(--ant-color-error);
@@ -2752,6 +2743,29 @@ html[data-theme="dark"] .ant-tag-hue {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+/* A menu that may outgrow the window scrolls inside it. */
+.ant-dropdown-menu {
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+}
+.ant-dropdown-menu-item-divider {
+    height: var(--ant-line-width);
+    margin: 4px 0;
+    background: var(--ant-color-split);
+}
+/* The current pick of a menu that chooses one (a selectable Menu). */
+.ant-dropdown-menu-item-selected,
+.ant-dropdown-menu-item-selected:not(:disabled):hover {
+    background: var(--ant-color-primary-bg);
+    color: var(--ant-color-primary-text);
+}
+/* An icon that is not an Ant icon (the Plan section's Phosphor set) sits
+   at the same size as one. */
+.ant-dropdown-menu-item > svg {
+    flex: none;
+    width: 14px;
+    height: 14px;
 }
 
 
@@ -2892,7 +2906,7 @@ html[data-theme="dark"] .ant-tag-hue {
 }
 .ant-tabs-card .ant-tabs-tab-btn:hover { color: var(--ant-color-primary-hover); }
 .ant-tabs-card .ant-tabs-tab-btn[aria-selected="true"] {
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     text-shadow: 0 0 0.25px currentColor;
 }
 .ant-tabs-card .ant-tabs-tab-btn:focus-visible {
@@ -3000,9 +3014,136 @@ html[data-theme="dark"] .ant-tag-hue {
 .ant-picker-presets button[aria-pressed="true"],
 .ant-picker-presets button[aria-pressed="true"]:hover {
     background: var(--ant-color-primary-bg);
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
 }
 .ant-picker-footer {
     padding: 8px 12px;
     border-top: var(--ant-line-width) solid var(--ant-color-split);
 }
+
+/* ─── 31. Notification icon tones ─────────────────────────────────────────────
+ * Notification.success / info / warning / error: the icon in its status
+ * colour, as Ant's own. A page's own icon class (tx-similar-icon) still wins. */
+.ant-notification-icon-success { color: var(--ant-color-success); }
+.ant-notification-icon-info { color: var(--ant-color-info); }
+.ant-notification-icon-warning { color: var(--ant-color-warning); }
+.ant-notification-icon-error { color: var(--ant-color-error); }
+
+/* ─── 32. Status tags, block Segmented, Switch ─────────────────────────────────
+ * Tag color="success" / "error"; Segmented block (the options share the
+ * whole width); Switch, a role="switch" button whose aria-checked the page
+ * script flips (small: .ant-switch-small). First drawn for the Plan section. */
+.ant-tag-success {
+    border-color: var(--ant-color-success-border);
+    background: var(--ant-color-success-bg);
+    color: var(--ant-color-success-text);
+}
+.ant-tag-error {
+    border-color: var(--ant-color-error-outline);
+    background: var(--ant-color-error-bg);
+    color: var(--ant-color-error-text);
+}
+.ant-segmented-block { display: flex; }
+.ant-segmented-block .ant-segmented-item { flex: 1; min-width: 0; }
+
+.ant-switch {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    min-width: 44px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 100px;
+    background: var(--ant-color-text-quaternary);
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background-color var(--ant-motion-mid);
+}
+.ant-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 4px 0 rgba(0, 35, 11, 0.2);
+    transition: left var(--ant-motion-mid) var(--ant-ease-in-out);
+}
+.ant-switch:hover { background: var(--ant-color-text-tertiary); }
+.ant-switch[aria-checked="true"] { background: var(--ant-color-primary); }
+.ant-switch[aria-checked="true"]:hover { background: var(--ant-color-primary-hover); }
+.ant-switch[aria-checked="true"]::after { left: calc(100% - 20px); }
+.ant-switch:focus-visible { outline: 4px solid var(--ant-color-primary-border); outline-offset: 1px; }
+.ant-switch:disabled { opacity: 0.65; cursor: not-allowed; }
+.ant-switch-small { min-width: 28px; height: 16px; }
+.ant-switch-small::after { width: 12px; height: 12px; }
+.ant-switch-small[aria-checked="true"]::after { left: calc(100% - 14px); }
+
+
+/* ─── 33. Collapse ──────────────────────────────────────────────────────────
+ * Ant's Collapse: bordered panels on the alternate fill, each a header with
+ * the right arrow (turned down when open) over a content box on the container
+ * colour. The header is a real button inside a heading, with aria-expanded and
+ * aria-controls; a closed panel's content is [hidden]. The accordion rule (one
+ * open at a time) is the caller's. */
+.ant-collapse {
+    margin: 0;
+    padding: 0;
+    border: var(--ant-line-width) solid var(--ant-color-border);
+    border-radius: var(--ant-radius-lg);
+    background: var(--ant-color-fill-quaternary);
+    color: var(--ant-color-text);
+    list-style: none;
+}
+.ant-collapse-item { border-bottom: var(--ant-line-width) solid var(--ant-color-border); }
+.ant-collapse-item:last-child { border-bottom: 0; }
+.ant-collapse-heading { margin: 0; font: inherit; }
+.ant-collapse-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    margin: 0;
+    padding: 12px 16px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ant-color-text);
+    font: inherit;
+    font-weight: var(--ant-font-weight-strong);
+    line-height: var(--ant-line-height);
+    text-align: start;
+    cursor: pointer;
+}
+.ant-collapse-item:first-child .ant-collapse-header {
+    border-radius: var(--ant-radius-lg) var(--ant-radius-lg) 0 0;
+}
+.ant-collapse-item:last-child .ant-collapse-header[aria-expanded="false"] {
+    border-radius: 0 0 var(--ant-radius-lg) var(--ant-radius-lg);
+}
+.ant-collapse-item:only-child .ant-collapse-header[aria-expanded="false"] { border-radius: var(--ant-radius-lg); }
+.ant-collapse-header:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+.ant-collapse-expand-icon {
+    display: inline-flex;
+    align-items: center;
+    height: calc(var(--ant-font-size) * var(--ant-line-height));
+    font-size: 12px;
+}
+.ant-collapse-expand-icon .anticon { transition: transform var(--ant-motion-mid); }
+.ant-collapse-header[aria-expanded="true"] .ant-collapse-expand-icon .anticon { transform: rotate(90deg); }
+.ant-collapse-header-text { flex: auto; min-width: 0; }
+.ant-collapse-content {
+    border-top: var(--ant-line-width) solid var(--ant-color-border);
+    background: var(--ant-color-bg-container);
+}
+.ant-collapse-item:last-child .ant-collapse-content { border-radius: 0 0 var(--ant-radius-lg) var(--ant-radius-lg); }
+.ant-collapse-content[hidden] { display: none; }
+.ant-collapse-content-box { padding: 16px; }
+.ant-collapse-small .ant-collapse-header { padding: 8px 12px; }
+.ant-collapse-small .ant-collapse-content-box { padding: 8px 12px; }

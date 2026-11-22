@@ -1,0 +1,63 @@
+/* ============================================================================
+   compare.css — the Compare workspace (compare.js), as an Ant Design page:
+   the bar of four plan picks, then one card of
+   line tabs: their net worth chart, their metrics ranked, and their goals.
+   The page frame is components.css's .page; the tab bar and the
+   chart's marks are outlook.css's.
+   ============================================================================ */
+
+/* ── The picks ──────────────────────────────────────────────────────────── */
+.compare-pick { margin-bottom: var(--space-16); }
+.compare-pick-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    align-items: center;
+    gap: var(--space-8) var(--space-16);
+    padding: var(--space-12) var(--space-16);
+}
+.compare-slot { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.compare-slot .plan-pick { flex: 1; width: auto; min-width: 0; }
+/* Each pick's file icon wears its line's colour (--slot, set by compare.js). */
+.compare-slot .plan-pick > .icon:first-child { color: var(--slot); }
+.plan-pick-name.is-placeholder { color: var(--color-text-tertiary); }
+
+/* ── The card of tabs ───────────────────────────────────────────────────── */
+.compare-over { gap: var(--space-12); }
+.compare-over.is-off { visibility: hidden; }
+.compare-legend { padding-left: 52px; }
+.compare-chart { height: clamp(300px, calc(100vh - 340px), 560px); }
+
+/* The table panes close the card: they round to its inner corners (and, as
+   scroll boxes, clip the cells' backgrounds to them), and the last row drops
+   its rule so it does not double the card's bottom border. */
+.compare-pane.ant-table-wrapper { border-radius: 0 0 var(--card-inner-radius) var(--card-inner-radius); }
+.compare-pane .plan-table tbody tr:last-child > * { border-bottom: 0; }
+
+.compare-col { display: inline-flex; flex-direction: column; align-items: flex-end; }
+.compare-col-note { display: block; color: var(--color-text-tertiary); font-size: var(--font-size-sm); font-weight: var(--font-weight-normal); }
+.compare-measure { display: block; font-weight: var(--font-weight-medium); }
+
+/* ── Metrics ────────────────────────────────────────────────────────────── */
+
+/* --heat runs 0..1 (compare.js sets it per place): a tint of the primary
+   colour, strongest on the best figure. Values keep the text colours. */
+.compare-table td.is-heat { background: color-mix(in srgb, var(--color-primary) calc(var(--heat) * 12%), var(--color-bg-container)); }
+.compare-table tbody tr:hover td.is-heat { background: color-mix(in srgb, var(--color-primary) calc(var(--heat) * 16%), var(--color-bg-container)); }
+
+.compare-plan { max-width: 240px; font-weight: var(--font-weight-strong); text-align: right; }
+
+/* A tag sits before the figure, so the figures keep one right edge. */
+.compare-cell { display: inline-flex; align-items: center; gap: var(--space-8); }
+.compare-value { font-weight: var(--font-weight-medium); }
+
+/* The runners-up's tags: a trophy in the place's medal colour, on a tint of
+   it. Best is the success tag. */
+.compare-cell[data-medal="silver"] { --medal: var(--medal-silver); }
+.compare-cell[data-medal="bronze"] { --medal: var(--medal-bronze); }
+.compare-cell[data-medal] .ant-tag {
+    background: color-mix(in srgb, var(--medal) 12%, transparent);
+    border-color: color-mix(in srgb, var(--medal) 40%, transparent);
+    color: color-mix(in srgb, var(--medal) 55%, var(--color-text));
+}
+.compare-cell[data-medal] .ant-tag .icon { color: var(--medal); }
+.compare-table td.is-negative .compare-value { color: var(--color-error-text); }

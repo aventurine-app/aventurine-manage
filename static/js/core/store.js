@@ -45,7 +45,6 @@
 // ────────
 //   'ie'        → /api/data          (Income + Expense + Savings + Investing)
 //   'balance'   → /api/balance/data
-//   'portfolio' → /api/portfolio/data
 //
 // sessionStorage (not localStorage) is intentional: the cache should not
 // outlive the browser tab session. A new tab gets a fresh fetch so the user
@@ -83,7 +82,6 @@
         const DATASETS = {
             ie:        '/api/data',
             balance:   '/api/balance/data',
-            portfolio: '/api/portfolio/data',
         };
         // Bump the version suffix whenever the cached data shape changes so old
         // sessionStorage entries are naturally ignored rather than causing errors.

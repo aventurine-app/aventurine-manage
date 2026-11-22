@@ -111,7 +111,7 @@ li {
 }
 
 .nav li a.active,
-.nav li button[aria-expanded="true"] {
+.nav-footer li button[aria-expanded="true"] {
     background: var(--frost-3);
     color: var(--text-primary);
 }
@@ -120,6 +120,67 @@ li {
 .nav li button:focus-visible {
     outline: 2px solid var(--accent-primary);
     outline-offset: -2px;
+}
+
+/* ── Sections: Manage and Plan ──────────────────────────────────────────────
+   Each header folds its links away. A folded section is named in
+   html[data-nav-closed] (a space-separated list, set before first paint by
+   theme-init.js and kept by nav.js), so the fold carries from page to page
+   without animating. It opens and closes like the File options below: the
+   grid row runs between 0fr and 1fr. */
+.nav-section-items {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows var(--nav-duration) var(--nav-ease);
+}
+
+html[data-nav-closed~="manage"] #nav-section-manage,
+html[data-nav-closed~="plan"] #nav-section-plan {
+    grid-template-rows: 0fr;
+}
+
+.nav-section-items > ul {
+    min-height: 0;
+    overflow: hidden;
+    margin: 0;
+}
+
+/* The gap under the header sits on the first link, inside the part that is
+   clipped. As padding on the list it would hold the folded row open. */
+.nav-section-items > ul > li:first-child {
+    margin-top: var(--space-4);
+}
+
+/* The section's links sit one step in from its header. In the rail every
+   icon lines up again, since there are no labels to set them apart.
+   (.nav li a sets the padding these override, hence the longer selectors.) */
+.nav .nav-section-items li a {
+    padding-left: calc(2 * var(--space-12));
+    transition: background 0.15s ease, color 0.15s ease, padding-left var(--nav-duration) var(--nav-ease);
+}
+
+html.has-rail .nav .nav-section-items li a {
+    padding-left: var(--space-12);
+}
+
+/* A folded section still says where you are: its header takes the active
+   look while the open page is one of its hidden links. */
+.nav-section:has(a.active) > .nav-section-toggle[aria-expanded="false"] {
+    background: var(--frost-3);
+    color: var(--text-primary);
+}
+
+/* Points down while open, right while folded. */
+.nav li button svg.nav-section-caret {
+    width: 0.875em;
+    height: 0.875em;
+    margin-left: auto;
+    transition: transform 200ms ease, opacity var(--nav-duration) var(--nav-ease);
+}
+
+html[data-nav-closed~="manage"] [data-section="manage"] svg.nav-section-caret,
+html[data-nav-closed~="plan"] [data-section="plan"] svg.nav-section-caret {
+    transform: rotate(-90deg);
 }
 
 /* ── File / Settings (foot of the sidebar) ──────────────────────────────── */
@@ -190,7 +251,8 @@ html.has-rail div.menu {
 }
 
 html.has-rail .nav-label,
-html.has-rail .nav li button svg.nav-caret {
+html.has-rail .nav li button svg.nav-caret,
+html.has-rail .nav li button svg.nav-section-caret {
     opacity: 0;
 }
 
@@ -204,6 +266,9 @@ html.has-rail .nav li button svg.nav-caret {
     div.menu,
     .nav-label,
     .nav-file-options,
+    .nav-section-items,
+    .nav .nav-section-items li a,
+    .nav li button svg.nav-section-caret,
     .nav li button svg.nav-caret {
         transition: none;
     }

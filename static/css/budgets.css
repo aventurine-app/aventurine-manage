@@ -76,7 +76,7 @@
 @container bud-page (max-width: 720px) {
     .bud-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.bud-stat-over .ant-statistic-content { color: var(--ant-color-error); }
+.bud-stat-over .ant-statistic-content { color: var(--ant-color-error-text); }
 /* "of $1,100" after the amount put away: the target it is measured against. */
 .bud-stat-suffix {
     margin-inline-start: 8px;
@@ -229,7 +229,7 @@ html[data-theme="dark"] .bud-bubble {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.bud-bubble-over .bud-bubble-spent { color: var(--ant-color-error); }
+.bud-bubble-over .bud-bubble-spent { color: var(--ant-color-error-text); }
 
 /* The amount is written twice by budgets.js; a circle under 120px across
    shows the one without a ".00". */
@@ -278,7 +278,7 @@ html[data-theme="dark"] .bud-bubble {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
-.bud-num-over { color: var(--ant-color-error); }
+.bud-num-over { color: var(--ant-color-error-text); }
 
 /* The bars in the circles' colours; over is Progress's own exception status. */
 .bud-progress-spend .ant-progress-bg { background: var(--ant-color-primary); }

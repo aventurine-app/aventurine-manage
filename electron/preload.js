@@ -49,6 +49,10 @@ contextBridge.exposeInMainWorld('electronFile', {
     // Save dialog for Export Transactions; format selects the file filter and
     // suggested name. Same contract: a path string, or null on cancel.
     chooseExportPath:     (format) => ipcRenderer.invoke('export-choose-path', format),
+    // The Plan section: a save dialog for a plan file, CSV or zip ('plan' |
+    // 'csv' | 'zip'), and the PDF report (prints this page to the chosen file).
+    choosePlanExportPath: (kind, suggestedName) => ipcRenderer.invoke('plan-export-choose-path', kind, suggestedName),
+    savePlanPdf:          (suggestedName) => ipcRenderer.invoke('plan-save-pdf', suggestedName),
 });
 
 // The installed version string, shown in About (static/js/shell/titlebar.js).
@@ -72,6 +76,22 @@ contextBridge.exposeInMainWorld('electronUpdater', {
     // Same lifetime as onNavCommand above: registered once per document and
     // discarded with it on the next page load.
     onStatus:         (fn) => ipcRenderer.on('update:status', (_e, status) => fn(status)),
+});
+
+// The Aventurine subscription (electron/license.js; UI in
+// static/js/shell/account.js, feature checks in static/js/core/subscription.js).
+// The page passes only the email and the code; the server it talks to and the
+// pricing page it opens are fixed in the main process. The request calls
+// resolve to { ok, error }, and every change is pushed on 'license:status'.
+contextBridge.exposeInMainWorld('electronLicense', {
+    getState:        () => ipcRenderer.invoke('license:get-state'),
+    requestCode:     (email) => ipcRenderer.invoke('license:request-code', email),
+    verifyCode:      (email, code) => ipcRenderer.invoke('license:verify-code', email, code),
+    check:           () => ipcRenderer.invoke('license:check'),
+    signOut:         () => ipcRenderer.invoke('license:sign-out'),
+    openPricingPage: () => ipcRenderer.invoke('license:open-pricing'),
+    // Same lifetime as onStatus above: one per document.
+    onStatus:        (fn) => ipcRenderer.on('license:status', (_e, status) => fn(status)),
 });
 
 // The data plane. Every /api/* call the page makes goes through here

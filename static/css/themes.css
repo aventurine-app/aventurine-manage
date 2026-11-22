@@ -1,414 +1,57 @@
 /* ============================================================================
    themes.css
-   ============================================================================ */
+   ============================================================================
+   The surface theme is the Aventurine theme (theme.css, shared with Aventurine
+   Planner): Light, Dark, or System (follow the OS). Its tokens carry every
+   colour; style.css maps Manage's names onto them. This file holds only:
+
+     - the dark theme's few restated ROLES, where Manage draws something from a
+       different theme token in dark than in light;
+     - the graph palettes, a second axis that picks what the charts are painted
+       with (data-graph-theme). */
 
 
-/* ─── Dark (default) ─────────────────────────────────────────────────────────
-   Deep surfaces, light text, olive accent lightened for contrast on black.
-   (The light theme is the :root baseline in style.css; this block overrides it
-   when data-theme="dark" is set on <html>.) */
+/* ─── Dark ─────────────────────────────────────────────────────────────────────
+   Names whose role, not just value, changes in dark. Everything else follows
+   theme.css's dark tokens through style.css's mapping. The selector also names
+   the Dark swatch, so the picker's preview reads the same. */
 html[data-theme="dark"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="dark"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="warm-dark"],
-[data-ds-theme="dark"] {   /* style-free scoping hook: render a subtree in dark
-                              regardless of the page theme (design-system previews) */
+.settings-theme-swatch[data-theme="dark"] {
 
-    color-scheme: dark;
-
-    /* Text — three lightnesses for hierarchy.
-       primary   → headings, hero values, anything that must read first.
-       secondary → body copy, supporting metadata.
-       tertiary  → captions, disabled states, the quietest tier. */
-    --text-primary:   var(--color-base-100);
-    --text-secondary: var(--color-base-300);
-    --text-tertiary:  var(--color-base-400);   /* one step quieter than secondary (was base-200, which read louder) */
-
-    /* Date-picker glyph with a base-100 stroke so it reads on dark. Same-origin
+    /* Date-picker glyph with a light stroke so it reads on dark. Same-origin
        SVG file, not a data: URI (blocked by the img-src 'self' CSP). */
     --calendar-icon: url('/static/icons/calendar-dark-theme.svg');
 
-    /* Background + surfaces.
-       background  — the deepest layer (body / page bg).
-       surface1-4  — opaque layers stacked from subtle to prominent, one
-                     palette stop apart so each rung is a visible step lighter
-                     than the one below (raised = lighter in dark).
-                     1 = card on bg, 2 = control fill, 3 = hover/prominent,
-                     4 = top elevation (scrollbar thumbs). */
-    --background: var(--color-base-950);
-    --surface1:   var(--color-base-900);
-    --surface2:   var(--color-base-900);
-    --surface3:   var(--color-base-800);
-    --surface4:   var(--color-base-600);
+    /* Control fills sit on the card here, not a step below it: the dark
+       page is far darker than the card, and a well that deep reads as a hole. */
+    --surface2: var(--color-bg-container);
 
-    /* Borders / dividers — one neutral grey used across cards, inputs, menus. */
-    --border: var(--color-base-800);
+    /* Frost and hairlines in the theme's dark ink, the paper #fcf8f0. */
+    --frost-2:        rgba(252, 248, 240, 0.05);
+    --frost-3:        rgba(252, 248, 240, 0.10);
+    --frost-focus:    rgba(252, 248, 240, 0.40);
+    --frost-dim:      rgba(252, 248, 240, 0.15);
+    --frost-caret:    rgba(252, 248, 240, 0.80);
+    --frost-text:     rgba(252, 248, 240, 0.65);
 
-    /* Accents — the page/UI accent: primary actions, links, focus,
-       active/selected states. Uses the --color-accent ramp (defined once in
-       style.css), distinct from the gain green (--accent-positive, style.css) so
-       UI chrome recolours independently of the gain/income indicators. */
-    --accent-primary: var(--color-accent-500);   /* base — buttons, links, focus, selection, hover/active fills */
-    /* The resting accent sits a rung lighter here than in the light theme, so
-       the hover lift steps up with it (400, not the light theme's 500) — the
-       lift on an accent fill goes toward the light end of the ramp in both
-       themes. */
-    --accent-primary-hover: var(--color-accent-400);
+    --stroke-divider: rgba(252, 248, 240, 0.06);
+    --stroke-soft:    rgba(252, 248, 240, 0.12);
+    --stroke-medium:  rgba(252, 248, 240, 0.20);
+    --stroke-strong:  rgba(252, 248, 240, 0.25);
 
-    /* Button text — text/icons on filled accent (or neutral-hover) buttons. */
-    --button-text:    var(--color-base-900);
-
-
-    /* Neutral secondary buttons (see style.css). The idle line and the hover
-       fill are one colour, --stroke-medium: of the two this theme used to
-       carry (that line and base-700), it is the darker against --surface1, and
-       a darker line cannot be had here because --surface1 is already base-900,
-       so even pure black would only reach 1.20:1 and the outline would
-       disappear. It is translucent, so .button-secondary paints its fill
-       inside the border (background-clip: padding-box) to keep the two from
-       stacking into a lighter ring. */
-    --accent-neutral:      var(--color-base-300);   /* idle text */
-    --accent-neutral-fill: var(--stroke-medium);    /* hover fill */
-    --accent-neutral-border: var(--stroke-medium);  /* idle border */
-
-    /* Status colours — system meaning, not brand. */
-    --warning: #f5a524;
-    /* Vivid primary blue — attention/notification accent (transfer Type pill,
-       computed-cell italics). Lightened on dark surfaces (mirrors the
-       accent's dark-theme treatment) so it stays legible against the deep background. */
-
-    --accent-info: var(--accent-info-light);
-
-    /* (--cat-* had a per-theme block here, back when the categorical ramp was
-       the fixed-hex merchant spectrum and dark needed the PALE step where light
-       needed the mid one. It is accent mixes now (style.css) — every stop mixes
-       with --text-primary or --background, both of which flip right here — so
-       the one definition already lands the ink on the correct side of the page
-       colour in either theme, and a second copy would only drift. The avatars
-       still use the spectrum directly, ui.css.) */
-
-    /* ── Frost layer tokens ──────────────────────────────────────────────
-     * Translucent overlays that tint surfaces in the current theme's
-     * direction.  Dark (default): white-tinted.  Light: black-tinted.
-     * Components reference these instead of hard-coding rgba values so
-     * switching theme only requires overriding these tokens, not touching
-     * any component file. */
-    --frost-2:        rgba(255,255,255, 0.05);   /* default tint */
-    --frost-3:        rgba(255,255,255, 0.10);   /* medium tint — hover bg */
-    --frost-focus:    rgba(255,255,255, 0.40);   /* focused input bg */
-    --frost-dim:      rgba(255,255,255, 0.15);   /* dimmed text / icons */
-    --frost-caret:    rgba(255,255,255, 0.80);   /* input caret */
-    --frost-text:     rgba(255,255,255, 0.65);   /* secondary text */
-
-    /* Hairline strokes — the border-side companion to the frost tints above,
-       for dividers and the borders of frosted controls (toggle chips, etc.).
-       Components used to hard-code these as rgba(255,255,255,…), which made
-       them invisible in the light theme; routing through tokens flips them. */
-    --stroke-divider: rgba(255,255,255, 0.06);   /* faint list / legend divider */
-    --stroke-soft:    rgba(255,255,255, 0.12);   /* idle control border */
-    --stroke-medium:  rgba(255,255,255, 0.20);   /* hover control border / focus ring */
-    --stroke-strong:  rgba(255,255,255, 0.25);   /* active / selected border */
-
-    /* Segmented control — only hover needs a dark value. The track follows
-       --surface1 (the nav fill) and the stroke/active fill follow --border /
-       --accent-primary / --button-text, all of which flip above; hover has to
-       step the opposite way along the ramp (base-900 track → base-700) because
-       stepping off the track means going lighter on dark. */
-    --segctl-hover:         var(--color-base-700);
-
-    /* Toolbar controls (stepper label, toolbar range picker) — same fill as
-       card-header pickers here; the light theme lifts them a rung instead
-       (see style.css). */
-    --toolbar-control-bg:   var(--surface2);
-
-    /* Selected-chip accent — the ends of the accent ramp trade places against
-       the light theme (see style.css): the fill comes from the DARK end so it
-       sits as close to this page as accent-200 sits to the light one, and the
-       line/label come from the light end so they still read on it. Without this
-       the chip kept the light theme's pale mint and glared. */
-    --chip-active-bg:       var(--color-accent-800);
-    --chip-active-bg-hover: var(--color-accent-700);
-    --chip-active-stroke:   var(--color-accent-600);
-    --chip-active-text:     var(--color-accent-200);
-
-    /* Selected table row — the light theme's percentages carried over gave the
-       ledger a selection nobody could see: 20% of a mid accent over a near-black
-       card lands at the card's own lightness (1.0:1), and the plain hover frost
-       above it read LOUDER than a selection. A wash gets its contrast from the
-       gap between the mix and the surface, and there is far less room to darken
-       toward black than to lighten toward white, so dark needs more accent to
-       travel the same distance: 25% clears the card at 1.48:1 (light sits at
-       1.27:1, and low-luminance surfaces need the larger ratio to read as the
-       same step) and stays well clear of hover's 1.14:1. It also lands on the
-       same wash .db-table td.cell-selected already uses (tables.css), so row
-       selection and cell selection finally agree in this theme. */
+    /* Selected table row: a wash gets its contrast from the gap between the
+       mix and the surface, and there is less room to darken toward black than
+       to lighten toward white, so dark needs more accent to read as the same
+       step (and to stay louder than the hover frost). */
     --row-selected-bg:       color-mix(in srgb, var(--accent-primary) 25%, var(--surface1));
     --row-selected-bg-hover: color-mix(in srgb, var(--accent-primary) 34%, var(--surface1));
-}
-
-
-/* ─── Colorful ───────────────────────────────────────────────────────────────
-   The light theme with the sidebar nav flipped to the accent. It deliberately
-   declares NO page-level tokens: everything outside .menu falls through to the
-   light baseline (:root in style.css), so Colorful cannot drift from Light as
-   the light theme evolves — there is only one place to change either.
-
-   The recolour re-points the tokens the nav ALREADY consumes, scoped to the nav
-   subtree, instead of adding theme-specific rules to nav.css. nav.css keeps one
-   set of rules and stays theme-agnostic, and the icons follow for free (their
-   SVGs stroke currentColor). .db-modal-overlay is a SIBLING of .menu, not a
-   child, so none of this reaches the database modal. */
-html[data-theme="colorful"] div.menu {
-
-    /* Nav fill. A vertical neutral gradient, base-700 at the top down to
-       base-900 at the bottom. The gradient is painted as a background-IMAGE
-       over the --surface1 background-color nav.css already sets, so nav.css
-       keeps its one theme-agnostic rule. --surface1 is re-pointed to the
-       bottom stop so the parts that read a flat colour (the scrollbar track)
-       land on a rung the gradient actually contains. White labels clear AA on
-       both stops (base-700 is 7.6:1, base-900 is 16.8:1). */
-    --surface1: var(--color-base-900);
-    background-image: linear-gradient(
-        to bottom,
-        var(--color-base-700),
-        var(--color-base-900)
-    );
-
-    /* Labels + icons. Idle dims to 85% white (5.7:1); hover/active go pure
-       white (7.3:1); section titles sit at 72% (4.7:1). All clear AA. */
-    --text-secondary: rgba(255,255,255, 0.85);
-    --text-primary:   #fff;
-    --text-tertiary:  rgba(255,255,255, 0.72);
-
-    /* Hover fill + scrollbar. White-tinted like the dark theme's frost,
-       because the nav is a DARK surface now regardless of the light page it
-       sits next to — the light theme's black tints would vanish on it. The
-       ACTIVE link takes the accent fill instead (rule below). */
-    --frost-3: rgba(255,255,255, 0.16);
-    --border:  rgba(255,255,255, 0.28);
-}
-
-/* Active nav item. The one place in the sidebar that takes the accent as a
-   FILL rather than a tint: --frost-3 is a white wash that reads the same on
-   every rung of the gradient, so on this theme the open page is marked with
-   the accent instead. Scoped to .active only — hover keeps the frost, so a
-   hovered link never impersonates the open one.
-
-   base-050 (not #fff) on accent-600 keeps the label on the same near-white
-   the rest of the app uses for text on a filled accent. The icon strokes
-   currentColor and follows.
-
-   The shadow lifts the chip off the gradient behind it. It is cast in black
-   at low alpha rather than in a darker accent, so it reads as depth on every
-   rung the nav passes through instead of only near the one it was mixed for,
-   and it is kept wide and faint so the edge stays soft against a background
-   that is already changing value down the sidebar. */
-html[data-theme="colorful"] .nav li a.active {
-    background: var(--accent-primary);
-    color: var(--color-base-050);
-    /* TEMP: disabled. Restore: box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16); */
-}
-
-
-
-/* ─── Warm Light and Warm Dark ───────────────────────────────────────────────
-   The same two themes on a warmer grey ramp (a faint sand/umber cast in place of
-   the neutral green-grey). They paint as data-theme "" / "dark" plus data-warm
-   (shell/theme-init.js), so every rule above and in the page sheets keeps
-   applying and this block only swaps the base ramp. Every surface, border and
-   text token reads that ramp, so nothing else is restated. The accent ramp is
-   left alone: warm changes the paper, not the brand colour. The rungs keep the
-   neutral ramp's lightness steps, so the contrast the themes were tuned to
-   carries over. The swatches name the theme on the swatch itself, as the other
-   surface swatches do. */
-html[data-warm],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="warm-light"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="warm-dark"] {
-    --color-base-050: #f7f3ec;
-    --color-base-100: #ece6dc;
-    --color-base-200: #d6cec1;
-    --color-base-300: #bdb4a5;
-    --color-base-400: #a39a8b;
-    --color-base-500: #877e70;
-    --color-base-600: #6c6458;
-    --color-base-700: #524b41;
-    --color-base-800: #38332c;
-    --color-base-900: #1d1a16;
-    --color-base-950: #0e0c0a;
-}
-
-
-
-/* ─── Tinted surfaces ────────────────────────────────────────────────────────
-   Light with one hue carried through the greys and the accent: red, orange,
-   blue, green, purple, pink. They paint as data-theme "" plus data-tint
-   (shell/theme-init.js), so Light's rules apply untouched and each block below
-   only swaps the two ramps every token reads. The greys keep the neutral ramp's
-   lightness steps at a low saturation. The accent ramp is the same walk at full
-   saturation, with the 600 rung (the resting accent) lowered per hue until it
-   clears 4.7:1 against both its own 050 (button text) and the page. Orange and
-   green need the lowest 600 for that. The swatches name the theme on the
-   swatch itself, as the other surface swatches do. */
-html[data-tint="red"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="tint-red"] {
-    --color-base-050: #f4f1f1;
-    --color-base-100: #e9e2e2;
-    --color-base-200: #d4c9c9;
-    --color-base-300: #beacac;
-    --color-base-400: #a99292;
-    --color-base-500: #917373;
-    --color-base-600: #755c5c;
-    --color-base-700: #594646;
-    --color-base-800: #3c2f2f;
-    --color-base-900: #1d1616;
-    --color-base-950: #0e0b0b;
-    --color-accent-050: #fbecec;
-    --color-accent-100: #f5d6d6;
-    --color-accent-200: #eba8a8;
-    --color-accent-300: #e17f7f;
-    --color-accent-400: #d75454;
-    --color-accent-500: #ca2f2f;
-    --color-accent-600: #992424;
-    --color-accent-700: #741b1b;
-    --color-accent-800: #531313;
-    --color-accent-900: #290a0a;
-    --color-accent-950: #140505;
-}
-
-html[data-tint="orange"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="tint-orange"] {
-    --color-base-050: #f4f2f1;
-    --color-base-100: #e9e5e2;
-    --color-base-200: #d4cdc9;
-    --color-base-300: #beb3ac;
-    --color-base-400: #a99b92;
-    --color-base-500: #917f73;
-    --color-base-600: #6f6158;
-    --color-base-700: #594d46;
-    --color-base-800: #3c342f;
-    --color-base-900: #1d1916;
-    --color-base-950: #0e0c0b;
-    --color-accent-050: #fcf2eb;
-    --color-accent-100: #f9e2d2;
-    --color-accent-200: #f3c1a0;
-    --color-accent-300: #eea472;
-    --color-accent-400: #e88543;
-    --color-accent-500: #de691b;
-    --color-accent-600: #9d4a13;
-    --color-accent-700: #78390f;
-    --color-accent-800: #5b2b0b;
-    --color-accent-900: #2d1606;
-    --color-accent-950: #160b03;
-}
-
-html[data-tint="blue"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="tint-blue"] {
-    --color-base-050: #f1f2f4;
-    --color-base-100: #e2e5e9;
-    --color-base-200: #c9ced4;
-    --color-base-300: #acb4be;
-    --color-base-400: #929ca9;
-    --color-base-500: #738091;
-    --color-base-600: #5a6472;
-    --color-base-700: #464d59;
-    --color-base-800: #2f343c;
-    --color-base-900: #16191d;
-    --color-base-950: #0b0c0e;
-    --color-accent-050: #ecf2fb;
-    --color-accent-100: #d6e3f5;
-    --color-accent-200: #a8c4eb;
-    --color-accent-300: #7fa8e1;
-    --color-accent-400: #548bd7;
-    --color-accent-500: #2f70ca;
-    --color-accent-600: #245599;
-    --color-accent-700: #1b4074;
-    --color-accent-800: #132e53;
-    --color-accent-900: #0a1729;
-    --color-accent-950: #050b14;
-}
-
-html[data-tint="green"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="tint-green"] {
-    --color-base-050: #f1f4f2;
-    --color-base-100: #e2e9e4;
-    --color-base-200: #c9d4cd;
-    --color-base-300: #acbeb2;
-    --color-base-400: #92a99a;
-    --color-base-500: #73917d;
-    --color-base-600: #536a5b;
-    --color-base-700: #415347;
-    --color-base-800: #2f3c33;
-    --color-base-900: #161d18;
-    --color-base-950: #0b0e0c;
-    --color-accent-050: #eef9f2;
-    --color-accent-100: #d9f2e1;
-    --color-accent-200: #afe4c1;
-    --color-accent-300: #88d7a3;
-    --color-accent-400: #61ca84;
-    --color-accent-500: #3ebb68;
-    --color-accent-600: #26713f;
-    --color-accent-700: #1b522e;
-    --color-accent-800: #194d2b;
-    --color-accent-900: #0d2615;
-    --color-accent-950: #06130a;
-}
-
-html[data-tint="purple"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="tint-purple"] {
-    --color-base-050: #f2f1f4;
-    --color-base-100: #e5e2e9;
-    --color-base-200: #cec9d4;
-    --color-base-300: #b4acbe;
-    --color-base-400: #9d92a9;
-    --color-base-500: #817391;
-    --color-base-600: #685c75;
-    --color-base-700: #4e4659;
-    --color-base-800: #352f3c;
-    --color-base-900: #19161d;
-    --color-base-950: #0c0b0e;
-    --color-accent-050: #f3eef9;
-    --color-accent-100: #e5d9f2;
-    --color-accent-200: #c8afe4;
-    --color-accent-300: #ad88d7;
-    --color-accent-400: #9261ca;
-    --color-accent-500: #793ebb;
-    --color-accent-600: #5b2f8e;
-    --color-accent-700: #45246b;
-    --color-accent-800: #31194d;
-    --color-accent-900: #190d26;
-    --color-accent-950: #0c0613;
-}
-
-html[data-tint="pink"],
-:is(.settings-theme-swatch, .settings-theme-btn)[data-theme="tint-pink"] {
-    --color-base-050: #f4f1f2;
-    --color-base-100: #e9e2e5;
-    --color-base-200: #d4c9ce;
-    --color-base-300: #beacb4;
-    --color-base-400: #a9929d;
-    --color-base-500: #917381;
-    --color-base-600: #755c68;
-    --color-base-700: #59464e;
-    --color-base-800: #3c2f35;
-    --color-base-900: #1d1619;
-    --color-base-950: #0e0b0c;
-    --color-accent-050: #faedf3;
-    --color-accent-100: #f5d6e4;
-    --color-accent-200: #eaa9c7;
-    --color-accent-300: #df81ad;
-    --color-accent-400: #d55691;
-    --color-accent-500: #c83278;
-    --color-accent-600: #97265b;
-    --color-accent-700: #721d45;
-    --color-accent-800: #521431;
-    --color-accent-900: #290a18;
-    --color-accent-950: #14050c;
 }
 
 
 
 /* ─── Graph palettes ─────────────────────────────────────────────────────────
    A SECOND, independent axis from the surface theme above: the surface theme
-   picks the page (light / dark / colorful nav), the graph palette picks what the
+   picks the page (light / dark), the graph palette picks what the
    charts are painted with. They compose — every palette works on every surface —
    which is why this lives in its own attribute (data-graph-theme on <html>, from
    settings.js / theme-init.js).
@@ -458,7 +101,7 @@ html[data-graph-theme="opal"],
     --ant-chart-extra-7: #6571af;
     --ant-chart-extra-8: #b8d782;
 
-    --ant-chart-primary: color-mix(in srgb, var(--ant-color-primary) 55%, #8e9391);
+    --ant-chart-primary: color-mix(in srgb, var(--ant-color-primary) 55%, #a39c8e);
     --ant-chart-income: #659f6e;
     --ant-chart-expense: #ac6664;
     --ant-chart-transfer: #6486ce;

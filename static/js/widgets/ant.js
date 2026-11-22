@@ -155,8 +155,11 @@
             : `<button type="button" class="ant-btn ant-btn-primary" data-empty-action="${escapeHtml(name)}">${escapeHtml(label)}</button>`;
     }
 
-    function empty({ title, desc = '', compact = false, action = null }) {
-        const footer = action ? `<div class="ant-empty-footer">${emptyAction(action)}</div>` : '';
+    /** `actionHtml` is trusted markup for the footer, for a page whose own
+     *  listener picks up its button (the Plan section's data-act). */
+    function empty({ title, desc = '', compact = false, action = null, actionHtml = '' }) {
+        const footerHtml = actionHtml || (action ? emptyAction(action) : '');
+        const footer = footerHtml ? `<div class="ant-empty-footer">${footerHtml}</div>` : '';
         return `<div class="ant-empty${compact ? ' ant-empty-compact' : ''}">
             <div class="ant-empty-image">${EMPTY_IMAGE}</div>
             <div class="ant-empty-title">${escapeHtml(title)}</div>
@@ -229,14 +232,25 @@
             pop.style.setProperty('--ant-arrow-y', `${Math.round(a.top + a.height / 2 - top)}px`);
         } else {
             top = side === 'top' ? a.top - p.height - gap : a.bottom + gap;
-            left = clamp(align === 'start' ? a.left : a.left + a.width / 2 - p.width / 2,
-                EDGE, vw - p.width - EDGE);
+            const x = align === 'start' ? a.left : align === 'end' ? a.right - p.width : a.left + a.width / 2 - p.width / 2;
+            left = clamp(x, EDGE, vw - p.width - EDGE);
             pop.style.setProperty('--ant-arrow-x',
                 `${Math.round(clamp(a.left + a.width / 2 - left, 12, p.width - 12))}px`);
         }
         pop.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
         pop.classList.remove('ant-placement-top', 'ant-placement-bottom', 'ant-placement-left');
         pop.classList.add(`ant-placement-${side}`);
+    }
+
+    /** A press point standing in for an anchor element: a context menu opens
+     *  where the pointer was, with nothing on the page to hang from. */
+    function pointAnchor({ x, y }) {
+        return {
+            getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
+            contains: () => false,
+            focus() {},
+            setAttribute() {},
+        };
     }
 
     // ── Modal ────────────────────────────────────────────────────────────────
@@ -514,10 +528,10 @@
      * Dashboard's period picker). `value` ('YYYY-MM') is the chosen month, or
      * null for none. → { focus() }, which puts the focus on its month.
      */
-    function monthPanel(host, { value = null, onPick, max = null }) {
+    function monthPanel(host, { value = null, onPick, max = null, defaultPickerValue = null, clearText = null }) {
         const now = new Date();
         const today = ymOf(now.getFullYear(), now.getMonth() + 1);
-        let year = Number((value || today).slice(0, 4));
+        let year = Number((value || defaultPickerValue || today).slice(0, 4));
         // 'YYYY-MM' strings order the same as the months they name.
         const isAfterMax = (ym) => max !== null && ym > max;
 
@@ -538,11 +552,11 @@
                         ${isAfterMax(ymOf(year + 1, 1)) ? 'disabled' : ''}>${icon('double-right')}</button>
                 </div>
                 <div class="ant-picker-body"><div class="ant-picker-months">${cells}</div></div>
-            </div>`;
+            </div>${clearText ? `<div class="ant-picker-footer"><button type="button" class="ant-btn ant-btn-link ant-btn-sm" data-clear>${escapeHtml(clearText)}</button></div>` : ''}`;
         }
 
-        /** The month a year view opens on: the chosen one, else this one, else January. */
-        const landingYm = () => [value, today].find((ym) => ym && ym.startsWith(`${year}-`)) || ymOf(year, 1);
+        /** The month a year view opens on: the chosen one, else the default, else this one, else January. */
+        const landingYm = () => [value, defaultPickerValue, today].find((ym) => ym && ym.startsWith(`${year}-`)) || ymOf(year, 1);
 
         function focusMonth(ym) {
             const target = Number(ym.slice(0, 4));
@@ -567,6 +581,7 @@
             }
             const cell = e.target.closest('[data-ym]');
             if (cell && !cell.disabled) onPick(cell.dataset.ym);
+            else if (e.target.closest('[data-clear]')) onPick(null);
         });
         host.addEventListener('keydown', (e) => {
             const steps = ARROW_STEPS[e.key];
@@ -581,7 +596,9 @@
         return { focus: () => host.querySelector('[data-ym][tabindex="0"]')?.focus() };
     }
 
-    function monthPicker(anchor, { value, onPick, max = null }) {
+    /** `defaultPickerValue` ('YYYY-MM') is the year shown when there is no
+     *  value; `clearText` adds a footer button that picks null (no month). */
+    function monthPicker(anchor, { value, onPick, max = null, defaultPickerValue = null, clearText = null }) {
         if (openPicker) {
             const again = openPicker.anchor === anchor;
             openPicker.close();
@@ -604,6 +621,8 @@
         const view = monthPanel(panel, {
             value,
             max,
+            defaultPickerValue,
+            clearText,
             onPick: (ym) => {
                 close();
                 anchor.focus();
@@ -626,8 +645,8 @@
     // The notice that drops in at the top centre after an action and leaves on
     // its own. The holder is a polite live region; an error is an alert. At
     // most three stay up, so a burst of them cannot stack down the window.
-    const MESSAGE_MS = { success: 3000, info: 3000, error: 4500 };
-    const MESSAGE_ICON = { success: 'check-circle', error: 'close-circle', info: 'info-circle' };
+    const MESSAGE_MS = { success: 3000, info: 3000, warning: 4500, error: 4500 };
+    const MESSAGE_ICON = { success: 'check-circle', error: 'close-circle', info: 'info-circle', warning: 'exclamation-circle' };
     const MESSAGE_MAX = 3;
     let messageHolder = null;
 
@@ -660,6 +679,7 @@
         success: (text, opts) => notify('success', text, opts),
         error: (text, opts) => notify('error', text, opts),
         info: (text, opts) => notify('info', text, opts),
+        warning: (text, opts) => notify('warning', text, opts),
     };
 
     // ── Tabs ─────────────────────────────────────────────────────────────────
@@ -709,7 +729,10 @@
     /** → { el, body, close, reposition } or null when this press closed it.
      *  `content` is a node, or trusted markup. `gap` is the space between the
      *  pop-up and its anchor (a dropdown-style pop-up without an arrow uses 4). */
-    function popover(anchor, { title = '', content = '', className = '', placement = 'bottom', align = 'start', gap = 10, onClose = null }) {
+    /** `anchor` may be a point { x, y } (a pop-up where the pointer was).
+     *  `arrow: false` drops the arrow, for a dropdown-shaped panel. */
+    function popover(anchor, { title = '', content = '', className = '', placement = 'bottom', align = 'start', gap = 10, arrow = true, onClose = null }) {
+        if (!(anchor instanceof Element)) anchor = pointAnchor(anchor);
         if (openPopover) {
             const again = openPopover.anchor === anchor;
             openPopover.close();
@@ -719,7 +742,7 @@
         pop.className = `ant-popover ant-scope ${className}`.trim();
         pop.setAttribute('role', 'dialog');
         if (title) pop.setAttribute('aria-label', title);
-        pop.innerHTML = `<div class="ant-popover-arrow"></div>
+        pop.innerHTML = `${arrow ? '<div class="ant-popover-arrow"></div>' : ''}
             <div class="ant-popover-inner">
                 ${title ? `<div class="ant-popover-title">${escapeHtml(title)}</div>` : ''}
                 <div class="ant-popover-inner-content"></div>
@@ -1509,19 +1532,34 @@
     // closes it. One at a time.
     let openDropdown = null;
 
-    /** `items`: [{ label, icon?, danger?, disabled? }]. onPick(item, index).
+    /** `items`: [{ label, icon?, iconHtml?, danger?, disabled?, selected? }],
+     *  or { type: 'divider' }. `icon` names an Ant icon; `iconHtml` is trusted
+     *  markup for any other (the Plan section's Phosphor icons). `selected`
+     *  marks the current pick of a menu that chooses one; the focus starts on
+     *  it. An item's own onClick runs when it is picked, then onPick(item,
+     *  index) if given. `anchor` is the button it drops from, or a point
+     *  { x, y } for a context menu. `align` 'end' lines up the right edges.
      *  → { el, close }, or null when pressing the button again closed it. */
-    function dropdown(anchor, { items, onPick, align = 'start' }) {
+    function dropdown(anchor, { items, onPick = null, align = 'start' }) {
+        if (!(anchor instanceof Element)) anchor = pointAnchor(anchor);
         if (openDropdown) {
             const again = openDropdown.anchor === anchor;
             openDropdown.close();
             if (again) return null;
         }
+        const itemHtml = (it, i) => {
+            if (it.type === 'divider') return '<li class="ant-dropdown-menu-item-divider" role="separator"></li>';
+            const cls = ['ant-dropdown-menu-item'];
+            if (it.danger) cls.push('ant-dropdown-menu-item-danger');
+            if (it.selected) cls.push('ant-dropdown-menu-item-selected');
+            const lead = it.iconHtml || (it.icon ? icon(it.icon) : '');
+            return `<li role="none">
+            <button type="button" role="menuitem" class="${cls.join(' ')}"
+                data-index="${i}"${it.disabled ? ' disabled' : ''}>${lead}<span class="ant-dropdown-menu-title-content">${escapeHtml(it.label)}</span></button></li>`;
+        };
         const el = document.createElement('div');
         el.className = 'ant-dropdown ant-scope';
-        el.innerHTML = `<ul class="ant-dropdown-menu" role="menu">${items.map((it, i) => `<li role="none">
-            <button type="button" role="menuitem" class="ant-dropdown-menu-item${it.danger ? ' ant-dropdown-menu-item-danger' : ''}"
-                data-index="${i}"${it.disabled ? ' disabled' : ''}>${it.icon ? icon(it.icon) : ''}<span class="ant-dropdown-menu-title-content">${escapeHtml(it.label)}</span></button></li>`).join('')}</ul>`;
+        el.innerHTML = `<ul class="ant-dropdown-menu" role="menu">${items.map(itemHtml).join('')}</ul>`;
         document.body.appendChild(el);
         place(el, anchor, { placement: 'bottom', align, gap: 4 });
         anchor.setAttribute('aria-expanded', 'true');
@@ -1532,9 +1570,15 @@
             if (!btn || btn.disabled) return;
             close();
             anchor.focus();
-            onPick(items[Number(btn.dataset.index)], Number(btn.dataset.index));
+            const item = items[Number(btn.dataset.index)];
+            if (item.onClick) item.onClick();
+            if (onPick) onPick(item, Number(btn.dataset.index));
         });
         el.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                close();
+                return;
+            }
             const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
             if (!step) return;
             e.preventDefault();
@@ -1546,15 +1590,28 @@
             close();
             anchor.focus();
         });
+        // A window resize or switch leaves the menu pointing at nothing.
+        window.addEventListener('resize', close);
+        window.addEventListener('blur', close);
         function close() {
             if (openDropdown?.el !== el) return;
             openDropdown = null;
             unwire();
+            window.removeEventListener('resize', close);
+            window.removeEventListener('blur', close);
             el.remove();
             anchor.setAttribute('aria-expanded', 'false');
         }
         openDropdown = { anchor, el, close };
-        enabled()[0]?.focus();
+        // Open on the current pick, scrolled into view in a menu that scrolls.
+        const first = el.querySelector('.ant-dropdown-menu-item-selected:not(:disabled)') || enabled()[0];
+        if (first) {
+            first.focus({ preventScroll: true });
+            const menu = el.firstElementChild;
+            if (menu.scrollHeight > menu.clientHeight) {
+                menu.scrollTop = first.offsetTop - (menu.clientHeight - first.offsetHeight) / 2;
+            }
+        }
         return { el, close };
     }
 

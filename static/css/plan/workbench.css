@@ -1,0 +1,228 @@
+/* ============================================================================
+   plan/workbench.css — the Plan page's layout (pages/plan.html).
+   ============================================================================
+   Manage draws the window: its title bar and its sidebar, whose Plan links
+   pick the workspace. The page area holds the section's app root (#app,
+   .plan-app), which shows one workspace at a time: the plan builder (Plans),
+   Goals, Analyze or Compare (data-workspace, kept by plan/tabs.js). In the
+   builder, the plans are tabs across the top of the page (plan/tabs.js) and
+   the canvas fills the rest.
+   ============================================================================ */
+
+/* The page area: the section fills it edge to edge and draws its own
+   surface, so the page adds no padding, card or scrollbar around it. */
+div.page.plan-page {
+    align-items: stretch;
+    overflow: hidden;
+    padding: 0;
+}
+
+.plan-app {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+/* Hidden until it boots, and again if it cannot (its display outranks the
+   browser's own [hidden] rule). */
+.plan-app[hidden] { display: none; }
+
+/* ── Workspaces: #app[data-workspace] shows one ────────────────────────────── */
+#app:not([data-workspace="plans"]) .builder,
+#app:not([data-workspace="goals"]) .goals-board,
+#app:not([data-workspace="analyze"]) .outlook,
+#app:not([data-workspace="compare"]) .compare { display: none; }
+
+/* ── The builder: the canvas fills the page, the rest floats over it ─────────
+   The plan tabs are a strip across the top of the page, and the canvas
+   starts under it: the open tab is the canvas's colour and opens into it.
+   Over the canvas, as on Manage's other pages: cards with a 20px page pad
+   and 16px between them, 8px corners. The module bar, the inspector and the
+   scrubber are cards laid out over the stage in the grid. canvas.js
+   measures what they cover (--open-top…) to frame plans and place its tools
+   in the open part. */
+.builder {
+    --plan-tabs-height: 44px;
+    position: relative;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    row-gap: var(--space-16);
+    /* The tab strip runs to the page's edges; the cards keep the pad. */
+    padding: 0 var(--space-20) var(--space-20);
+    /* The grid's empty cells are the canvas: clicks fall through to it. */
+    pointer-events: none;
+}
+.builder > * { pointer-events: auto; }
+.builder > .stage {
+    position: absolute;
+    /* No grid cell: a positioned grid child is placed in its cell, and
+       without one it spans the whole builder, pad included. */
+    grid-area: auto;
+    inset: var(--plan-tabs-height) 0 0 0;
+    z-index: 0;
+    --island-inset: var(--space-20);
+}
+.builder > .plan-tabs { grid-row: 1; }
+.builder > .library { grid-row: 2; }
+.builder > .inspector { grid-row: 3; }
+.builder > .scrubber { grid-row: 4; }
+
+/* The module bar: a card as wide as its modules, 20px into the canvas. */
+.builder > .library {
+    position: relative;
+    z-index: 6;
+    justify-self: start;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    border: var(--line-width) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--box-shadow-tertiary);
+}
+
+/* The inspector already floats; here it keeps to the grid's pad and gap. */
+.builder > .inspector { margin: 0; }
+
+/* The scrubber: a card across the bottom. */
+.builder > .scrubber {
+    border: var(--line-width) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--box-shadow-tertiary);
+}
+
+/* ── Plan tabs: Ant Design's editable card tabs ──────────────────────────────
+   A strip in the container colour across the top of the page, with a line
+   under it where the canvas begins. The open tab takes the canvas's colour
+   and covers the line, so it opens into the canvas. The tabs scroll
+   sideways when there are more than fit. */
+.builder > .plan-tabs {
+    position: relative;
+    z-index: 7;
+    /* Edge to edge, over the builder's side pad. */
+    margin: 0 calc(-1 * var(--space-20));
+    /* The module bar sits the page pad (20px) into the canvas. */
+    margin-bottom: calc(var(--space-20) - var(--space-16));
+}
+.plan-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-4);
+    min-width: 0;
+    height: var(--plan-tabs-height);
+    box-sizing: border-box;
+    padding: var(--space-8) var(--space-20) 0;
+    background: var(--color-bg-container);
+    box-shadow: inset 0 calc(-1 * var(--line-width)) 0 var(--color-border-secondary);
+}
+
+.plan-tabs-list {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    /* The open tab's edge overlaps the bar's bottom border. */
+    margin-bottom: 0;
+}
+
+.plan-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    flex: none;
+    max-width: 220px;
+    height: 36px;
+    padding: 0 var(--space-8) 0 var(--space-16);
+    border: var(--line-width) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+    /* Ant's tint for a closed tab, on the strip's container colour. */
+    background: var(--color-fill-alter);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--motion-duration-mid), color var(--motion-duration-mid);
+}
+.plan-tab:hover { color: var(--color-text); }
+.plan-tab[aria-selected="true"] {
+    background: var(--canvas-bg);
+    border-bottom-color: var(--canvas-bg);
+    color: var(--color-primary-text);
+}
+.plan-tab:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: -4px; }
+.plan-tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.plan-tab-close {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    padding: 0;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+}
+.plan-tab-close .icon { width: 12px; height: 12px; }
+.plan-tab-close:hover { background: var(--color-bg-text-hover); color: var(--color-text); }
+
+.plan-tab-rename {
+    min-width: 0;
+    height: 26px;
+    padding: 0 var(--space-4);
+    border: var(--line-width) solid var(--color-primary);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-container);
+    box-shadow: 0 0 0 2px var(--control-outline);
+    color: var(--color-text);
+    font: inherit;
+    outline: none;
+}
+
+.plan-tab.is-dragging { opacity: 0.5; }
+.plan-tab.is-drop-before { box-shadow: inset 2px 0 0 var(--color-primary); }
+.plan-tab.is-drop-after  { box-shadow: inset -2px 0 0 var(--color-primary); }
+
+/* Add plan: a small card after the last tab. */
+.plan-tabs-add {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 30px;
+    height: 30px;
+    margin-bottom: var(--space-4);
+    padding: 0;
+    border: var(--line-width) solid var(--color-border-secondary);
+    border-radius: var(--border-radius);
+    background: var(--color-fill-alter);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+.plan-tabs-add .icon { width: 14px; height: 14px; }
+.plan-tabs-add:hover,
+.plan-tabs-add[aria-expanded="true"] { color: var(--color-primary-text); border-color: var(--color-primary-border); }
+.plan-tabs-add:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .plan-tab { transition: none; }
+}
+
+/* The locked page (plan/main.js, when the section requires a subscription):
+   one Empty, centred in the page area. */
+.plan-locked {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-24);
+}
+.plan-locked .ant-empty-footer { display: flex; justify-content: center; gap: var(--space-8); }
+/* "Download your plans" waits, hidden, until the plans are counted; .ant-btn's
+   own display would otherwise beat the browser's [hidden] rule. */
+.plan-locked [hidden] { display: none !important; }

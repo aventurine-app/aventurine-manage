@@ -22,8 +22,9 @@
 // what they find. Turned off, the app makes no network request unless the user
 // clicks Check for Updates.
 //
-// NETWORK CONTRACT: this file is the only part of the app that touches the
-// network. Each request goes to GitHub and carries nothing about the user or
+// NETWORK CONTRACT: this file and license.js are the only parts of the app that
+// touch the network, and license.js makes no request unless the user signs in
+// to an Aventurine account. Each request here goes to GitHub and carries nothing about the user or
 // their data: no identifiers, no cookies, no database contents. GitHub sees
 // what any download would show it, an IP address and a user agent that names
 // the app version.

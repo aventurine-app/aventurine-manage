@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Aventurine Manage | Plan</title>
+    <!-- @include head -->
+    <link rel="stylesheet" href="/static/css/ant.css">
+    <!-- The Plan section (Aventurine Planner): its tokens and form controls,
+         its own small parts, each surface, then the page's layout. -->
+    <link rel="stylesheet" href="/static/css/plan/base.css">
+    <link rel="stylesheet" href="/static/css/plan/kit.css">
+    <link rel="stylesheet" href="/static/css/plan/library.css">
+    <link rel="stylesheet" href="/static/css/plan/canvas.css">
+    <link rel="stylesheet" href="/static/css/plan/inspector.css">
+    <link rel="stylesheet" href="/static/css/plan/outlook.css">
+    <link rel="stylesheet" href="/static/css/plan/goals.css">
+    <link rel="stylesheet" href="/static/css/plan/compare.css">
+    <link rel="stylesheet" href="/static/css/plan/report.css">
+    <link rel="stylesheet" href="/static/css/plan/workbench.css">
+</head>
+<body>
+    <!-- @include chrome -->
+
+    <div class="body_container">
+        <!-- @include sidebar -->
+
+        <!-- The Plan section: four workspaces, one shown at a time
+             (data-workspace, which the sidebar's /plan#… links pick through
+             the address; plan/main.js). Hidden until it boots. -->
+        <div class="page plan-page">
+            <div class="plan-app ant-scope" id="app" data-workspace="plans" hidden>
+                <main class="workbench">
+                    <!-- Plans: the builder. The plan tabs and the module bar
+                         across the top, the canvas, the inspector floating
+                         over the canvas's right side, and the net worth
+                         scrubber under them. -->
+                    <section class="builder" aria-label="Plan builder">
+                        <div class="library" id="library" role="toolbar" aria-label="Modules"></div>
+                        <div class="stage" id="stage" tabindex="0" aria-label="Plan canvas">
+                            <!-- The world is the one transformed layer: links (SVG),
+                                 the moving dots on them, the labels, then the module
+                                 cards. Camera moves change only its transform. -->
+                            <div class="canvas-world" id="world">
+                                <svg class="canvas-links" id="links" aria-hidden="true"></svg>
+                                <svg class="canvas-links" id="flows" aria-hidden="true"></svg>
+                                <div class="canvas-labels" id="labels"></div>
+                                <div class="canvas-nodes" id="nodes"></div>
+                            </div>
+                        </div>
+                        <aside class="inspector" id="inspector" aria-label="Inspector"></aside>
+                        <div class="scrubber" id="scrubber"></div>
+                    </section>
+                    <section class="goals-board" id="goals-board" aria-label="Goals"></section>
+                    <section class="outlook" id="outlook" aria-label="Analyze"></section>
+                    <section class="compare" id="compare" aria-label="Compare plans"></section>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- @include scripts -->
+    <script src="/static/js/widgets/ant.js"></script>
+    <!-- The Plan section. Order is load-bearing: each script attaches its
+         globals to window and may use only what loaded above it. -->
+    <script src="/static/js/plan/prefs.js"></script>
+    <script src="/static/js/plan/format.js"></script>
+    <script src="/static/js/plan/icon-data.js"></script>
+    <script src="/static/js/plan/icons.js"></script>
+    <!-- The model: pure, and also require()d by the backend
+         (electron/backend/services/planSim.js) and its tests. -->
+    <script src="/static/js/plan/sim/catalog.js"></script>
+    <script src="/static/js/plan/sim/plan.js"></script>
+    <script src="/static/js/plan/sim/engine.js"></script>
+    <script src="/static/js/plan/sim/goals.js"></script>
+    <script src="/static/js/plan/sim/summary.js"></script>
+    <script src="/static/js/plan/notice.js"></script>
+    <script src="/static/js/plan/pickers.js"></script>
+    <script src="/static/js/plan/components.js"></script>
+    <script src="/static/js/plan/describe.js"></script>
+    <script src="/static/js/plan/report.js"></script>
+    <script src="/static/js/plan/example.js"></script>
+    <script src="/static/js/plan/store.js"></script>
+    <script src="/static/js/plan/runs.js"></script>
+    <script src="/static/js/plan/export-menu.js"></script>
+    <script src="/static/js/plan/tabs.js"></script>
+    <script src="/static/js/plan/library.js"></script>
+    <script src="/static/js/plan/canvas.js"></script>
+    <script src="/static/js/plan/chart.js"></script>
+    <script src="/static/js/plan/scrubber.js"></script>
+    <script src="/static/js/plan/inspector.js"></script>
+    <script src="/static/js/plan/sankey.js"></script>
+    <script src="/static/js/plan/outlook.js"></script>
+    <script src="/static/js/plan/goals-board.js"></script>
+    <script src="/static/js/plan/compare.js"></script>
+    <script src="/static/js/plan/main.js"></script>
+</body>
+</html>

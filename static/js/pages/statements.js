@@ -20,9 +20,6 @@
 (function () {
     const NET_TIP = 'Income minus expenses. Transfers to your own accounts are neither.';
 
-    const legendFigure = (extra = '') => `<span class="stmt-legend-figure${extra}">${
-        escapeHtml(formatCurrency(0, false, { editable: true }))}</span>`;
-
     // ── Page state ───────────────────────────────────────────────────────────
     let years = [];            // union across both statements, oldest first
     let current = -1;          // index into years; -1 when there are none
@@ -51,8 +48,6 @@
                     data-tip="${NET_TIP}">${Ant.icon('info-circle-outlined')}</span>`,
                 includeTotals: true,
                 footer: () => `
-                    <span class="stmt-legend">${legendFigure(' cell-computed')} computed from transactions</span>
-                    <span class="stmt-legend">${legendFigure()} typed by you</span>
                     <span class="stmt-legend">${Ant.icon('undo')} typed over a computed value; click to revert</span>`,
                 containerSelector: '#stmt-tables-cashflow',
                 onRender: () => sheetRendered('cashflow'),

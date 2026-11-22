@@ -25,6 +25,7 @@
   "devDependencies": {
     "@electron/rebuild": "^4.0.4",
     "@eslint/js": "^9.39.1",
+    "@phosphor-icons/core": "^2.1.1",
     "electron": "^41.7.2",
     "electron-builder": "^26.15.3",
     "eslint": "^9.39.1",

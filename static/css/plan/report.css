@@ -1,0 +1,114 @@
+/* ─── report.css ─────────────────────────────────────────────────────────────
+   The PDF report (shell/report.js): hidden on screen; when printing, it is the
+   only thing on the page. Fixed light colours whatever the theme, because it
+   is paper. Sizes are in pt for print, on a 4pt step. */
+
+.report { display: none; }
+
+@media print {
+    @page { margin: 16mm 14mm; }
+
+    html, body {
+        background: #fff !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    body > :not(.report) { display: none !important; }
+
+    .report {
+        display: block;
+        color: #1f1f1f;
+        font-family: var(--font-family);
+        font-size: 10pt;
+        line-height: 1.45;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    .report-plan + .report-plan { break-before: page; }
+
+    .report-head { margin-bottom: 16pt; }
+    .report-brand {
+        color: #08979c;
+        font-size: 8pt;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .report h2 {
+        margin: 4pt 0;
+        font-size: 20pt;
+        line-height: 1.2;
+    }
+    .report h3 {
+        margin: 20pt 0 8pt;
+        font-size: 12pt;
+        break-after: avoid;
+    }
+    .report-muted { color: #595959; font-size: 9pt; }
+
+    .report-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8pt;
+    }
+    .report-stat {
+        padding: 8pt 12pt;
+        border: 1px solid #d9d9d9;
+        border-radius: 4pt;
+    }
+    .report-stat-title { color: #595959; font-size: 8pt; }
+    .report-stat-value { font-size: 14pt; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .report-figure { break-inside: avoid; }
+    .report-chart { display: block; width: 100%; height: auto; }
+
+    .report-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4pt 12pt;
+        margin-top: 4pt;
+        color: #434343;
+        font-size: 8pt;
+    }
+    .report-legend span { display: inline-flex; align-items: center; gap: 4pt; }
+    .report-legend i {
+        display: inline-block;
+        width: 8pt;
+        height: 8pt;
+        border-radius: 2pt;
+    }
+    .report-legend i.is-line { height: 2pt; border-radius: 0; }
+
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 8.5pt;
+        font-variant-numeric: tabular-nums;
+    }
+    .report-table th,
+    .report-table td {
+        padding: 4pt 8pt 4pt 0;
+        border-bottom: 1px solid #f0f0f0;
+        text-align: left;
+        vertical-align: top;
+    }
+    .report-table thead th {
+        border-bottom-color: #d9d9d9;
+        color: #595959;
+        font-weight: 600;
+    }
+    .report-table tbody th { font-weight: 500; }
+    .report-table .is-num { text-align: right; }
+    .report-table .is-negative { color: #a8071a; }
+    .report-table tr { break-inside: avoid; }
+    .report-table thead { display: table-header-group; }
+    .report-table .is-total th,
+    .report-table .is-total td { border-top: 1px solid #d9d9d9; font-weight: 600; }
+
+    .report-note {
+        margin-top: 16pt;
+        color: #595959;
+        font-size: 8pt;
+    }
+}

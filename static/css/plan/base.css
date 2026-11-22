@@ -1,0 +1,354 @@
+/* ============================================================================
+   plan/base.css — the Plan section's tokens and form controls.
+   ============================================================================
+   Loaded by pages/plan.html only, after Manage's shared CSS and ant.css. The
+   colours underneath are theme.css's (the one Aventurine theme); what is here
+   is the section's own:
+
+     1. Module roles and chart colours (light, then dark)
+     2. Type, size, radius, elevation and motion: the names the section's
+        stylesheets use, pointed at ant.css's tokens, so the two never drift
+     3. Utilities
+     4. Form controls (Ant's Input, Select and addons, as the inspector and
+        the goal editor draw them)
+   ============================================================================ */
+
+
+/* ─── 1. Module roles and chart colours ───────────────────────────────────────
+ * Every module wears its ROLE's colour (catalog.js): its avatar, its ports and
+ * its bar. Five roles, five Ant hues: green is money arriving, blue money held,
+ * gold money leaving, red money owed, teal (Ant's cyan) money changing on the
+ * way through.
+ * A budget group, which only splits, wears a neutral grey (catalog.js, swatchOf).
+ *
+ * Picked from Ant's palettes with the dataviz validator against the card
+ * surface, all pairs, since any two roles can sit side by side on the canvas
+ * (.scratch/rainbow/roles-antd.mjs). Light: cyan-7, blue-6, gold-8, red-8,
+ * purple-6 passed every check (CVD 9.9, normal 16.8, contrast 3.5:1 or more).
+ * Since moved: Income to green-7 (3.5:1) and Modifiers to cyan-7. Green-7
+ * against Spending's gold-8 is only ΔE 2.9 under simulated protan/deutan
+ * vision (the other pairs are 13+), so colour alone may not tell income from
+ * spending for colour-blind users.
+ * Dark (below) passes all but the lightness band, as the earlier roles did. */
+:root {
+    --role-source:   var(--green-7);
+    --role-account:  var(--blue-6);
+    --role-expense:  var(--gold-8);
+    --role-debt:     var(--red-8);
+    --role-modifier: var(--cyan-7);
+    /* A budget group only splits, so it wears a neutral, a step darker than
+       Unassigned's so the two stay apart. */
+    --role-group:    #636363;
+
+    /* Unassigned money: no role, so it takes the neutral that recedes. */
+    --role-none: #8c8c8c;
+
+    /* Runner-up medals (Compare's All plans): silver, bronze. */
+    --medal-silver: #8c8c8c;
+    --medal-bronze: var(--orange-7);
+
+    /* Every link on the canvas, whatever it carries. */
+    --link-line: var(--blue-4);
+    /* A two-way link (one that turns around): purple, so it reads apart from
+       the one-way blue. */
+    --link-twoway: var(--purple-6);
+
+    /* Net worth bands wear the colour of the module they stand for: accounts
+       blue, debts red, as on the canvas. Several of one role are told apart by
+       alternating lighter and darker shades of it, in module order (outlook.js,
+       worthBands). Mixed from the role colours, so a theme switch carries them
+       along. Unassigned and folded "Other" bands are the neutral. */
+    --chart-account-1: var(--role-account);
+    --chart-account-2: color-mix(in srgb, var(--role-account) 70%, white);
+    --chart-account-3: color-mix(in srgb, var(--role-account) 80%, black);
+    --chart-account-4: color-mix(in srgb, var(--role-account) 45%, white);
+    --chart-account-5: color-mix(in srgb, var(--role-account) 62%, black);
+    --chart-account-6: color-mix(in srgb, var(--role-account) 28%, white);
+
+    --chart-debt-1: var(--red-6);
+    --chart-debt-2: color-mix(in srgb, var(--red-6) 70%, white);
+    --chart-debt-3: color-mix(in srgb, var(--red-6) 80%, black);
+    --chart-debt-4: color-mix(in srgb, var(--red-6) 45%, white);
+    --chart-debt-5: color-mix(in srgb, var(--red-6) 62%, black);
+    --chart-debt-6: color-mix(in srgb, var(--red-6) 28%, white);
+    /* What a loan is secured by (a home, a car): green, apart from the
+       accounts, since it is worth something but is not money to spend. */
+    --chart-asset-1: var(--green-6);
+    --chart-asset-2: color-mix(in srgb, var(--green-6) 70%, white);
+    --chart-asset-3: color-mix(in srgb, var(--green-6) 80%, black);
+    --chart-asset-4: color-mix(in srgb, var(--green-6) 45%, white);
+    --chart-asset-5: color-mix(in srgb, var(--green-6) 62%, black);
+    --chart-asset-6: color-mix(in srgb, var(--green-6) 28%, white);
+    --chart-unassigned: var(--role-none);
+
+    /* Headline lines are the text colour, as in Ant's charts; the cash-flow
+       pair is the arriving green against the leaving gold. */
+    --chart-networth:   var(--color-text);
+    --chart-worth-line: var(--color-text);
+    --chart-in:         var(--green-6);
+    --chart-out:        var(--gold-6);
+    --chart-growth:     var(--blue-6);
+    --chart-interest:   var(--red-5);
+    --chart-grid:       var(--color-split);
+    /* Compare's four plans: Ant's blue, orange, cyan and purple. */
+    --chart-plan-a: var(--blue-6);
+    --chart-plan-b: var(--orange-6);
+    --chart-plan-c: var(--cyan-7);
+    --chart-plan-d: var(--purple-6);
+
+    /* The Sankey: money arriving on the green ramp, money leaving on the gold
+       one, both deepest first (they grade size; every band prints its own
+       name), and a purple hub, Money in, that is neither. Past the hub, money splits into
+       groups that wear their modules' role colours (accounts blue, debts red,
+       taxes and fees teal), so the pipes read like the canvas. */
+    --plan-sankey-in-1: var(--green-8);
+    --plan-sankey-in-2: var(--green-7);
+    --plan-sankey-in-3: var(--green-6);
+    --plan-sankey-in-4: var(--green-5);
+    --plan-sankey-in-5: var(--green-4);
+    --plan-sankey-in-6: var(--green-3);
+    --plan-sankey-out-1: var(--gold-8);
+    --plan-sankey-out-2: var(--gold-7);
+    --plan-sankey-out-3: var(--gold-6);
+    --plan-sankey-out-4: var(--gold-5);
+    --plan-sankey-out-5: var(--gold-4);
+    --chart-hub:       var(--purple-6);
+    --chart-fee-1: var(--role-modifier);
+    --chart-fee-2: color-mix(in srgb, var(--role-modifier) 70%, white);
+    --chart-fee-3: color-mix(in srgb, var(--role-modifier) 80%, black);
+    --chart-fee-4: color-mix(in srgb, var(--role-modifier) 45%, white);
+}
+
+/* The dark theme's roles and chart colours, re-picked against the dark card. */
+html[data-theme="dark"] {
+    /* Roles re-picked from Ant's dark palettes against the dark card (style.css
+       §3): cyan-7, blue-6, gold-6, red-6, purple-8. (Since moved: Income to green-7, 7.9:1, and Modifiers
+       to cyan-7. Green-7 against gold-6 is only ΔE 2.7 under simulated
+       protan/deutan vision.) The original five clear CVD 9.6 and
+       normal 19.0, and every one 3.5:1. Cyan and gold sit at OKLCH L 0.72, past
+       the chart band's 0.67, as the earlier dark roles did (gold at 0.75): a role
+       marks an avatar or a port, not a wide area, so there is no glare to fear. */
+    --role-source:   var(--green-7);
+    --role-account:  var(--blue-6);
+    --role-expense:  var(--gold-6);
+    --role-debt:     var(--red-6);
+    --role-modifier: var(--cyan-7);
+    --role-group:    #aca698;
+    --role-none:     #7f7a6e;
+
+    --medal-silver: #c5bfb1;
+    --medal-bronze: var(--orange-6);
+
+    --link-line: var(--blue-7);
+    --link-twoway: var(--purple-7);
+
+    /* Net worth bands: the roles a step brighter, so the stacked bands hold up
+       on the dark surface (the modules keep their own colours). */
+    --chart-account-1: var(--blue-7);
+    --chart-account-2: color-mix(in srgb, var(--blue-7) 75%, white);
+    --chart-account-3: color-mix(in srgb, var(--blue-7) 80%, black);
+    --chart-account-4: color-mix(in srgb, var(--blue-7) 55%, white);
+    --chart-account-5: color-mix(in srgb, var(--blue-7) 62%, black);
+    --chart-account-6: color-mix(in srgb, var(--blue-7) 38%, white);
+
+    --chart-debt-1: var(--red-7);
+    --chart-debt-2: color-mix(in srgb, var(--red-7) 75%, white);
+    --chart-debt-3: color-mix(in srgb, var(--red-7) 80%, black);
+    --chart-debt-4: color-mix(in srgb, var(--red-7) 55%, white);
+    --chart-debt-5: color-mix(in srgb, var(--red-7) 62%, black);
+    --chart-debt-6: color-mix(in srgb, var(--red-7) 38%, white);
+
+    --chart-asset-1: var(--green-7);
+    --chart-asset-2: color-mix(in srgb, var(--green-7) 75%, white);
+    --chart-asset-3: color-mix(in srgb, var(--green-7) 80%, black);
+    --chart-asset-4: color-mix(in srgb, var(--green-7) 55%, white);
+    --chart-asset-5: color-mix(in srgb, var(--green-7) 62%, black);
+    --chart-asset-6: color-mix(in srgb, var(--green-7) 38%, white);
+
+    --chart-in:       var(--green-6);
+    --chart-out:      var(--gold-6);
+    --chart-growth:   var(--blue-7);
+    --chart-interest: var(--red-7);
+    --chart-plan-a:   var(--blue-7);
+    --chart-plan-b:   var(--orange-6);
+    --chart-plan-c:   var(--cyan-7);
+    --chart-plan-d:   var(--purple-7);
+
+    /* The Sankey: Ant's dark green and gold ramps, deepest first. */
+    --plan-sankey-in-1: var(--green-5);
+    --plan-sankey-in-2: var(--green-6);
+    --plan-sankey-in-3: var(--green-7);
+    --plan-sankey-in-4: var(--green-8);
+    --plan-sankey-in-5: var(--green-9);
+    --plan-sankey-in-6: var(--green-10);
+    --plan-sankey-out-1: var(--gold-5);
+    --plan-sankey-out-2: var(--gold-6);
+    --plan-sankey-out-3: var(--gold-7);
+    --plan-sankey-out-4: var(--gold-8);
+    --plan-sankey-out-5: var(--gold-9);
+    --chart-hub:       var(--purple-7);
+}
+
+
+/* ─── 2. Type, size, radius, elevation and motion ─────────────────────────────
+ * Ant's values, through ant.css's tokens where it has them. */
+:root {
+    --font-family: var(--ant-font-family);
+    --font-family-code: var(--ant-font-family-code);
+
+    --font-size:           var(--ant-font-size);
+    --font-size-sm:        var(--ant-font-size-sm);
+    --font-size-lg:        var(--ant-font-size-lg);
+    --font-size-xl:        20px;
+    --font-size-heading-3: var(--ant-font-size-heading-3);
+    --font-size-heading-4: 20px;
+    --font-size-heading-5: 16px;
+
+    --line-height:    var(--ant-line-height);
+    --line-height-sm: var(--ant-line-height-sm);
+    --line-height-lg: var(--ant-line-height-lg);
+    --line-height-heading: 1.4;
+
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-strong: var(--ant-font-weight-strong);
+
+    /* --space-* and --control-height are Manage's (style.css), same values. */
+    --line-width: var(--ant-line-width);
+    --control-height-sm: var(--ant-control-height-sm);
+    --control-height-lg: 40px;
+    --border-radius-xs: 2px;
+    --border-radius-sm: var(--ant-radius-sm);
+    --border-radius:    var(--ant-radius);
+    --border-radius-lg: var(--ant-radius-lg);
+
+    /* Ant's three shadows: pop-ups and modals, then cards and small chrome. */
+    --box-shadow:           var(--ant-shadow);
+    --box-shadow-secondary: var(--ant-shadow);
+    --box-shadow-tertiary:  0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+    /* A hoverable card lifted under the pointer. */
+    --box-shadow-card-hover: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 0 3px 6px 0 rgba(0, 0, 0, 0.12), 0 5px 12px 4px rgba(0, 0, 0, 0.09);
+
+    --motion-duration-fast: var(--ant-motion-fast);
+    --motion-duration-mid:  var(--ant-motion-mid);
+    --motion-duration-slow: var(--ant-motion-slow);
+    --motion-ease-in-out:   var(--ant-ease-in-out);
+    --motion-ease-out:      cubic-bezier(0.215, 0.61, 0.355, 1);
+
+    --inspector-width: 320px;
+}
+
+
+/* ─── 3. Utilities ────────────────────────────────────────────────────────── */
+
+/* One thin scrollbar treatment for every scrolling panel. */
+.scroll-y {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-fill) transparent;
+}
+
+/* The section's geometry (module cards, ports, the inspector) is measured
+   border-box, as Ant's components are. */
+.plan-app *, .plan-app *::before, .plan-app *::after,
+.plan-pop *, .goal-editor * { box-sizing: border-box; }
+
+/* The section's views hide parts with the hidden attribute, many of them
+   elements whose own display (flex, grid) would otherwise outrank the
+   browser's [hidden] rule. */
+.plan-app [hidden],
+.plan-pop [hidden],
+.goal-editor [hidden] { display: none !important; }
+
+/* A Phosphor icon (planIcon): the size of the text around it. */
+.icon { width: 1em; height: 1em; flex-shrink: 0; display: block; }
+
+
+/* ─── 4. Form controls ───────────────────────────────────────────────────────
+ * Ant's Input and Select: 32px, a 6px radius, a grey border that turns the
+ * primary hover colour under the pointer and the primary colour, with a soft
+ * ring, when focused. */
+.field-input,
+.field-select {
+    height: var(--control-height);
+    min-width: 0;
+    padding: 4px 11px;
+    background: var(--color-bg-container);
+    border: var(--line-width) solid var(--color-border);
+    border-radius: var(--border-radius);
+    color: var(--color-text);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color var(--motion-duration-mid), box-shadow var(--motion-duration-mid), background-color var(--motion-duration-mid);
+}
+.field-input:hover,
+.field-select:hover { border-color: var(--color-primary-hover); }
+.field-input:focus,
+.field-select:focus,
+.field-input:focus-visible,
+.field-select:focus-visible {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--control-outline);
+}
+.field-input::placeholder { color: var(--color-text-quaternary); }
+.field-input:disabled,
+.field-select:disabled {
+    background: var(--color-bg-container-disabled);
+    border-color: var(--color-border);
+    color: var(--color-text-disabled);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+.field-input[aria-invalid="true"] { border-color: var(--color-error); }
+.field-input[aria-invalid="true"]:focus { box-shadow: 0 0 0 2px var(--color-error-outline); }
+
+/* Ant's Select arrow, drawn with two gradients (the CSP allows no data: images). */
+.field-select {
+    appearance: none;
+    padding-right: 28px;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--color-text-quaternary) 50%),
+        linear-gradient(135deg, var(--color-text-quaternary) 50%, transparent 50%);
+    background-position: calc(100% - 15px) 52%, calc(100% - 11px) 52%;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+.field-select option { background: var(--color-bg-elevated); color: var(--color-text); }
+
+/* A field with a unit stuck to it, as Ant's addons: "$ [ 1,800 ]", "[ 4.5 ] %". */
+.field-affix {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+}
+.field-affix > .field-input { flex: 1; width: 100%; }
+.field-affix-text {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 11px;
+    background: var(--color-fill-alter);
+    border: var(--line-width) solid var(--color-border);
+    color: var(--color-text);
+    font-size: var(--font-size);
+    white-space: nowrap;
+}
+.field-affix-text:first-child { border-radius: var(--border-radius) 0 0 var(--border-radius); border-right: 0; }
+.field-affix-text:last-child  { border-radius: 0 var(--border-radius) var(--border-radius) 0; border-left: 0; }
+.field-affix > .field-input:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.field-affix > .field-input:not(:last-child)  { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+/* The addon keeps the field's ring company: it sits behind the focused field. */
+.field-affix > .field-input:focus { position: relative; z-index: 1; }
+
+/* A section heading inside a panel (the inspector's): a small label. */
+.eyebrow {
+    margin: 0;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-strong);
+    line-height: var(--line-height-sm);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}

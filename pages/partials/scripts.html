@@ -31,6 +31,11 @@
     <!-- The Updates section of Preferences → About. Needs only ui.js (toasts)
          and the About markup in chrome.html. -->
     <script src="/static/js/shell/updates.js"></script>
+    <!-- The subscription state features read (Subscription.unlocked()), then
+         Preferences → Account, which draws it. Need only ui.js (toasts), the
+         Account markup in chrome.html and the electronLicense bridge. -->
+    <script src="/static/js/core/subscription.js"></script>
+    <script src="/static/js/shell/account.js"></script>
     <script src="/static/js/shell/titlebar.js"></script>
     <script src="/static/js/shell/zoom.js"></script>
     <script src="/static/js/shell/nav.js"></script>

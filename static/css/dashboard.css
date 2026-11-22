@@ -313,7 +313,7 @@
     letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
 }
-.dash-figure-value.is-neg { color: var(--ant-color-error); }
+.dash-figure-value.is-neg { color: var(--ant-color-error-text); }
 .dash-figure-sub {
     margin-top: 2px;
     color: var(--ant-color-text-secondary);
@@ -329,8 +329,8 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
-.dash-change.is-up { color: var(--ant-color-success); }
-.dash-change.is-down { color: var(--ant-color-error); }
+.dash-change.is-up { color: var(--ant-color-success-text); }
+.dash-change.is-down { color: var(--ant-color-error-text); }
 
 .dash-chips {
     display: flex;
@@ -537,7 +537,7 @@
     text-decoration: none;
     transition: color var(--ant-motion-mid);
 }
-.dash-cf-label:hover { color: var(--ant-color-primary); }
+.dash-cf-label:hover { color: var(--ant-color-primary-text); }
 .dash-cf-track { min-width: 0; }
 .dash-cf-bar {
     display: flex;
@@ -580,8 +580,8 @@
     font-weight: var(--ant-font-weight-strong);
     font-variant-numeric: tabular-nums;
 }
-.dash-cf-net-value.is-up { color: var(--ant-color-success); }
-.dash-cf-net-value.is-down { color: var(--ant-color-error); }
+.dash-cf-net-value.is-up { color: var(--ant-color-success-text); }
+.dash-cf-net-value.is-down { color: var(--ant-color-error-text); }
 
 @keyframes dash-grow-x { from { transform: scaleX(0); } }
 
@@ -747,7 +747,7 @@ a.dash-row:focus-visible {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
-.dash-row-amt .is-over { color: var(--ant-color-error); }
+.dash-row-amt .is-over { color: var(--ant-color-error-text); }
 .dash-row-of { color: var(--ant-color-text-tertiary); }
 .dash-row .avatar-circle {
     flex: none;
@@ -800,9 +800,9 @@ a.dash-row:focus-visible {
 }
 .dash-datechip.is-today {
     background: var(--ant-color-primary-bg);
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
 }
-.dash-datechip.is-today b { color: var(--ant-color-primary); }
+.dash-datechip.is-today b { color: var(--ant-color-primary-text); }
 
 /* The last row when there are more items than rows: Ant's link. */
 .dash-more {
@@ -811,7 +811,7 @@ a.dash-row:focus-visible {
     align-items: center;
     gap: 4px;
     padding: 0 4px;
-    color: var(--ant-color-primary);
+    color: var(--ant-color-primary-text);
     font-size: 13px;
     text-decoration: none;
 }
@@ -856,7 +856,7 @@ a.dash-row:focus-visible {
 }
 .dash-cal-day.is-due {
     background: var(--ant-color-error-bg);
-    color: var(--ant-color-error);
+    color: var(--ant-color-error-text);
     font-weight: var(--ant-font-weight-strong);
 }
 .dash-cal-day.is-today { outline: 1.5px solid var(--ant-color-primary); }

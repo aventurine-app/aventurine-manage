@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { initUpdater } = require('./updater');
+const { initLicense } = require('./license');
 
 const APP_HOST = 'aventurine';
 const APP_ORIGIN = `app://${APP_HOST}`;
@@ -34,11 +35,13 @@ const PAGE_ROUTES = {
     '/':                'dashboard.html',
     '/statements':      'statements.html',
     '/budgets':         'budgets.html',
-    '/portfolio':       'portfolio.html',
     '/transactions':    'transactions.html',
     // Cash Flow, Spending and Forecast are tabs of this one page.
     '/reports':         'reports.html',
     '/recurring':       'recurring.html',
+    // The Plan section (Aventurine Planner). The hash names its workspace:
+    // /plan#plans, #goals, #analyze or #compare.
+    '/plan':            'plan.html',
 };
 
 // app:// must be registered as standard+secure BEFORE app.whenReady so the
@@ -152,6 +155,8 @@ if (!gotSingleInstanceLock) {
 // ─── Backend (in-process) ───────────────────────────────────────────────────
 
 let conn = null;
+// The subscription check (license.js), set once the app is ready.
+let license = null;
 // The single app window.
 let mainWindow = null;
 
@@ -175,6 +180,10 @@ function startBackend() {
     // backend writes only to paths the renderer sends; for anything not chosen
     // through a native dialog (approveWrite, below), require an OS-level
     // confirmation the sandboxed renderer cannot forge or dismiss.
+    // Plan edits need an active subscription (handlers/plans.js). The license
+    // starts after the backend, so this reads it late.
+    conn.setSubscriptionCheck(() => Boolean(license && license.isUnlocked()));
+
     conn.setWriteGuard({
         confirm: (filePath) => {
             const win = BrowserWindow.getFocusedWindow() || mainWindow || undefined;
@@ -291,6 +300,72 @@ ipcMain.handle('export-choose-path', async (e, format) => {
     if (r.canceled) return null;
     conn?.approveWrite(r.filePath); // dialog-issued → no write re-confirmation
     return r.filePath;
+});
+
+// ─── Plan exports ──────────────────────────────────────────────────────────
+// The Plan section saves a plan file, a plan's CSV, the Download All zip and
+// a PDF report. The renderer names the kind and suggests a file name (a plan's
+// name); both are untrusted, so the kind falls back to a plan file and the
+// name is cut down to a plain file name before it seeds the dialog.
+
+const PLAN_FILE_FILTERS = {
+    plan: { name: 'Aventurine Plan',  extensions: ['json'] },
+    csv:  { name: 'Spreadsheet (CSV)', extensions: ['csv'] },
+    zip:  { name: 'Zip Archive',       extensions: ['zip'] },
+    pdf:  { name: 'PDF Document',      extensions: ['pdf'] },
+};
+
+/** A suggested name as a bare file name with `ext`: no folders, no characters
+ *  file systems refuse, at most 80 characters. */
+function planFileName(suggested, ext) {
+    // eslint-disable-next-line no-control-regex
+    const base = path.basename(String(suggested || '')).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim().slice(0, 80);
+    const name = base || 'Plan';
+    return name.toLowerCase().endsWith(`.${ext}`) ? name : `${name}.${ext}`;
+}
+
+function planSaveDialog(sender, kind, suggested, title) {
+    const filter = PLAN_FILE_FILTERS[kind];
+    return dialog.showSaveDialog(BrowserWindow.fromWebContents(sender), {
+        title,
+        defaultPath: planFileName(suggested, filter.extensions[0]),
+        filters: [filter, { name: 'All Files', extensions: ['*'] }],
+    });
+}
+
+// A plan file, a CSV or the zip: the backend writes it (handlers/plans.js) to
+// the path chosen here, approved like Export Transactions' path.
+ipcMain.handle('plan-export-choose-path', async (e, kind, suggested) => {
+    const k = ['plan', 'csv', 'zip'].includes(kind) ? kind : 'plan';
+    const r = await planSaveDialog(e.sender, k, suggested, k === 'zip' ? 'Download All Plans' : 'Export Plan');
+    if (r.canceled || !r.filePath) return null;
+    conn?.approveWrite(r.filePath);
+    return r.filePath;
+});
+
+// The PDF report: the page has already put the report in the document
+// (plan/report.js; report.css shows only it in print media), so this prints
+// the calling page to PDF and writes it where the user chose. Resolves
+// { saved: true }, { canceled: true } or { error }.
+ipcMain.handle('plan-save-pdf', async (e, suggested) => {
+    const r = await planSaveDialog(e.sender, 'pdf', suggested, 'Save PDF Report');
+    if (r.canceled || !r.filePath) return { canceled: true };
+    // The page's margins are painted in the window's background colour (dark,
+    // for the frameless window's first paint), so the window is white while
+    // the paper is printed.
+    const w = BrowserWindow.fromWebContents(e.sender);
+    const background = w?.getBackgroundColor();
+    try {
+        w?.setBackgroundColor('#ffffff');
+        const pdf = await e.sender.printToPDF({ printBackground: true, preferCSSPageSize: true });
+        await fs.promises.writeFile(r.filePath, pdf);
+        return { saved: true };
+    } catch (err) {
+        console.error('[plan] the PDF report could not be saved:', err);
+        return { error: 'The report could not be saved.' };
+    } finally {
+        if (w && background) w.setBackgroundColor(background);
+    }
 });
 
 // The installed version, for the About modal. Read from app.getVersion() (the
@@ -471,6 +546,8 @@ app.whenReady().then(async () => {
     // Before the window: the About tab asks for the update state as soon as
     // the page runs, and an IPC handler registered after that call is too late.
     initUpdater({ getWindow: () => mainWindow });
+    // Same reason: Preferences → Account asks for the sign-in state on load.
+    license = initLicense({ getWindow: () => mainWindow });
     await createWindow();
 
     // macOS: re-open the main window from the dock. No-op elsewhere.

@@ -99,13 +99,6 @@
     gap: 10px;
 }
 
-/* Forces the next option onto a new line, so each family of surfaces (the base
-   set, the warm pair, the tints) starts a line of its own. */
-.settings-theme-break {
-    flex-basis: 100%;
-    height: 0;
-}
-
 .settings-theme-btn {
     position: relative;
     display: flex;
@@ -163,21 +156,6 @@
     background-color: var(--sw-accent);
 }
 
-/* Colorful reads as light everywhere except the sidebar, so its swatch is the
-   light face plus a vertical band on the left — the nav. The band is a
-   background-image over --sw-surface, which puts it UNDER ::before (the top
-   background strip), and that is the real layout: the title bar spans the full
-   width and the sidebar starts below it. The band carries the same base-700 →
-   base-900 top-to-bottom gradient the live nav fill uses (themes.css); its
-   width comes from background-size rather than a second colour stop, because
-   the gradient now runs down the band instead of across it. */
-.settings-theme-swatch[data-theme="colorful"] {
-    background-image: linear-gradient(to bottom,
-        var(--color-base-700), var(--color-base-900));
-    background-repeat: no-repeat;
-    background-size: 24% 100%;
-}
-
 /* ── Graph palette swatches ─────────────────────────────────────────────
    Same card as the theme swatches above (same size, same active border, same
    label), so the two appearance rows read as one control stacked twice. The
@@ -199,26 +177,26 @@
 }
 
 .settings-graph-btn:hover  { border-color: var(--text-tertiary); }
-/* The chosen option: a thick black border with a black square set into its
-   top-left corner, flush with the border so the two read as one shape, and a
-   white check inside the square. The square sits over the tile, not beside it,
+/* The chosen option: a thick border in the theme's accent (charcoal) with a
+   square of it set into its top-left corner, flush with the border so the two
+   read as one shape, and a light check inside the square. The square sits over the tile, not beside it,
    so nothing shifts when an option is chosen. The check is two borders turned
    45 degrees, because the CSP blocks data: URIs and so an inline icon. */
 .settings-theme-btn.active,
-.settings-graph-btn.active { border-color: #000; }
+.settings-graph-btn.active { border-color: var(--accent-primary); }
 
 .settings-theme-btn.active::after,
 .settings-graph-btn.active::after {
     content: '';
     position: absolute;
-    /* Starts inside the border ring, not at its inner edge, so it paints black
-       over black and leaves no seam. 0.5px out puts its corner 2.5px in from the
+    /* Starts inside the border ring, not at its inner edge, so it paints over
+       the border's own colour and leaves no seam. 0.5px out puts its corner 2.5px in from the
        tile's edge, inside the 8px outer curve. */
     left: -0.5px;
     top: -0.5px;
     width: 16px;
     height: 16px;
-    background: #000;
+    background: var(--accent-primary);
     border-bottom-right-radius: 5px;
 }
 
@@ -231,7 +209,7 @@
     top: 2.25px;
     width: 3px;
     height: 6px;
-    border: solid #fff;
+    border: solid var(--button-text);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
 }
@@ -278,8 +256,9 @@
 }
 
 /* System swatch: a split light/dark face standing in for "follow the OS". It
-   shows both palettes at once, so every colour is a fixed neutral: it cannot
-   borrow the live theme tokens like the other swatches. It also carries the
+   shows both faces at once, so it cannot borrow the live theme tokens like the
+   other swatches: its colours are the theme's (theme.css) light and dark
+   values, written out: container, layout and accent. It also carries the
    shared .settings-theme-swatch class, whose ::before/::after paint the live
    theme's background strip and accent bar, so those are redrawn here as the same
    split. Each layer is the full-face diagonal, positioned to its own band, so
@@ -291,8 +270,8 @@
     --sw-split: linear-gradient(105deg, var(--sw-light) 0 50%, var(--sw-dark) 50% 100%);
     background: var(--sw-split);
     background-size: 76px 46px;
-    --sw-light: #ffffff;
-    --sw-dark:  #191a19;
+    --sw-light: #fcfaf4;
+    --sw-dark:  #161411;
 }
 
 .settings-theme-swatch-system::before,
@@ -302,12 +281,12 @@
 }
 
 .settings-theme-swatch-system::before {
-    background-image: linear-gradient(105deg, #f5f5f5 0 50%, #0c0d0d 50% 100%);
+    background-image: linear-gradient(105deg, #f5f2ea 0 50%, #080706 50% 100%);
     background-position: top left;
 }
 
 .settings-theme-swatch-system::after {
-    background-image: linear-gradient(105deg, #497e74 0 50%, #5b9f92 50% 100%);
+    background-image: linear-gradient(105deg, #3a3630 0 50%, #6a645a 50% 100%);
     background-position: bottom left;
 }
 
@@ -574,7 +553,7 @@
 .settings-tab:hover { color: var(--text-primary); }
 
 .settings-tab.active {
-    color: var(--accent-primary);
+    color: var(--accent-primary-text);
     border-bottom-color: var(--accent-primary);
 }
 
@@ -726,3 +705,30 @@
 }
 
 
+
+/* ── Account (Preferences → Account, shell/account.js) ── */
+.account-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    max-width: 480px;
+}
+
+.account-form .enc-input {
+    flex: 1 1 200px;
+    width: auto;
+}
+
+.account-code-input {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.2em;
+}
+
+.account-error-row {
+    padding-top: 0;
+}
+
+.settings-row + .account-error-row {
+    border-top: 0;
+}

@@ -60,8 +60,8 @@
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 12px;
 }
-.rec-stat-income .ant-statistic-content { color: var(--ant-color-success); }
-.rec-stat-expense .ant-statistic-content { color: var(--ant-color-error); }
+.rec-stat-income .ant-statistic-content { color: var(--ant-color-success-text); }
+.rec-stat-expense .ant-statistic-content { color: var(--ant-color-error-text); }
 .rec-stat-transfer .ant-statistic-content { color: var(--ant-color-info-text); }
 
 
@@ -175,7 +175,7 @@
     cursor: pointer;
     transition: color var(--ant-motion-mid);
 }
-.rec-day-more:hover { color: var(--ant-color-primary); }
+.rec-day-more:hover { color: var(--ant-color-primary-text); }
 .rec-day-more:focus-visible {
     outline: 2px solid var(--ant-color-primary);
     outline-offset: 1px;
@@ -272,7 +272,7 @@ html[data-theme="dark"] {
     gap: 4px;
 }
 .rec-list-date { font-weight: var(--ant-font-weight-strong); }
-.rec-list-today { color: var(--ant-color-primary); }
+.rec-list-today { color: var(--ant-color-primary-text); }
 .rec-list .rec-occ {
     flex-direction: row;
     justify-content: space-between;
@@ -389,8 +389,8 @@ html[data-theme="dark"] {
 
 /* ─── Amounts by direction ──────────────────────────────────────────────────
    The detection table's amounts, in the trio the totals use. */
-.rec-amount-income   { color: var(--ant-color-success); }
-.rec-amount-expense  { color: var(--ant-color-error); }
+.rec-amount-income   { color: var(--ant-color-success-text); }
+.rec-amount-expense  { color: var(--ant-color-error-text); }
 .rec-amount-transfer { color: var(--ant-color-info-text); }
 
 
@@ -441,7 +441,7 @@ html[data-theme="dark"] {
 .rec-edit-ends .ant-input { width: 180px; }
 
 .rec-edit-footnote { color: var(--ant-color-text-tertiary); }
-.rec-edit-error { color: var(--ant-color-error); }
+.rec-edit-error { color: var(--ant-color-error-text); }
 .rec-edit-footnote[hidden],
 .rec-edit-error[hidden] { display: none; }
 

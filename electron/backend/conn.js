@@ -159,6 +159,23 @@ function createConn() {
     throw new ApiError('write_not_authorized', 403);
   }
 
+  // ─── Subscriber features ───────────────────────────────────────────────────
+  // The Electron shell injects the license's answer (setSubscriptionCheck,
+  // electron/license.js isUnlocked). requireSubscription() throws 402 when it
+  // says no; handlers call it before anything only subscribers may do (Plan
+  // edits, handlers/plans.js). With no check injected (host-Node tests, smoke)
+  // everything is allowed, as with the write guard above. Reading and exporting
+  // the user's own data never calls this: a lapsed license locks no data.
+  let subscriptionCheck = null;
+
+  function setSubscriptionCheck(fn) {
+    subscriptionCheck = fn;
+  }
+
+  function requireSubscription() {
+    if (subscriptionCheck && !subscriptionCheck()) throw new ApiError('subscription_required', 402);
+  }
+
   /** Open + migrate + seed the DB named by current state (startup path).
    *  A locked (encrypted, no key yet) DB stays unopened until unlock. */
   function init() {
@@ -369,6 +386,7 @@ function createConn() {
   return {
     state, init, db, statusPayload, switchTo, lock, rekey, closeAll,
     setWriteGuard, approveWrite, authorizeWrite,
+    setSubscriptionCheck, requireSubscription,
   };
 }
 

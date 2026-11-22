@@ -36,6 +36,8 @@ files:
   - preload.js
   - updater.js
   - updatePolicy.js
+  - license.js
+  - licensePolicy.js
   - backend/**/*
   - node_modules/**/*
   - package.json

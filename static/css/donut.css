@@ -63,7 +63,7 @@
 }
 
 .accounts-legend-item .accounts-legend-label { transition: color 0.15s ease; }
-a.accounts-legend-item:hover .accounts-legend-label { color: var(--accent-primary); }
+a.accounts-legend-item:hover .accounts-legend-label { color: var(--accent-primary-text); }
 
 .accounts-legend-item:last-child {
     padding-bottom: 0;

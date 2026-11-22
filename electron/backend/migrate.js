@@ -454,6 +454,14 @@ const MIGRATIONS = [
     if (tableExists(db, 'dashboard_layouts')) return;
     db.exec(DDL.find((stmt) => stmt.startsWith('CREATE TABLE dashboard_layouts')));
   }],
+  // v22 — Aventurine Planner's plans (see schema.js baseline). The Plan section
+  // used to keep them in its own browser storage, outside this file; now they
+  // live here. Nothing is carried over: that storage only ever existed in
+  // unreleased builds.
+  [22, (db) => {
+    if (tableExists(db, 'plans')) return;
+    db.exec(DDL.find((stmt) => stmt.startsWith('CREATE TABLE plans')));
+  }],
 ];
 
 /**

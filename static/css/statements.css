@@ -96,15 +96,13 @@
 }
 .stmt-grid .stmt-fixed-end { border-inline-end: 0; }
 .stmt-grid > :last-child > tr:last-child > :is(td, th) { border-bottom: 0; }
-/* Bordered tables draw no half-height splitters between header cells, and a
-   header cell flush in a card has no corners of its own. */
+/* Bordered tables draw no half-height splitters between header cells. */
 .stmt-grid thead th:not(:last-child):not(.ant-table-selection-column)::before { content: none; }
-.stmt-grid thead th:is(:first-child, :last-child) { border-radius: 0; }
 
 /* ─── Header: groups over their columns ─────────────────────────────────────
    Each group and its columns are underlined in the type's colour, so a column
    reads as part of its group. The group's name says the same in words. */
-.stmt-grid thead th { padding: 8px 12px; }
+.stmt-grid thead th { padding: var(--ant-table-pad-y-sm) 12px; }
 .stmt-grid .stmt-group { text-align: start; }
 .stmt-grid .stmt-col {
     width: var(--stmt-col-w);
@@ -126,7 +124,7 @@
     width: var(--stmt-month-w);
     min-width: var(--stmt-month-w);
     box-sizing: border-box;
-    padding: 8px 12px;
+    padding: var(--ant-table-pad-y-sm) 12px;
     font-weight: var(--ant-font-weight-strong);
     text-align: start;
 }
@@ -134,7 +132,7 @@
     width: var(--stmt-summary-w);
     min-width: var(--stmt-summary-w);
     box-sizing: border-box;
-    padding: 8px 12px;
+    padding: var(--ant-table-pad-y-sm) 12px;
     font-weight: var(--ant-font-weight-strong);
     font-variant-numeric: tabular-nums;
     text-align: end;
@@ -153,7 +151,7 @@
 
 /* Table.Summary: the Total row on the header's tint. */
 .stmt-grid tfoot :is(td, th) {
-    padding: 8px 12px;
+    padding: var(--ant-table-pad-y-sm) 12px;
     background: var(--ant-table-header-bg);
     font-weight: var(--ant-font-weight-strong);
     font-variant-numeric: tabular-nums;
@@ -161,8 +159,8 @@
 .stmt-grid .stmt-total-cell { text-align: end; }
 
 /* Net: which way the month went, in words (the sign) and in colour. */
-.stmt-pos { color: var(--ant-color-success); }
-.stmt-neg { color: var(--ant-color-error); }
+.stmt-pos { color: var(--ant-color-success-text); }
+.stmt-neg { color: var(--ant-color-error-text); }
 
 /* ─── Pinned columns ────────────────────────────────────────────────────────
    Month stays at the left edge and the summary at the right while the
@@ -209,7 +207,8 @@ html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
     display: block;
     box-sizing: border-box;
     width: 100%;
-    height: 38px;   /* the row: Ant's small table, 8px + 22px + 8px */
+    /* the row: Ant's small table, 8px + 22px + 8px (less under Compact) */
+    height: calc(22px + 2 * var(--ant-table-pad-y-sm));
     margin: 0;
     padding: 0 12px;
     border: 0;
@@ -239,7 +238,7 @@ html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
 
 /* Computed from transactions: the primary colour (the legend under the table
    says so in words). */
-.cell-computed { color: var(--ant-color-primary); }
+.cell-computed { color: var(--ant-color-primary-text); }
 
 /* A cleared override fading its computed value back in: the moment that
    shows clearing a cell returns it to the transactions. */
@@ -269,7 +268,7 @@ html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
     flex-wrap: wrap;
     align-items: center;
     gap: 4px 16px;
-    padding: 8px 12px;
+    padding: var(--ant-table-pad-y-sm) 12px;
     border-top: var(--ant-line-width) solid var(--ant-color-split);
     background: var(--ant-table-header-bg);
     color: var(--ant-color-text-tertiary);
@@ -281,12 +280,6 @@ html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
     font-size: var(--ant-font-size-sm);
     line-height: var(--ant-line-height-sm);
 }
-.stmt-legend-figure {
-    color: var(--ant-color-text);
-    font-weight: var(--ant-font-weight-strong);
-    font-variant-numeric: tabular-nums;
-}
-.stmt-legend-figure.cell-computed { color: var(--ant-color-primary); }
 
 /* Standing in for a year's card: no years, a year this statement lacks, no
    accounts, or a failed load. */
@@ -304,6 +297,31 @@ html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
 
 .stmt-modal-tabs { margin-bottom: 16px; }
 
+/* Manage Columns fits the window: the title, tabs and Done stay put and the
+   open tab's list scrolls inside the modal, not the overlay behind it. The
+   cap is the window less the overlay's 100px top and 24px bottom padding. */
+.confirm-dialog.ant-modal.stmt-columns-modal {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 124px);
+}
+.stmt-columns-modal .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.stmt-columns-modal .stmt-modal-tabs { flex: none; }
+.stmt-columns-modal .stmt-modal-panel {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Room for focus rings at the panel's edges, which would be clipped. */
+    padding: 2px;
+    margin: -2px;
+}
+.stmt-columns-modal .stmt-modal-panel[hidden] { display: none; }
+
 .stmt-item-main {
     display: flex;
     align-items: center;
@@ -317,7 +335,6 @@ html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.stmt-item-count { font-variant-numeric: tabular-nums; }
 .stmt-year-value {
     font-weight: var(--ant-font-weight-strong);
     font-variant-numeric: tabular-nums;
@@ -350,11 +367,6 @@ html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
 .stmt-year-add { align-self: flex-start; margin-top: 12px; }
 .stmt-year-add .ant-input { width: 120px; font-variant-numeric: tabular-nums; }
 
-.stmt-cat-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
 .stmt-add-row { margin-top: 8px; }
 .stmt-account-list + .stmt-add-row { margin-top: 12px; }
 .stmt-add-row > .ant-btn { flex: none; }

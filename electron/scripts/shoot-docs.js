@@ -49,14 +49,15 @@ const W = Number(process.env.SHOT_W) || 1400;
 const H = Number(process.env.SHOT_H) || 900;
 // Surface theme for the `frames` group only (every other group is shot in the
 // theme its own block sets). The website's Features section carries two sets of
-// the same shots, 'colorful' and 'dark', so one run per theme writes both; the
-// dark run suffixes its filenames so the pair lands side by side in one folder.
-const FRAME_SURFACES = { colorful: 'colorful', dark: 'dark', light: '' };
-const FRAME_SURFACE = process.env.SHOT_SURFACE || 'colorful';
+// the same shots, 'light' and 'dark' (the Aventurine theme's two faces), so one
+// run per theme writes both; the dark run suffixes its filenames so the pair
+// lands side by side in one folder.
+const FRAME_SURFACES = { light: '', dark: 'dark' };
+const FRAME_SURFACE = process.env.SHOT_SURFACE || 'light';
 if (!(FRAME_SURFACE in FRAME_SURFACES)) {
   throw new Error(`SHOT_SURFACE must be one of ${Object.keys(FRAME_SURFACES).join(', ')}, got "${FRAME_SURFACE}"`);
 }
-const FRAME_SUFFIX = FRAME_SURFACE === 'colorful' ? '' : `-${FRAME_SURFACE}`;
+const FRAME_SUFFIX = FRAME_SURFACE === 'light' ? '' : `-${FRAME_SURFACE}`;
 const DEADLINE_MS = 25000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1043,7 +1044,7 @@ app.whenReady().then(async () => {
     //     electron --no-sandbox --force-device-scale-factor=2 scripts/shoot-docs.js
     //
     // SHOT_SURFACE=dark takes the same set again in the dark theme and writes it
-    // as frame-<page>-dark.png. The website's Features section shows the colorful
+    // as frame-<page>-dark.png. The website's Features section shows the light
     // shot and swaps in the dark one on click, so the two sets have to be taken
     // at the same size, on the same data, with the same cards open.
     //
@@ -1181,32 +1182,6 @@ app.whenReady().then(async () => {
         throw new Error('recurring rail listed no schedules');
       }
       await shotEl('recurring-rail', '#rec-rail', 12);
-    }
-
-    // ═══ Phase 10: tools ═════════════════════════════════════════════════════
-    if (phase('tools')) {
-      console.log('\n— tools —');
-      // Portfolio: a few holdings.
-      const acct = await js('apiFetch("/api/portfolio/data").then(r => r.json())');
-      const accountId = acct.accounts[0].id;
-      const holdings = [
-        ['Total Market Index', 'VTSAX', 142.318, 96.4, 128.72],
-        ['Global Bond Fund', 'BNDX', 310, 49.1, 51.05],
-        ['Tech Growth Fund', 'TGFX', 64.5, 88.2, 112.4],
-      ];
-      for (const [name, ticker, amount, price, market] of holdings) {
-        const e = await post('/api/portfolio/entry', { account_id: accountId });
-        await js(`apiFetch('/api/portfolio/entry/${e.entry.id}', { method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ asset_name: ${JSON.stringify(name)}, ticker: ${JSON.stringify(ticker)},
-            amount: ${amount}, price: ${price}, market_price: ${market} }) }).then(r => r.json())`);
-      }
-      await js(`apiFetch('/api/portfolio/account/${accountId}', { method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Brokerage' }) }).then(r => r.json())`);
-      await nav('/portfolio', 2500);
-      await unhover();
-      await shotPage('portfolio-page', '.pf-account');
     }
 
     // ═══ Phase 11: settings + database management ════════════════════════════

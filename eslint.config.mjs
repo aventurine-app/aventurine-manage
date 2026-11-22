@@ -45,6 +45,8 @@ const appGlobals = {
   Store: 'readonly',
   // core/viewstate.js
   ViewState: 'readonly',
+  // core/subscription.js
+  Subscription: 'readonly',
   // core/currency.js
   CURRENCY_SYMBOL: 'readonly',
   formatCurrency: 'readonly',
@@ -54,6 +56,7 @@ const appGlobals = {
   formatDate: 'readonly',
   setCurrencySymbol: 'readonly',
   setSymbolPosition: 'readonly',
+  currencyFormat: 'readonly',
   setHideCents: 'readonly',
   setNegativeStyle: 'readonly',
   setNumberFormat: 'readonly',
@@ -66,6 +69,8 @@ const appGlobals = {
   securityActions: 'readonly',
   // shell/ui.js
   UI: 'readonly',
+  // shell/settings.js
+  openPreferences: 'readonly',
   // shell/nav.js
   setUncatBadge: 'readonly',
   refreshUncatBadge: 'readonly',
@@ -91,7 +96,7 @@ const appGlobals = {
   BubbleField: 'readonly',
   // widgets/ant.js (Ant Design's Modal, Tooltip, Popconfirm, month picker,
   // message and tabs; loaded by the pages drawn in Ant Design — Recurring,
-  // Portfolio, Reports, Budgets, Statements)
+  // Reports, Budgets, Statements)
   Ant: 'readonly',
   // core/format.js
   debounce: 'readonly',
@@ -118,6 +123,36 @@ const appGlobals = {
   financeApi: 'readonly',
   electronApp: 'readonly',
   electronUpdater: 'readonly',
+  electronLicense: 'readonly',
+
+  // ── The Plan section (static/js/plan/) ──
+  // prefs.js, format.js, icons.js (data from the generated icon-data.js)
+  PlanPrefs: 'readonly',
+  Fmt: 'readonly',
+  planIcon: 'readonly',
+  // sim/ (pure; also require()d by the backend, services/planSim.js)
+  PlanCatalog: 'readonly',
+  PlanModel: 'readonly',
+  PlanEngine: 'readonly',
+  PlanGoals: 'readonly',
+  PlanSummary: 'readonly',
+  // notice.js, pickers.js, components.js
+  planNotice: 'readonly',
+  PlanPickers: 'readonly',
+  Components: 'readonly',
+  // describe.js, report.js, example.js, store.js, runs.js, export-menu.js
+  Describe: 'readonly',
+  PlanReport: 'readonly',
+  PlanExample: 'readonly',
+  PlanStore: 'readonly',
+  Runs: 'readonly',
+  ExportMenu: 'readonly',
+  // canvas.js, chart.js, inspector.js, sankey.js, outlook.js
+  Canvas: 'readonly',
+  PlanChart: 'readonly',
+  Inspector: 'readonly',
+  PlanSankey: 'readonly',
+  Outlook: 'readonly',
 };
 
 export default [
@@ -169,6 +204,12 @@ export default [
   {
     files: ['static/js/widgets/txparse.js', 'static/js/widgets/dashgrid.js', 'static/js/widgets/dashperiod.js'],
     languageOptions: { globals: { module: 'readonly' } },
+  },
+  // The Plan section's model is dual-environment too, and its files require()
+  // one another in their CommonJS branch.
+  {
+    files: ['static/js/plan/sim/*.js'],
+    languageOptions: { globals: { module: 'readonly', require: 'readonly' } },
   },
 
   // Electron main process, backend, build/train scripts, tests: Node CJS.

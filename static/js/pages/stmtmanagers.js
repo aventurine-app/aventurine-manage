@@ -303,9 +303,6 @@
 
         const rowHtml = (c, i, group) => {
             const count = c.transactions || 0;
-            const countHtml = count
-                ? `<span class="ant-typography-secondary stmt-item-count" data-tip="${plural(count, 'transaction')}">${count}<span
-                    class="ant-visually-hidden"> transactions</span></span>` : '';
             let last;
             if (c.locked) {
                 last = `<span class="ant-tag" tabindex="0" role="note" aria-label="Required: ${REQUIRED_TIP}"
@@ -325,33 +322,56 @@
                 <div class="stmt-item-main">
                     <span class="stmt-item-name" data-slot>${escapeHtml(c.name)}</span>
                     ${c.locked ? '' : pencil(`Rename ${c.name}`)}
-                    ${countHtml}
                 </div>
                 ${actions([...moveButtons(c.name, i > 0, i < group.length - 1), last])}
             </li>`;
         };
 
+        // The types are an accordion (Ant's Collapse): one open at a time,
+        // Income first. Kept across redraws, so a save doesn't close the
+        // panel being edited; null when the open one was closed again.
+        let open = CATEGORY_GROUPS[0].type;
+
         const cardHtml = (g) => {
             const group = cats.filter((c) => c.cat_type === g.type);
             const placeholder = `New ${g.noun} category`;
-            return `<section class="ant-card ant-card-small stmt-cat-card" data-type="${g.type}" aria-labelledby="stmt-cat-${g.type}">
-                <div class="ant-card-head"><div class="ant-card-head-wrapper">
-                    <h3 class="ant-card-head-title" id="stmt-cat-${g.type}">${g.title}</h3>
-                </div></div>
-                <div class="ant-card-body">
-                    <ul class="ant-list ant-list-sm">${group.map((c, i) => rowHtml(c, i, group)).join('')}</ul>
-                    <div class="ant-space-compact ant-space-compact-block stmt-add-row">
-                        <input class="ant-input" data-new="${g.type}" maxlength="${MAX_CATEGORY_NAME}"
-                            placeholder="${placeholder}" aria-label="${placeholder}">
-                        <button type="button" class="ant-btn ant-btn-default" data-act="add" data-type="${g.type}" disabled>${Ant.icon('plus')}<span>Add</span></button>
+            const expanded = g.type === open;
+            return `<div class="ant-collapse-item stmt-cat-card" data-type="${g.type}">
+                <h3 class="ant-collapse-heading">
+                    <button type="button" class="ant-collapse-header" data-act="toggle" data-type="${g.type}"
+                        id="stmt-cat-${g.type}" aria-expanded="${expanded}" aria-controls="stmt-cat-panel-${g.type}">
+                        <span class="ant-collapse-expand-icon">${Ant.icon('right')}</span>
+                        <span class="ant-collapse-header-text">${g.title}</span>
+                    </button>
+                </h3>
+                <div class="ant-collapse-content" id="stmt-cat-panel-${g.type}" role="region"
+                    aria-labelledby="stmt-cat-${g.type}"${expanded ? '' : ' hidden'}>
+                    <div class="ant-collapse-content-box">
+                        <ul class="ant-list ant-list-sm">${group.map((c, i) => rowHtml(c, i, group)).join('')}</ul>
+                        <div class="ant-space-compact ant-space-compact-block stmt-add-row">
+                            <input class="ant-input" data-new="${g.type}" maxlength="${MAX_CATEGORY_NAME}"
+                                placeholder="${placeholder}" aria-label="${placeholder}">
+                            <button type="button" class="ant-btn ant-btn-default" data-act="add" data-type="${g.type}" disabled>${Ant.icon('plus')}<span>Add</span></button>
+                        </div>
                     </div>
                 </div>
-            </section>`;
+            </div>`;
         };
 
         const render = () => {
-            panel.innerHTML = `<div class="stmt-cat-cards">${CATEGORY_GROUPS.map(cardHtml).join('')}</div>`;
+            panel.innerHTML = `<div class="ant-collapse ant-collapse-small stmt-cat-cards">${CATEGORY_GROUPS.map(cardHtml).join('')}</div>`;
         };
+
+        /** Open one type and close the rest, or close it if it was open. In
+         *  place rather than a redraw, so a half-typed new name survives. */
+        function toggle(type) {
+            open = open === type ? null : type;
+            for (const g of CATEGORY_GROUPS) {
+                const expanded = g.type === open;
+                panel.querySelector(`#stmt-cat-${g.type}`).setAttribute('aria-expanded', String(expanded));
+                panel.querySelector(`#stmt-cat-panel-${g.type}`).hidden = !expanded;
+            }
+        }
 
         async function refresh() {
             const res = await apiFetch('/api/categories?counts=true');
@@ -401,6 +421,7 @@
             const btn = e.target.closest('[data-act]');
             if (!btn || btn.disabled) return;
             if (btn.dataset.act === 'add') { add(btn.dataset.type); return; }
+            if (btn.dataset.act === 'toggle') { toggle(btn.dataset.type); return; }
             const id = Number(btn.closest('[data-id]').dataset.id);
             const cat = cats.find((c) => c.id === id);
             const act = btn.dataset.act;
@@ -582,7 +603,7 @@
     /** tab: the statement tab the page is on, which picks the tab to open on. */
     function openColumns({ tab, cashflow, balance }) {
         const tabs = [
-            { key: 'cashflow', label: 'Categories', mount: (panel) => mountCategories(panel, { onChange: () => cashflow.reload() }) },
+            { key: 'cashflow', label: 'Cash Flow categories', mount: (panel) => mountCategories(panel, { onChange: () => cashflow.reload() }) },
             { key: 'balance', label: 'Balance Sheet accounts', mount: (panel) => mountAccounts(panel, { balance }) },
         ];
         const { dialog, close } = Ant.modal({

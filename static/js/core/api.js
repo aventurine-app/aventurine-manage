@@ -539,14 +539,6 @@
         { id: 9, key: 'retirement', name: 'Retirement',        cat_type: 'transfer', position: 2 },
       ],
     },
-    // static/js/pages/portfolio.js — brokerage accounts and holdings.
-    '/api/portfolio/data': {
-      accounts: [{
-        id: 1, name: 'My Portfolio',
-        entries: [{ id: 1, ticker: 'VTI', asset_name: 'Total Market ETF',
-                    amount: 12, price: 210.5, market_price: 268.4 }],
-      }],
-    },
     '/api/recurring': recurringFixture,
     '/api/recurring/candidates': recurringCandidatesFixture,
     // static/js/pages/recurring.js — the editor's Name-field suggestions, from

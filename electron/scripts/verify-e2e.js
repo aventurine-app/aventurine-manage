@@ -21,6 +21,9 @@ const path = require('path');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-e2e-'));
 const { app, BrowserWindow } = require('electron');
 
+// The Plan section needs a subscription; this run checks the section itself,
+// so it unlocks it the dev-only way (licensePolicy.js) before main.js reads it.
+process.env.AVENTURINE_DEV_UNLOCK = '1';
 require('../main.js'); // the real entry: backend, protocol, window
 app.setPath('userData', tmp);
 
@@ -141,7 +144,6 @@ app.whenReady().then(async () => {
       '/transactions':    'Transactions',
       '/statements':      'Statements',
       '/budgets':         'Budgets',
-      '/portfolio':       'Portfolio',
       '/reports':         'Reports',
       '/recurring':       'Recurring',
     };
@@ -163,6 +165,95 @@ app.whenReady().then(async () => {
         && document.querySelectorAll(".menu .nav a.active").length === ${activeHref ? 1 : 0}`);
       check(`page ${route} assembles with chrome`, ok);
     }
+
+    // ── Plan: the Plan section (pages/plan.html, static/js/plan/) ──
+    // An ordinary page on Manage's origin: these checks prove it opens the
+    // plans from the database, that the sidebar's links and the section's
+    // own workspace changes stay in step both ways, that it follows Manage's
+    // Preferences, and that plans and their order are stored in the file.
+    await win.loadURL('app://aventurine/plan#goals');
+    const until = async (fn) => {
+      const t0 = Date.now();
+      while (!(await fn()) && Date.now() - t0 < 4000) await new Promise((r) => setTimeout(r, 100));
+      return fn();
+    };
+    check('Plan page opens its plans', await until(() => evalJs(
+      '!!(window.PlanStore && PlanStore.state.plan) && !document.getElementById("app").hidden')));
+    check('Plan page has no frame of its own', await evalJs('window.frames.length === 0'));
+    check('Plan opens on the hash\'s workspace', (await evalJs('PlanStore.state.workspace')) === 'goals');
+    check('Plan link for the workspace is active', await evalJs(
+      'document.querySelector(".menu .nav a.active")?.getAttribute("href") === "/plan#goals"'
+      + ' && document.querySelectorAll(".menu .nav a.active").length === 1'));
+    await evalJs('document.querySelector(".menu .nav a[href=\'/plan#compare\']").click()');
+    check('Plan link switches the workspace', await until(
+      async () => (await evalJs('PlanStore.state.workspace')) === 'compare'));
+    await evalJs('PlanStore.setWorkspace("analyze")');
+    check('the section\'s own workspace change moves the sidebar', await until(() => evalJs(
+      'location.hash === "#analyze"'
+      + ' && document.querySelector(".menu .nav a.active")?.getAttribute("href") === "/plan#analyze"')));
+
+    // Manage's Preferences are the section's: Format and Flow Animation apply
+    // live, and Ctrl+, opens them.
+    await evalJs('setCurrencySymbol("€"); setNumberFormat("eu")');
+    check('Plan follows Manage\'s Format', (await evalJs('Fmt.money(1234)')) === '€1.234');
+    await evalJs('setCurrencySymbol("$"); setNumberFormat("us")');
+    await evalJs('document.querySelector(".settings-pref-radio[name=\'flow-motion\'][value=\'off\']").click()');
+    check('Plan follows Manage\'s Flow Animation', await until(
+      async () => (await evalJs('document.documentElement.dataset.motion')) === 'off'));
+    await evalJs('document.querySelector(".settings-pref-radio[name=\'flow-motion\'][value=\'on\']").click()');
+    await evalJs('document.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true, bubbles: true }))');
+    check('Ctrl+, on the Plan page opens Preferences', await until(() => evalJs(
+      '!document.querySelector("[data-modal=\'preferences\']").hidden')));
+    await evalJs('document.querySelector("[data-modal=\'preferences\']").hidden = true');
+
+    // The plans are in the database file: a new plan is stored there, beside
+    // the ledger.
+    const storedPlans = () => evalJs('apiFetch("/api/plans").then((r) => r.json())');
+    const storedIds = async () => (await storedPlans()).plans.map((p) => p.id).sort();
+    const before = await storedIds();
+    await evalJs('PlanStore.newPlan().then(() => PlanStore.flush())');
+    const after = await storedIds();
+    const tabs = await evalJs('PlanStore.state.tabs.slice().sort()');
+    check('a new plan is stored in the database', after.length === before.length + 1
+      && JSON.stringify(after) === JSON.stringify(tabs));
+
+    // The plans are tabs across the builder's top. Moving one reorders the
+    // stored plans; its × deletes it once confirmed.
+    await evalJs('PlanStore.setWorkspace("plans")');
+    check('a tab per plan, the open one selected', await until(() => evalJs(
+      '[...document.querySelectorAll(".builder > .plan-tabs .plan-tab")].map((t) => t.dataset.id).join() === PlanStore.state.tabs.join()'
+      + ' && document.querySelector(".plan-tab[aria-selected=\'true\']").dataset.id === PlanStore.state.activeId')));
+    const order = await evalJs('PlanStore.state.tabs.slice()');
+    await evalJs('document.querySelector(".plan-tab[aria-selected=\'true\']")'
+      + '.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", ctrlKey: true, shiftKey: true, bubbles: true }))');
+    const moved = [...order.slice(0, -2), order.at(-1), order.at(-2)];
+    check('a tab moves, and the order is stored', await until(async () =>
+      JSON.stringify((await storedPlans()).order) === JSON.stringify(moved)));
+    const doomed = await evalJs('PlanStore.state.activeId');
+    await evalJs('document.querySelector(".plan-tab[aria-selected=\'true\'] .plan-tab-close").click()');
+    await until(() => evalJs('!!document.querySelector(".ant-modal-confirm [data-choice=\'ok\']")'));
+    await evalJs('document.querySelector(".ant-modal-confirm [data-choice=\'ok\']").click()');
+    check('a tab\'s × deletes its plan', await until(async () => !(await storedIds()).includes(doomed)
+      && !(await evalJs(`!!document.querySelector('.plan-tab[data-id="${doomed}"]')`))));
+
+    // The sections fold, and stay folded on the next page (painted before
+    // the page's scripts run, from theme-init.js). On the dashboard Manage
+    // is the open section.
+    await win.loadURL('app://aventurine/');
+    await evalJs('document.querySelector(".nav-section-toggle[data-section=\'manage\']").click()');
+    // (It animates, so the height is read once the fold has run.)
+    check('Manage section folds', await until(() => evalJs(
+      'document.getElementById("nav-section-manage").inert'
+      + ' && document.querySelector("[data-section=\'manage\']").getAttribute("aria-expanded") === "false"'
+      + ' && document.getElementById("nav-section-manage").getBoundingClientRect().height < 1')));
+    await win.loadURL('app://aventurine/plan');
+    check('folded section stays folded on the next page', await evalJs(
+      'document.documentElement.dataset.navClosed.split(" ").includes("manage") && document.getElementById("nav-section-manage").inert'));
+    await evalJs('document.querySelector(".nav-section-toggle[data-section=\'plan\']").click()');
+    await evalJs('document.querySelector(".nav-section-toggle[data-section=\'manage\']").click()');
+    check('opening Manage folds Invest and Plan (one section open at a time)', await evalJs(
+      'document.documentElement.dataset.navClosed === "invest plan" && !document.getElementById("nav-section-manage").inert'
+      + ' && document.getElementById("nav-section-invest").inert && document.getElementById("nav-section-plan").inert'));
 
     // The sidebar's File button is the only way to reach the DB modal — prove
     // the File options → window.dbActions → modal chain works, and that the

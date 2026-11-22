@@ -62,6 +62,9 @@
                         id="settings-tab-security" data-tab="security"
                         aria-selected="false" tabindex="-1" aria-controls="settings-panel-security">Security</button>
                 <button class="settings-tab" type="button" role="tab"
+                        id="settings-tab-account" data-tab="account" data-footer="hide"
+                        aria-selected="false" tabindex="-1" aria-controls="settings-panel-account">Account</button>
+                <button class="settings-tab" type="button" role="tab"
                         id="settings-tab-about" data-tab="about" data-footer="hide"
                         aria-selected="false" tabindex="-1" aria-controls="settings-panel-about">About</button>
             </div>
@@ -76,10 +79,8 @@
                 <div class="settings-row-name">Surface</div>
             </div>
             <div class="settings-theme-options">
-                <button class="settings-theme-btn" data-theme="colorful">
-                    <div class="settings-theme-swatch" data-theme="colorful"></div>
-                    <span class="settings-theme-label">Mixed</span>
-                </button>
+                <!-- The Aventurine theme's two faces (static/css/theme.css,
+                     shared with Aventurine Planner), and the OS's choice. -->
                 <button class="settings-theme-btn" data-theme="">
                     <div class="settings-theme-swatch" data-theme="light"></div>
                     <span class="settings-theme-label">Light</span>
@@ -91,40 +92,6 @@
                 <button class="settings-theme-btn" data-theme="system">
                     <div class="settings-theme-swatch settings-theme-swatch-system"></div>
                     <span class="settings-theme-label">System</span>
-                </button>
-                <span class="settings-theme-break"></span>
-                <button class="settings-theme-btn" data-theme="warm-light">
-                    <div class="settings-theme-swatch" data-theme="warm-light"></div>
-                    <span class="settings-theme-label">Warm Light</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="warm-dark">
-                    <div class="settings-theme-swatch" data-theme="warm-dark"></div>
-                    <span class="settings-theme-label">Warm Dark</span>
-                </button>
-                <span class="settings-theme-break"></span>
-                <button class="settings-theme-btn" data-theme="tint-red">
-                    <div class="settings-theme-swatch" data-theme="tint-red"></div>
-                    <span class="settings-theme-label">Red</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="tint-orange">
-                    <div class="settings-theme-swatch" data-theme="tint-orange"></div>
-                    <span class="settings-theme-label">Orange</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="tint-blue">
-                    <div class="settings-theme-swatch" data-theme="tint-blue"></div>
-                    <span class="settings-theme-label">Blue</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="tint-green">
-                    <div class="settings-theme-swatch" data-theme="tint-green"></div>
-                    <span class="settings-theme-label">Green</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="tint-purple">
-                    <div class="settings-theme-swatch" data-theme="tint-purple"></div>
-                    <span class="settings-theme-label">Purple</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="tint-pink">
-                    <div class="settings-theme-swatch" data-theme="tint-pink"></div>
-                    <span class="settings-theme-label">Pink</span>
                 </button>
             </div>
         </div>
@@ -176,6 +143,22 @@
                 </label>
                 <label class="settings-match-option">
                     <input class="settings-pref-radio" type="radio" name="merchant_icons" value="0">
+                    <span class="settings-match-label seg-switch-btn">Off</span>
+                </label>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-label">
+                <div class="settings-row-name">Flow Animation</div>
+                <div class="settings-row-desc">Moves dots along the links between modules in a plan, in the direction the money flows.</div>
+            </div>
+            <div class="settings-match-toggle seg-switch">
+                <label class="settings-match-option">
+                    <input class="settings-pref-radio" type="radio" name="flow-motion" value="on">
+                    <span class="settings-match-label seg-switch-btn">On</span>
+                </label>
+                <label class="settings-match-option">
+                    <input class="settings-pref-radio" type="radio" name="flow-motion" value="off">
                     <span class="settings-match-label seg-switch-btn">Off</span>
                 </label>
             </div>
@@ -412,6 +395,77 @@
     </div>
 </div>
 
+
+<!-- Account. Signs in to an Aventurine account and shows whether the
+     subscription is active. Driven by static/js/shell/account.js against the
+     electronLicense bridge (electron/license.js). Three views, one shown at a
+     time: signed out (email), code sent (6-digit code), signed in (status).
+     The forms submit through script; nothing here posts anywhere by itself.
+     No Restore Defaults: there is no display setting on this tab. -->
+<div class="settings-tabpanel" data-tabpanel="account" role="tabpanel" hidden
+     id="settings-panel-account" aria-labelledby="settings-tab-account">
+
+<div class="settings-section" data-account-section>
+    <div class="settings-section-header">Aventurine Account</div>
+    <div class="settings-card">
+        <form class="settings-row" data-account-view="email" novalidate>
+            <div class="settings-row-label">
+                <label class="settings-row-name" for="account-email">Sign In</label>
+                <div class="settings-row-desc">One Aventurine subscription unlocks subscriber features here and in Aventurine Planner. Signing in sends only your email address. Nothing about your finances leaves this computer.</div>
+            </div>
+            <div class="account-form">
+                <input class="enc-input" id="account-email" type="email" data-account-email
+                       autocomplete="email" spellcheck="false" placeholder="you@example.com" required>
+                <button class="button-primary" type="submit" data-account-send>Send Code</button>
+            </div>
+        </form>
+
+        <form class="settings-row" data-account-view="code" novalidate hidden>
+            <div class="settings-row-label">
+                <label class="settings-row-name" for="account-code">Enter Your Code</label>
+                <div class="settings-row-desc" data-account-code-desc></div>
+            </div>
+            <div class="account-form">
+                <input class="enc-input account-code-input" id="account-code" type="text" data-account-code
+                       inputmode="numeric" autocomplete="one-time-code" maxlength="7" spellcheck="false"
+                       placeholder="123456" required>
+                <button class="button-primary" type="submit" data-account-verify>Sign In</button>
+                <button class="button-secondary" type="button" data-account-restart>Use Another Email</button>
+            </div>
+        </form>
+
+        <div class="settings-row" data-account-view="signed-in" hidden>
+            <div class="settings-row-label">
+                <div class="settings-row-name">Signed In</div>
+                <div class="settings-row-desc" data-account-email-text></div>
+            </div>
+            <button class="button-secondary" type="button" data-account-signout>Sign Out</button>
+        </div>
+        <div class="settings-row" data-account-view="signed-in" hidden>
+            <div class="settings-row-label">
+                <div class="settings-row-name">Subscription</div>
+                <div class="settings-row-desc" data-account-status role="status" aria-live="polite"></div>
+            </div>
+            <div class="update-actions">
+                <button class="button-secondary" type="button" data-account-check>Check Now</button>
+                <button class="button-primary" type="button" data-account-pricing hidden>See Plans</button>
+            </div>
+        </div>
+
+        <div class="settings-row" data-account-view="email">
+            <div class="settings-row-label">
+                <div class="settings-row-name">No Subscription Yet?</div>
+                <div class="settings-row-desc">Everything Aventurine Manage does today stays free, with or without one.</div>
+            </div>
+            <button class="button-secondary" type="button" data-account-pricing>See Plans</button>
+        </div>
+        <div class="settings-row account-error-row" data-account-error-row hidden>
+            <div class="update-error" data-account-error role="alert"></div>
+        </div>
+    </div>
+</div>
+
+</div>
 
 <!-- About. The installed version, and software updates.
 
