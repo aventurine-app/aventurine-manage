@@ -9,7 +9,8 @@
   "homepage": "https://aventurine-app.com",
   "license": "GPL-3.0-or-later",
   "scripts": {
-    "start": "electron .",
+    "start": "AVENTURINE_DEV_UNLOCK=1 electron .",
+    "start:locked": "electron .",
     "test": "node --test",
     "lint": "eslint ..",
     "smoke": "electron scripts/smoke.js",

@@ -1,0 +1,50 @@
+/* ─── Sign-in page (pages/signin.html) ─────────────────────────────────────
+   One centered column under the title bar: the logo, a heading, a sentence,
+   then Preferences → Account's form in a settings card (settings.css). */
+
+/* Nothing to go back or forward to from here. */
+.signin-body .titlebar-nav { visibility: hidden; }
+
+.signin {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-8);
+    padding: 32px 16px 48px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.signin-logo {
+    width: 56px;
+    height: 56px;
+    margin-bottom: var(--space-8);
+}
+
+.signin-title {
+    margin: 0;
+    font-family: var(--font-h3);
+    font-size: 22px;
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+}
+
+.signin-lede {
+    margin: 0 0 var(--space-8);
+    max-width: 440px;
+    font-size: var(--size-body);
+    line-height: var(--lh-relaxed);
+    color: var(--text-secondary);
+}
+
+.signin-card {
+    width: 100%;
+    max-width: 480px;
+    text-align: left;
+}
+
+.signin-card .account-form { max-width: none; }

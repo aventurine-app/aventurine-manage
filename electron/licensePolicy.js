@@ -45,16 +45,20 @@ const TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 const LICENSE_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
 // A dev run (npm start) may point at `wrangler dev` with its own key, or set
-// AVENTURINE_DEV_UNLOCK=1 to unlock subscriber features with no account at all
-// (working on the Plan section, verify-e2e). A packaged app never reads these,
+// AVENTURINE_DEV_UNLOCK to open the app with no account at all: '1' as Pro
+// (npm start, verify-e2e), 'basic' as Basic (to see Pro features locked).
+// devUnlock is then that tier, otherwise null. A packaged app never reads these,
 // so nothing in the environment can steer a real install to another server,
 // make it trust another key or unlock it.
+const DEV_UNLOCK_TIERS = { 1: 'pro', basic: 'basic' };  // value → tier
+
 function resolveLicenseConfig({ isPackaged, env = {} }) {
     const dev = !isPackaged;
     return {
         origin:    (dev && env.AVENTURINE_ACCOUNT_URL) || ACCOUNT_ORIGIN,
         publicKey: (dev && env.AVENTURINE_LICENSE_PUBLIC_KEY) || LICENSE_PUBLIC_KEY,
-        devUnlock: dev && env.AVENTURINE_DEV_UNLOCK === '1',
+        devUnlock: dev && Object.hasOwn(DEV_UNLOCK_TIERS, env.AVENTURINE_DEV_UNLOCK)
+            ? DEV_UNLOCK_TIERS[env.AVENTURINE_DEV_UNLOCK] : null,
     };
 }
 
@@ -81,20 +85,44 @@ function parseLicense(license, publicKeyBase64) {
     const valid = payload && payload.v === 1
         && typeof payload.email === 'string' && payload.email.length > 0
         && typeof payload.active === 'boolean'
+        // Licenses signed before tiers have no `tier`; tierOf reads them.
+        && (payload.tier === undefined || TIERS.includes(payload.tier))
         && typeof payload.status === 'string'
         && isTime(payload.issuedAt) && isTime(payload.validUntil)
         && isTimeOrNull(payload.renewsAt) && isTimeOrNull(payload.cancelsAt);
     return valid ? payload : null;
 }
 
+// What a subscription buys (the worker's access.js decides it from the Paddle
+// price):
+//   none    nothing: the app shows only the sign-in page
+//   basic   Aventurine Manage
+//   pro     Manage plus Plan and every later Pro feature
+const TIERS = ['none', 'basic', 'pro'];
+
+// The tier a license grants while it is valid. A license from before tiers
+// existed has none written down; it counts as Basic, never more, and the next
+// check (at most 6 hours away) brings the real one.
+function tierOf(payload) {
+    if (!payload.active) return 'none';
+    return payload.tier || 'basic';
+}
+
 // What the app shows and decides from. `payload` is parseLicense's answer, or
-// null when signed out. `unlocked` is the one value features should read.
+// null when signed out. `tier` is the one value features should read:
+// `unlocked` (Basic or better, the app opens) and `pro` follow from it.
 function describeLicense(payload, now) {
-    if (!payload) return { signedIn: false, unlocked: false };
+    if (!payload) return { signedIn: false, tier: 'none', unlocked: false, pro: false };
+    const tier = now < payload.validUntil ? tierOf(payload) : 'none';
     return {
         signedIn:   true,
         email:      payload.email,
-        unlocked:   payload.active && now < payload.validUntil,
+        tier,
+        unlocked:   tier !== 'none',
+        pro:        tier === 'pro',
+        // What the subscription is, even past validUntil (the Account tab
+        // says "not confirmed for 30 days" from it).
+        paidTier:   tierOf(payload),
         active:     payload.active,
         status:     payload.status,
         renewsAt:   payload.renewsAt,
@@ -157,6 +185,7 @@ module.exports = {
     PRICING_URL,
     ACCOUNT_FILE,
     TOKEN_SHAPE,
+    TIERS,
     resolveLicenseConfig,
     parseLicense,
     describeLicense,

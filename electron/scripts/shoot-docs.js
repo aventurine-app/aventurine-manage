@@ -47,8 +47,8 @@ const SCALE = Number(process.env.SHOT_SCALE) || 1;
 // so only override it for one-off captures, never for a docs refresh.
 const W = Number(process.env.SHOT_W) || 1400;
 const H = Number(process.env.SHOT_H) || 900;
-// Surface theme for the `frames` group only (every other group is shot in the
-// theme its own block sets). The website's Features section carries two sets of
+// Surface theme for the `frames` and `site` groups only (every other group is
+// shot in the theme its own block sets). The website's Features section carries two sets of
 // the same shots, 'light' and 'dark' (the Aventurine theme's two faces), so one
 // run per theme writes both; the dark run suffixes its filenames so the pair
 // lands side by side in one folder.
@@ -964,56 +964,98 @@ app.whenReady().then(async () => {
     //   SHOT_ONLY=site SHOT_W=1900 SHOT_H=1400 SHOT_OUT=… \
     //     electron --no-sandbox --force-device-scale-factor=1.5 scripts/shoot-docs.js
     //
-    // The width matters: below ~1900 the Recurring merchant column clips its
-    // names (they are <input>s, so they cut mid-word rather than ellipsing) and
-    // the ledger's Notes column falls off the right edge. The height matters to
-    // the dashboard shot alone — see it below.
+    // SHOT_W/SHOT_H do not matter here: each crop sets its own window size
+    // to come out at SITE_RATIO (see shotShape below), and puts W×H back.
     if (ONLY && ONLY.has('site')) {
       console.log('\n— site —');
 
-      // Every site crop is shot in the LIGHT theme and the DEFAULT chart
-      // palette, so the Features section reads as one set. Set once here rather
-      // than per shot: both live in localStorage on a fixed origin, so they
-      // survive every nav below. The docs phases run under the defaults, which
-      // is why the pair is put back at the end of the block.
-      await setTheme('');
+      // Every site crop is shot in one surface theme (LIGHT unless
+      // SHOT_SURFACE=dark, which also suffixes the filenames) and the DEFAULT
+      // chart palette, so the Features section reads as one set. Set once here
+      // rather than per shot: both live in localStorage on a fixed origin, so
+      // they survive every nav below. The docs phases run under the defaults,
+      // which is why the pair is put back at the end of the block.
+      await setTheme(FRAME_SURFACE === 'dark' ? 'dark' : '');
       await setGraphTheme('');
 
+      // EVERY SITE CROP COMES OUT AT ONE SHAPE, SITE_RATIO (the Planner
+      // canvas shot's 1379×809), so the website's feature rows line up. A crop
+      // is fitted rather than cut wherever the page allows it:
+      //   fit 'h' — the page fills the window's height (Budgets, the Sankey,
+      //             Recurring), so the window's height is stepped until the
+      //             element's box has the shape;
+      //   fit 'w' — the page has a fixed height (the dashboard's two bands,
+      //             the statement grid), so the window's width is stepped;
+      //   fit null — the element is longer than any window (the ledger), so it
+      //             is cut to the shape from the bottom.
+      // Whatever a fit leaves over (a few px) is trimmed off the bottom, or off
+      // the right if the box came out too wide. The window goes back to W×H
+      // after each shot.
+      const SITE_RATIO = 1379 / 809;
+      const shotShape = async (name, selector, { w = W, h = H, fit = null, pad = 0 } = {}) => {
+        const box = async () => {
+          const r = await rectOf(selector);
+          return r && { x: r.x - pad, y: r.y - pad, width: r.width + pad * 2, height: r.height + pad * 2 };
+        };
+        win.setContentSize(w, h);
+        await sleep(1200);
+        let r = await box();
+        for (let i = 0; r && fit && i < 4; i++) {
+          if (fit === 'h') {
+            const dh = Math.round(r.width / SITE_RATIO - r.height);
+            if (Math.abs(dh) < 2) break;
+            h += dh;
+          } else {
+            const dw = Math.round(r.height * SITE_RATIO - r.width);
+            if (Math.abs(dw) < 2) break;
+            w += dw;
+          }
+          win.setContentSize(w, h);
+          await sleep(1200);
+          r = await box();
+        }
+        await unhover();
+        if (!r || r.width < 2 || r.height < 2) { missing.push(`${name} (${selector})`); win.setContentSize(W, H); return; }
+        let width = Math.round(r.width);
+        let height = Math.round(r.height);
+        if (width / height > SITE_RATIO) width = Math.round(height * SITE_RATIO);
+        else height = Math.round(width / SITE_RATIO);
+        const x = Math.max(0, Math.round(r.x));
+        const y = Math.max(0, Math.round(r.y));
+        await shot(name, { x, y, width: Math.min(width, w - x), height: Math.min(height, h - y) });
+        console.log(`    window ${w}×${h}`);
+        win.setContentSize(W, H);
+        await sleep(400);
+      };
+
       // The default dashboard — two rows, six cards, under its toolbar.
-      // Unlike the crops below this one is padded: those are cards, whose own
-      // rounded edge is the frame, while the dashboard's outermost things are
-      // the layout tabs and the Customize button, and text flush to the crop
-      // edge reads as clipped. 20 is the most that fits — the page's own gutter is 20 either
-      // side, so any more and the rect is clamped to the window and the frame
-      // goes lopsided. Needs SHOT_H ≥ 1400: at 1150 the second band is cut.
-      // Stepped back one month first: the seeded ledger stops at today, so the
-      // current month is a part-month and the month cards would open on a half
-      // paycheque against a half month of spending. The month before it is the
-      // whole picture the cards are meant to show.
+      // Padded, unlike the card crops: the dashboard's outermost things are the
+      // layout tabs and the Customize button, and text flush to the crop edge
+      // reads as clipped. 20 is the page's own gutter, so any more pulls in the
+      // sidebar. Stepped back one month first: the seeded ledger stops at
+      // today, so the current month is a part-month and the month cards would
+      // open on a half paycheque against a half month of spending.
       await nav('/', 3200);
       if (await js(`document.documentElement.dataset.graphTheme !== undefined`)) {
         throw new Error('dashboard did not load in the default graph palette');
       }
       await dashboardPreviousMonth();
+      // The stepper click leaves its button focused, and the focus ring would
+      // land in the picture.
+      await js(`document.activeElement && document.activeElement.blur()`);
       await sleep(900);
-      await unhover();
-      await shotEl('site-dashboard', '.dashboard-page', 20);
+      await shotShape(`site-dashboard${FRAME_SUFFIX}`, '.dashboard-page', { w: 1640, h: 1400, fit: 'w', pad: 20 });
 
-      // The ledger card: header row through the pagination footer, which is a
-      // row of the same table, so one element covers it.
-      // Flush to the element box, no padding: 10px of air here is 10px of the
-      // title bar above the Recurring heading and of the tab bar above the
-      // Sankey, which is exactly the chrome these crops exist to drop.
+      // The ledger card from its filters down, cut to the shape: it is a list,
+      // and a list stopped after row N still reads as one. Flush to the
+      // element box: padding here is the title bar and the sidebar's edge.
       await nav('/transactions', 2500);
-      await unhover();
-      await shotEl('site-transactions', '.tx-wrapper', 0);
+      await shotShape(`site-transactions${FRAME_SUFFIX}`, '.tx-ledger', { w: 1900, h: 1400 });
 
       // Month stepper, the calendar with its occurrence chips, and the rail
-      // beside it — the whole feature, minus the chrome around it. This used to
-      // be shot with a chip's floating card held open, because the chips carry
-      // only a name and an amount; the card is gone, and the rail is where the
-      // rest of a schedule reads now (cadence and next due, a column each), so
-      // the page shows its own data with nothing opened over it.
+      // beside it — the whole feature, minus the chrome around it. The
+      // calendar's weeks have a floor height, so a shorter window cuts the
+      // last week off instead of shrinking it: fitted by width.
       await adoptRecurring();
       await nav('/recurring', 3200);
       if (!(await js(`(() => document.querySelectorAll('.rec-occ').length)()`))) {
@@ -1022,15 +1064,49 @@ app.whenReady().then(async () => {
       if (!(await js(`(() => document.querySelectorAll('.rec-rail-row').length)()`))) {
         throw new Error('recurring rail listed no schedules');
       }
-      await unhover();
-      await shotEl('site-recurring', '.rec-page', 0);
+      await shotShape(`site-recurring${FRAME_SUFFIX}`, '.rec-page', { w: 2040, h: 1400, fit: 'w' });
 
       // The Sankey card alone — the tab bar above it is page furniture.
+      // One whole month, not the year, and a month with a single income band:
+      // the household's odd refunds ("Other Income") are a few hundred dollars
+      // against a year of pay, and drew as a hairline pinned under the income
+      // bar. Walks back from last month (a whole one; this month is partial)
+      // to the first month that has no such band.
       await nav('/reports', 3200);
-      await unhover();
-      await shotEl('site-cash-flow', '.rep-panel:not([hidden]) .forecast-card', 0);
+      const sankeySel = '.rep-panel:not([hidden]) .forecast-card';
+      const thisMonth = new Date().getMonth();
+      let picked = null;
+      for (let m = thisMonth - 1; m >= 0 && !picked; m--) {
+        await click('#cashflow-month-btn');
+        await sleep(300);
+        await click(`#cashflow-month-menu button[data-month="${MONTHS[m]}"]`);
+        await sleep(1500);
+        const text = await js(`(() => document.querySelector(${JSON.stringify(sankeySel)})?.textContent || '')()`);
+        if (text.includes('Net Inflow') && !text.includes('Other Income')) picked = MONTHS[m];
+      }
+      if (!picked) throw new Error('no month this year with a single income band for the Sankey');
+      console.log(`  cash flow month: ${picked}`);
+      await js(`document.activeElement && document.activeElement.blur()`);
+      await shotShape(`site-cash-flow${FRAME_SUFFIX}`, sankeySel, { w: 1900, h: 1100, fit: 'h' });
+
+      // The Budgets page, toolbar through the circles, stepped back a month for
+      // the reason the dashboard is (a part-month part-fills every circle).
+      // Wide, so the smallest circle (General) still has room for its name.
+      await seedBudgets();
+      await nav('/budgets', 3200);
+      await click('#bud-month-prev');
+      await js(`document.activeElement && document.activeElement.blur()`);
+      await sleep(2500);
+      await shotShape(`site-budgets${FRAME_SUFFIX}`, '.bud-page', { w: 2300, h: 1300, fit: 'h' });
+
+      // The cash flow statement: year tabs and the month-by-month grid. Its
+      // height is twelve rows and a total whatever the window, so the window
+      // narrows to the shape and the grid scrolls sideways, Net still pinned.
+      await nav('/statements', 3000);
+      await shotShape(`site-statements${FRAME_SUFFIX}`, '.stmt-page', { w: 1500, h: 1400, fit: 'w' });
 
       // Back to the defaults for any docs phase sharing the pass.
+      await setTheme('');
       await setGraphTheme('');
     }
 

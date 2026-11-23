@@ -62,7 +62,7 @@ test('license: an edited payload, another key, or a malformed token is rejected'
 });
 
 test('license: a signed payload of the wrong shape or version is rejected', () => {
-  for (const overrides of [{ v: 2 }, { email: '' }, { active: 'yes' }, { validUntil: 'soon' }, { renewsAt: -1 }]) {
+  for (const overrides of [{ v: 2 }, { email: '' }, { active: 'yes' }, { validUntil: 'soon' }, { renewsAt: -1 }, { tier: 'gold' }]) {
     assert.equal(policy.parseLicense(sign(payload(overrides)), PUBLIC_KEY), null, JSON.stringify(overrides));
   }
 });
@@ -75,7 +75,7 @@ test('license: the shipped public key is a valid Ed25519 key', () => {
 // ── describeLicense ─────────────────────────────────────────────────────────
 
 test('describe: signed out is locked', () => {
-  assert.deepEqual(policy.describeLicense(null, NOW), { signedIn: false, unlocked: false });
+  assert.deepEqual(policy.describeLicense(null, NOW), { signedIn: false, tier: 'none', unlocked: false, pro: false });
 });
 
 test('describe: an active license unlocks until its offline period runs out', () => {
@@ -95,6 +95,21 @@ test('describe: an inactive license never unlocks', () => {
   assert.equal(s.email, 'alice@example.com');
 });
 
+test('describe: the tier comes from the license, and runs out with it', () => {
+  const basic = policy.describeLicense(payload({ tier: 'basic' }), NOW);
+  assert.deepEqual([basic.tier, basic.unlocked, basic.pro], ['basic', true, false]);
+  const pro = policy.describeLicense(payload({ tier: 'pro' }), NOW);
+  assert.deepEqual([pro.tier, pro.unlocked, pro.pro], ['pro', true, true]);
+
+  const expired = policy.describeLicense(payload({ tier: 'pro' }), NOW + 30 * DAY);
+  assert.deepEqual([expired.tier, expired.unlocked, expired.pro, expired.paidTier], ['none', false, false, 'pro']);
+
+  // Signed before tiers existed: Basic, never more, until the next check.
+  assert.equal(policy.describeLicense(payload(), NOW).tier, 'basic');
+  // A lapsed subscription is no tier whatever the license names.
+  assert.equal(policy.describeLicense(payload({ active: false, tier: 'pro' }), NOW).tier, 'none');
+});
+
 // ── resolveLicenseConfig ────────────────────────────────────────────────────
 
 test('config: a packaged app ignores the environment', () => {
@@ -104,16 +119,19 @@ test('config: a packaged app ignores the environment', () => {
     AVENTURINE_DEV_UNLOCK: '1',
   };
   assert.deepEqual(policy.resolveLicenseConfig({ isPackaged: true, env }), {
-    origin: policy.ACCOUNT_ORIGIN, publicKey: policy.LICENSE_PUBLIC_KEY, devUnlock: false,
+    origin: policy.ACCOUNT_ORIGIN, publicKey: policy.LICENSE_PUBLIC_KEY, devUnlock: null,
   });
   assert.deepEqual(policy.resolveLicenseConfig({ isPackaged: false, env }), {
-    origin: 'http://127.0.0.1:8787', publicKey: PUBLIC_KEY, devUnlock: true,
+    origin: 'http://127.0.0.1:8787', publicKey: PUBLIC_KEY, devUnlock: 'pro',
   });
   assert.deepEqual(policy.resolveLicenseConfig({ isPackaged: false, env: {} }), {
-    origin: policy.ACCOUNT_ORIGIN, publicKey: policy.LICENSE_PUBLIC_KEY, devUnlock: false,
+    origin: policy.ACCOUNT_ORIGIN, publicKey: policy.LICENSE_PUBLIC_KEY, devUnlock: null,
   });
-  // Only exactly '1' unlocks a dev run.
-  assert.equal(policy.resolveLicenseConfig({ isPackaged: false, env: { AVENTURINE_DEV_UNLOCK: 'true' } }).devUnlock, false);
+  // Only exactly '1' (Pro) or 'basic' unlocks a dev run, and never a packaged app.
+  assert.equal(policy.resolveLicenseConfig({ isPackaged: false, env: { AVENTURINE_DEV_UNLOCK: 'true' } }).devUnlock, null);
+  assert.equal(policy.resolveLicenseConfig({ isPackaged: false, env: { AVENTURINE_DEV_UNLOCK: 'basic' } }).devUnlock, 'basic');
+  assert.equal(policy.resolveLicenseConfig({ isPackaged: true, env: { AVENTURINE_DEV_UNLOCK: 'basic' } }).devUnlock, null);
+  assert.equal(policy.resolveLicenseConfig({ isPackaged: false, env: { AVENTURINE_DEV_UNLOCK: 'constructor' } }).devUnlock, null);
 });
 
 test('config: the account server is https', () => {

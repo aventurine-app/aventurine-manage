@@ -232,13 +232,13 @@ test('plans: exports refuse an unknown format, a missing plan and a missing path
   assert.match(fs.readFileSync(file, 'utf8'), /^\uFEFF/, 'a byte-order mark, so Excel reads UTF-8');
 });
 
-test('plans: without a subscription every edit answers 402, and reading and exporting still work', (t) => {
+test('plans: on Basic every edit answers 402, and reading and exporting still work', (t) => {
   const c = makeClient(t);
   const a = add(c, samplePlan('Kept'));
   const text = PlanFiles.serialize(samplePlan('Imported'));
 
-  let unlocked = false;
-  c.conn.setSubscriptionCheck(() => unlocked);
+  let tier = 'basic';
+  c.conn.setSubscriptionCheck(() => tier);
   const refused = [
     c.post('/api/plans', { plan: samplePlan('New') }),
     c.put(`/api/plans/${a.id}`, { plan: { ...a, name: 'Renamed' } }),
@@ -258,8 +258,27 @@ test('plans: without a subscription every edit answers 402, and reading and expo
   assert.equal(c.post('/api/plans/export-all', { path: all }).status, 200);
   assert.ok(fs.existsSync(one) && fs.existsSync(all));
 
-  // Subscribed again (or signed in later), edits go through.
-  unlocked = true;
+  // On Pro (an upgrade, or signed in later), edits go through.
+  tier = 'pro';
   add(c, samplePlan('After'));
   assert.equal(load(c).plans.length, 2);
+});
+
+test('app: with no subscription every /api/ request answers 402, plans and data alike', (t) => {
+  const c = makeClient(t);
+  add(c, samplePlan('Kept'));
+  let tier = 'none';
+  c.conn.setSubscriptionCheck(() => tier);
+  for (const r of [c.get('/api/plans'), c.get('/api/db/status'), c.get('/api/transactions')]) {
+    assert.deepEqual([r.status, r.body.error], [402, 'subscription_required']);
+  }
+  // An answer the shell doesn't recognise is no subscription, not a free pass.
+  tier = 'gold';
+  assert.equal(c.get('/api/plans').status, 402);
+
+  // Basic opens the app (and reads plans); Pro is needed only to change them.
+  tier = 'basic';
+  assert.equal(c.get('/api/plans').status, 200);
+  assert.equal(c.get('/api/db/status').status, 200);
+  assert.equal(c.post('/api/plans', { plan: samplePlan('New') }).status, 402);
 });

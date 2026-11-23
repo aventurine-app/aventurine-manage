@@ -98,6 +98,19 @@ function buildRouter(routes) {
       return { status: 423, body: { ok: false, error: 'db_locked' } };
     }
 
+    // Every version of the app is paid: below Basic nothing behind /api/
+    // answers (conn.js, "Subscription tiers"). The shell shows the sign-in page
+    // then, which asks nothing of the backend, so this only stops a page that
+    // was already open when the subscription ran out. A ctx without the check
+    // (unit tests' fakes) is not gated.
+    if (
+      typeof ctx.subscriptionTier === 'function' &&
+      ctx.subscriptionTier() === 'none' &&
+      path.startsWith('/api/')
+    ) {
+      return { status: 402, body: { ok: false, error: 'subscription_required' } };
+    }
+
     for (const r of compiled) {
       if (r.method !== method) continue;
       const m = r.regex.exec(path);

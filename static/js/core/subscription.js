@@ -1,21 +1,24 @@
 'use strict';
 
 // ─── Subscription state (window.Subscription) ───────────────────────────────
-// The one place page code asks "are subscriber features unlocked?". The main
+// The one place page code asks what the subscription unlocks. The main
 // process decides (electron/license.js, licensePolicy.js); this file keeps the
-// latest answer it was sent and hands it out.
+// latest answer it was sent and hands it out. All three are false (or 'none')
+// until the first answer arrives, and always in a plain browser (no bridge).
 //
-//   Subscription.unlocked()   true only with a valid, active license. False
-//                             until the first answer arrives, and always false
-//                             in a plain browser (no bridge).
+//   Subscription.tier()       'none', 'basic' or 'pro'
+//   Subscription.unlocked()   Basic or Pro: the app is open. Every page but
+//                             the sign-in page can assume it (main.js serves
+//                             that page below Basic).
+//   Subscription.pro()        Pro: Plan and every later Pro feature.
 //   Subscription.onState(fn)  fn(state) now if known, then on every change.
-//                             state: { signedIn, unlocked, email, status,
+//                             state: { signedIn, tier, unlocked, pro, paidTier, email, status,
 //                             renewsAt, cancelsAt, checkedAt, validUntil,
 //                             checking, error }
 //
-// Gating a feature:
+// Gating a Pro feature:
 //
-//   Subscription.onState(() => { button.hidden = !Subscription.unlocked(); });
+//   Subscription.onState(() => { button.hidden = !Subscription.pro(); });
 //
 // Read it on every change rather than once: the answer can arrive after the
 // page script runs, and signing in or out changes it without a reload.
@@ -37,7 +40,9 @@
     }
 
     window.Subscription = {
+        tier: () => (current && current.tier) || 'none',
         unlocked: () => Boolean(current && current.unlocked),
+        pro: () => Boolean(current && current.pro),
         onState(fn) {
             listeners.add(fn);
             if (current) fn(current);

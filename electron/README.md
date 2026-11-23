@@ -20,7 +20,8 @@ no rebuild step. (Drops `node_modules/` next to this README.)
 ## Running
 
 ```bash
-flatpak-spawn --host npm start    # the app
+flatpak-spawn --host npm start    # the app as Pro, without signing in (AVENTURINE_DEV_UNLOCK=1)
+flatpak-spawn --host npm run start:locked   # signed out: the sign-in page
 flatpak-spawn --host npm test     # backend test suite (host Node, no Electron)
 flatpak-spawn --host npm run smoke            # backend stack under real Electron
 flatpak-spawn --host npx electron scripts/verify-e2e.js   # boots the app, asserts from the renderer

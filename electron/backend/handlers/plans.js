@@ -27,10 +27,10 @@
 //   DELETE /api/plans/<id>                                -> { order, active }
 //   POST   /api/plans/<id>/export     { format, path }    -> { ok }     (json | csv)
 //
-// The Plan section is a subscriber feature (CLAUDE.md rule 16). Every route
-// that changes plans or goals asks ctx.requireSubscription() first and answers
-// 402 `subscription_required` without one. Reading and exporting do not: the
-// plans are the user's data, and a lapsed subscription never locks them in.
+// The Plan section is a Pro feature (CLAUDE.md rule 16). Every route that
+// changes plans or goals asks ctx.requireSubscription('pro') first and answers
+// 402 `subscription_required` on Basic. Reading and exporting do not: the plans
+// are the user's data, and dropping to Basic never locks them in.
 //
 // Exports write to a path from a native save dialog (main.js
 // `export-choose-path`), which approves it; any other path goes through
@@ -304,9 +304,9 @@ function exportAll(ctx, { body }) {
 // Literal segments ('order', 'goals', 'import', 'export-all') come before the
 // <id> patterns beside them. Plan ids are always '<letter>_<chars>'
 // (Plan.newId), so no plan can be named like one of them.
-/** `fn` behind the subscription (see the header). */
+/** `fn` behind Pro (see the header). */
 const subscriber = (fn) => (ctx, req) => {
-  ctx.requireSubscription();
+  ctx.requireSubscription('pro');
   return fn(ctx, req);
 };
 

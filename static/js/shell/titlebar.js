@@ -28,8 +28,10 @@
     // Save As / Unlock) reloads the page, so reading status once on load is
     // enough — no live updates to maintain. A locked DB still reports its
     // path, so the name shows behind the unlock prompt too.
+    // dbStatus is dbactions.js's, which the sign-in page doesn't load: it has
+    // no database to name.
     const titleEl = bar.querySelector('.titlebar-title');
-    if (titleEl) {
+    if (titleEl && typeof dbStatus === 'function') {
         dbStatus()
             .then(s => {
                 const p = s && typeof s.path === 'string' ? s.path : '';

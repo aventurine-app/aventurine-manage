@@ -56,23 +56,27 @@
         errorRow.hidden = !code;
     }
 
+    const TIER_NAMES = { basic: 'Basic', pro: 'Pro' };
+
     // One sentence on the subscription, then when it was last confirmed.
     function describe(s) {
         if (!s.email) return 'Checking your subscription…';
         let line;
         if (s.unlocked) {
-            if (s.status === 'complimentary') line = 'Active, complimentary.';
-            else if (s.cancelsAt) line = `Active until ${longDate(s.cancelsAt)}. It won’t renew.`;
-            else if (s.status === 'past_due') line = 'Active. Your last payment didn’t go through, so Paddle will try again. You can update your card from Aventurine Planner’s billing settings.';
-            else if (s.status === 'trialing') line = s.renewsAt ? `Free trial, until ${longDate(s.renewsAt)}.` : 'Free trial.';
-            else line = s.renewsAt ? `Active. Renews on ${longDate(s.renewsAt)}.` : 'Active.';
+            const name = TIER_NAMES[s.tier] || 'Active';
+            if (s.status === 'complimentary') line = `${name}, complimentary.`;
+            else if (s.cancelsAt) line = `${name}, until ${longDate(s.cancelsAt)}. It won’t renew.`;
+            else if (s.status === 'past_due') line = `${name}. Your last payment didn’t go through, so Paddle will try again. You can update your card from Paddle’s customer portal.`;
+            else if (s.status === 'trialing') line = s.renewsAt ? `${name}, free trial until ${longDate(s.renewsAt)}.` : `${name}, free trial.`;
+            else line = s.renewsAt ? `${name}. Renews on ${longDate(s.renewsAt)}.` : `${name}.`;
+            if (s.tier === 'basic') line += ' Aventurine Planner comes with Pro.';
         } else if (s.active) {
-            line = 'Not confirmed for 30 days. Connect to the internet and choose Check Now to unlock subscriber features again.';
+            line = 'Not confirmed for 30 days. Connect to the internet and choose Check Now to open Aventurine Manage again.';
         } else {
-            line = 'No active subscription. Subscriber features are locked; everything else works as usual.';
+            line = 'No active subscription. Aventurine Manage needs a Basic or Pro subscription.';
         }
         if (s.checking) return `${line} Checking…`;
-        if (s.error && s.unlocked) return `${line} Couldn’t check just now; subscriber features stay unlocked until ${longDate(s.validUntil)}.`;
+        if (s.error && s.unlocked) return `${line} Couldn’t check just now; this computer stays signed in until ${longDate(s.validUntil)}.`;
         return `${line} Last checked ${longDate(s.checkedAt)}.`;
     }
 
@@ -87,9 +91,10 @@
             statusText.textContent = describe(s);
             checkBtn.disabled = s.checking;
             checkBtn.textContent = s.checking ? 'Checking…' : 'Check Now';
-            // The status row's See Plans: only when there's nothing active.
+            // The status row's See Plans: when there's nothing active, or
+            // Basic, which can move up to Pro.
             pricingBtns.forEach(btn => {
-                if (btn.closest('[data-account-view="signed-in"]')) btn.hidden = Boolean(s.email && s.active);
+                if (btn.closest('[data-account-view="signed-in"]')) btn.hidden = Boolean(s.email && s.active && s.paidTier === 'pro');
             });
             // A failed background check is said in the status line, not as an error.
             if (s.error && !s.unlocked && s.email) showError(s.error);
@@ -164,7 +169,7 @@
         try {
             await license.signOut();
             emailInput.value = '';
-            UI.toast('Signed out. Subscriber features are locked on this computer.');
+            UI.toast('Signed out of your Aventurine account.');
         } catch (err) {
             console.error('[account] sign-out failed:', err);
             showError('server');

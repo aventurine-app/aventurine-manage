@@ -159,21 +159,34 @@ function createConn() {
     throw new ApiError('write_not_authorized', 403);
   }
 
-  // ─── Subscriber features ───────────────────────────────────────────────────
-  // The Electron shell injects the license's answer (setSubscriptionCheck,
-  // electron/license.js isUnlocked). requireSubscription() throws 402 when it
-  // says no; handlers call it before anything only subscribers may do (Plan
-  // edits, handlers/plans.js). With no check injected (host-Node tests, smoke)
-  // everything is allowed, as with the write guard above. Reading and exporting
-  // the user's own data never calls this: a lapsed license locks no data.
+  // ─── Subscription tiers ────────────────────────────────────────────────────
+  // The Electron shell injects the license's tier (setSubscriptionCheck,
+  // electron/license.js): 'none', 'basic' or 'pro'.
+  //   • Below Basic the app does not open: router.js answers every /api/
+  //     request 402 `subscription_required`, and the shell shows the sign-in
+  //     page instead of any other (main.js).
+  //   • Pro features call requireSubscription('pro') first, which throws the
+  //     same 402 for Basic (Plan edits, handlers/plans.js). Reading and
+  //     exporting plans don't: a Basic user keeps the plans they made on Pro.
+  // With no check injected (host-Node tests, smoke) the tier is Pro, as with
+  // the write guard above.
+  const TIER_ORDER = ['none', 'basic', 'pro'];
   let subscriptionCheck = null;
 
   function setSubscriptionCheck(fn) {
     subscriptionCheck = fn;
   }
 
-  function requireSubscription() {
-    if (subscriptionCheck && !subscriptionCheck()) throw new ApiError('subscription_required', 402);
+  function subscriptionTier() {
+    if (!subscriptionCheck) return 'pro';
+    const tier = subscriptionCheck();
+    return TIER_ORDER.includes(tier) ? tier : 'none';
+  }
+
+  function requireSubscription(need = 'pro') {
+    if (TIER_ORDER.indexOf(subscriptionTier()) < TIER_ORDER.indexOf(need)) {
+      throw new ApiError('subscription_required', 402);
+    }
   }
 
   /** Open + migrate + seed the DB named by current state (startup path).
@@ -386,7 +399,7 @@ function createConn() {
   return {
     state, init, db, statusPayload, switchTo, lock, rekey, closeAll,
     setWriteGuard, approveWrite, authorizeWrite,
-    setSubscriptionCheck, requireSubscription,
+    setSubscriptionCheck, subscriptionTier, requireSubscription,
   };
 }
 

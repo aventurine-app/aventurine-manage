@@ -130,12 +130,13 @@
     }
 
     // ── Subscription ───────────────────────────────────────────────────────
-    // The Plan section is a subscriber feature (CLAUDE.md rule 16). Locked,
-    // the page says why and how to unlock it, and the plans stay in the
-    // database file untouched; if there are any, it offers them as the
-    // Download All zip, because a lapsed subscription never locks data in.
-    // The backend holds the same line (handlers/plans.js answers every edit
-    // with 402), so this page is the explanation, not the lock. The
+    // The Plan section is a Pro feature (CLAUDE.md rule 16). On Basic the
+    // page says why and how to unlock it, and the plans stay in the database
+    // file untouched; if there are any, it offers them as the Download All
+    // zip, because dropping to Basic never locks data in. The backend holds
+    // the same line (handlers/plans.js answers every edit with 402), so this
+    // page is the explanation, not the lock. Below Basic this page never
+    // loads at all (main.js serves the sign-in page). The
     // subscription's state can arrive after this script runs and change
     // without a reload, so it is followed, not read once
     // (core/subscription.js).
@@ -148,10 +149,10 @@
         locked = document.createElement('div');
         locked.className = 'plan-locked ant-scope';
         locked.innerHTML = Ant.empty({
-            title: 'Aventurine Planner comes with an Aventurine subscription',
-            desc: 'Sign in with your subscription to plan here. Your plans are kept in this file either way.',
-            actionHtml: `<button class="ant-btn ant-btn-primary" type="button" data-act="sign-in">Sign in</button>
-                <button class="ant-btn ant-btn-default" type="button" data-act="pricing">See pricing</button>
+            title: 'Aventurine Planner comes with Aventurine Pro',
+            desc: 'Upgrade to Pro to plan here. Your plans are kept in this file either way.',
+            actionHtml: `<button class="ant-btn ant-btn-primary" type="button" data-act="pricing">See Pro</button>
+                <button class="ant-btn ant-btn-default" type="button" data-act="sign-in">Account</button>
                 <button class="ant-btn ant-btn-default" type="button" data-act="download" hidden>Download your plans</button>`,
         });
         locked.addEventListener('click', (e) => {
@@ -179,14 +180,14 @@
     } else {
         let booted = false;
         Subscription.onState(() => {
-            if (Subscription.unlocked()) {
+            if (Subscription.pro()) {
                 if (booted) return;
                 booted = true;
                 locked?.remove();
                 locked = null;
                 boot();
             } else if (booted) {
-                // Signed out, or the subscription lapsed, with the plans open.
+                // Dropped to Basic (or signed out) with the plans open.
                 location.reload();
             } else {
                 showLocked();

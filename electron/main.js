@@ -42,7 +42,11 @@ const PAGE_ROUTES = {
     // The Plan section (Aventurine Planner). The hash names its workspace:
     // /plan#plans, #goals, #analyze or #compare.
     '/plan':            'plan.html',
+    // Shown instead of every page above until the app is signed in with a
+    // Basic or Pro subscription (license.js; showPageForTier below).
+    '/signin':          'signin.html',
 };
+const SIGNIN_PATH = '/signin';
 
 // app:// must be registered as standard+secure BEFORE app.whenReady so the
 // renderer treats it as a normal origin (localStorage, fetch, etc.).
@@ -180,9 +184,10 @@ function startBackend() {
     // backend writes only to paths the renderer sends; for anything not chosen
     // through a native dialog (approveWrite, below), require an OS-level
     // confirmation the sandboxed renderer cannot forge or dismiss.
-    // Plan edits need an active subscription (handlers/plans.js). The license
-    // starts after the backend, so this reads it late.
-    conn.setSubscriptionCheck(() => Boolean(license && license.isUnlocked()));
+    // The subscription's tier: below Basic no API answers, and Plan edits need
+    // Pro (conn.js, "Subscription tiers"). The license starts after the
+    // backend, so this reads it late; until then the app is locked.
+    conn.setSubscriptionCheck(() => (license ? license.tier() : 'none'));
 
     conn.setWriteGuard({
         confirm: (filePath) => {
@@ -434,7 +439,11 @@ function registerAppProtocol() {
         catch { return new Response('bad request', { status: 400 }); }
 
         if (p in PAGE_ROUTES) {
-            return servePage(path.join(PAGES_DIR, PAGE_ROUTES[p]));
+            // Every version of the app is paid: below Basic, whatever page is
+            // asked for, the sign-in page is what loads (a reload, a link, a
+            // page left open when the subscription ran out).
+            const page = appUnlocked() ? PAGE_ROUTES[p] : PAGE_ROUTES[SIGNIN_PATH];
+            return servePage(path.join(PAGES_DIR, page));
         }
         if (p.startsWith('/static/')) {
             const file = safeJoin(STATIC_DIR, p.slice('/static/'.length));
@@ -442,6 +451,29 @@ function registerAppProtocol() {
         }
         return new Response('not found', { status: 404 });
     });
+}
+
+// ─── Sign-in gate ───────────────────────────────────────────────────────────
+// The app opens only with a Basic or Pro subscription (license.js). Below
+// that the window shows /signin, and when the subscription stops opening the
+// app this moves an open window there. The way back is the sign-in page's
+// own (static/js/shell/signin.js). The protocol handler above and the
+// backend's router hold the same line, so this is the view, not the lock.
+
+function appUnlocked() {
+    return Boolean(license) && license.tier() !== 'none';
+}
+
+function showPageForTier() {
+    const win = mainWindow;
+    if (!win || win.isDestroyed() || appUnlocked()) return;
+    let current = '';
+    try { current = new URL(win.webContents.getURL()).pathname; } catch { /* not loaded yet */ }
+    if (current === SIGNIN_PATH) return;
+    win.loadURL(`${APP_ORIGIN}${SIGNIN_PATH}`)
+        // No Back from the sign-in page into pages that can't load.
+        .then(() => win.webContents.navigationHistory.clear())
+        .catch((err) => console.error('[electron] showing the sign-in page failed:', err));
 }
 
 // ─── Window ─────────────────────────────────────────────────────────────────
@@ -510,7 +542,7 @@ async function createWindow() {
     mainWindow = win;
     win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
 
-    await win.loadURL(`${APP_ORIGIN}/`);
+    await win.loadURL(`${APP_ORIGIN}${appUnlocked() ? '/' : SIGNIN_PATH}`);
     return win;
 }
 
@@ -547,7 +579,7 @@ app.whenReady().then(async () => {
     // the page runs, and an IPC handler registered after that call is too late.
     initUpdater({ getWindow: () => mainWindow });
     // Same reason: Preferences → Account asks for the sign-in state on load.
-    license = initLicense({ getWindow: () => mainWindow });
+    license = initLicense({ getWindow: () => mainWindow, onTierChange: showPageForTier });
     await createWindow();
 
     // macOS: re-open the main window from the dock. No-op elsewhere.

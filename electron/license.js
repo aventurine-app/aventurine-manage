@@ -2,8 +2,9 @@
 
 // ─── Aventurine subscription ────────────────────────────────────────────────
 //
-// Signs the app in to an Aventurine account and keeps track of whether its
-// subscription is active, so subscriber features can be unlocked. The rules
+// Signs the app in to an Aventurine account and keeps track of what its
+// subscription buys: nothing (the app shows only its sign-in page), Basic
+// (Aventurine Manage) or Pro (Manage plus Plan and later Pro features). The rules
 // (which server, which key, what a license means, the saved file) are in
 // licensePolicy.js; this file does the requests, the timers and the IPC. The
 // renderer reaches it through window.electronLicense (preload.js); the UI is
@@ -15,7 +16,7 @@
 // the profile (licensePolicy.js, account.json).
 //
 // Checking: while signed in, the app asks for a fresh license 10 seconds after
-// launch and every 6 hours. A failed check changes nothing: the saved license
+// launch (at once if the saved one no longer opens the app) and every 6 hours. A failed check changes nothing: the saved license
 // keeps features unlocked until its validUntil (30 days after the last good
 // check). A 401 means the server no longer knows this device, so the app signs
 // out.
@@ -46,7 +47,7 @@ class AccountError extends Error {
     }
 }
 
-function initLicense({ getWindow }) {
+function initLicense({ getWindow, onTierChange = () => {} }) {
     const dir = app.getPath('userData');
     const config = policy.resolveLicenseConfig({ isPackaged: app.isPackaged, env: process.env });
 
@@ -62,9 +63,14 @@ function initLicense({ getWindow }) {
     function snapshot() {
         const described = policy.describeLicense(payload, Date.now());
         if (saved && !payload) Object.assign(described, { signedIn: true, email: null });
-        if (config.devUnlock) described.unlocked = true;
+        if (config.devUnlock) Object.assign(described, { tier: config.devUnlock, unlocked: true, pro: config.devUnlock === 'pro' });
         return { ...described, checking, error: lastError };
     }
+
+    // The main process swaps between the sign-in page and the app when the
+    // tier changes (main.js), so it hears about every change, not only the
+    // window.
+    let lastTier = snapshot().tier;
 
     // A license runs out at its validUntil without any check happening (a
     // month offline, say). Push the state at that moment too, so an open
@@ -83,8 +89,13 @@ function initLicense({ getWindow }) {
 
     function push() {
         watchExpiry();
+        const state = snapshot();
         const win = getWindow();
-        if (win && !win.isDestroyed()) win.webContents.send('license:status', snapshot());
+        if (win && !win.isDestroyed()) win.webContents.send('license:status', state);
+        if (state.tier !== lastTier) {
+            lastTier = state.tier;
+            onTierChange(state.tier);
+        }
     }
 
     // ── Requests ────────────────────────────────────────────────────────────
@@ -264,13 +275,16 @@ function initLicense({ getWindow }) {
     ipcMain.handle('license:sign-out', async () => { await signOut(); return snapshot(); });
     ipcMain.handle('license:open-pricing', () => shell.openExternal(policy.PRICING_URL));
 
-    if (saved) startChecks(FIRST_CHECK_DELAY_MS);
+    // A saved sign-in that no longer opens the app (a month offline, say) is
+    // checked at once: the user is looking at the sign-in page meanwhile.
+    if (saved) startChecks(snapshot().unlocked ? FIRST_CHECK_DELAY_MS : 0);
     watchExpiry();
-    if (config.devUnlock) console.log('[license] AVENTURINE_DEV_UNLOCK=1: subscriber features unlocked for this dev run');
+    if (config.devUnlock) console.log(`[license] AVENTURINE_DEV_UNLOCK: ${config.devUnlock} unlocked for this dev run`);
 
-    // For the main process: whether subscriber features are unlocked now. The
-    // backend asks it before every Plan edit (conn.setSubscriptionCheck).
-    return { isUnlocked: () => snapshot().unlocked };
+    // For the main process: the tier right now. The protocol handler serves
+    // the sign-in page below Basic, and the backend asks before every request
+    // (conn.setSubscriptionCheck).
+    return { tier: () => snapshot().tier };
 }
 
 module.exports = { initLicense };

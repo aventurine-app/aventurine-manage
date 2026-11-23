@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Aventurine Manage | Sign In</title>
+    <!-- @include head -->
+    <link rel="stylesheet" href="/static/css/signin.css">
+</head>
+<!-- What the window shows until the app is signed in with a Basic or Pro
+     subscription. Every version of Aventurine Manage is paid, so the main
+     process serves this page in place of any other below Basic (electron/main.js,
+     "Sign-in gate") and moves to the app once the license allows it.
+
+     It asks nothing of the backend, which refuses every request below Basic
+     anyway (router.js): no sidebar, no database chrome, no Preferences. The
+     form is Preferences → Account's (the same data-account-* hooks), driven by
+     the same static/js/shell/account.js. -->
+<body class="signin-body">
+    <!-- @include titlebar -->
+
+    <main class="signin">
+        <img class="signin-logo" src="/static/icons/logo/logo.svg" alt="" width="56" height="56" draggable="false">
+        <h1 class="signin-title">Sign in to Aventurine Manage</h1>
+        <p class="signin-lede">Aventurine Manage needs a Basic or Pro subscription. Sign in with the email you subscribed with, and we’ll send you a code.</p>
+
+        <div class="settings-card signin-card" data-account-section>
+            <form class="settings-row" data-account-view="email" novalidate>
+                <div class="settings-row-label">
+                    <label class="settings-row-name" for="account-email">Email</label>
+                </div>
+                <div class="account-form">
+                    <input class="enc-input" id="account-email" type="email" data-account-email
+                           autocomplete="email" spellcheck="false" placeholder="you@example.com" autofocus>
+                    <button class="button-primary" type="submit" data-account-send>Send Code</button>
+                </div>
+            </form>
+
+            <form class="settings-row" data-account-view="code" novalidate hidden>
+                <div class="settings-row-label">
+                    <label class="settings-row-name" for="account-code">Enter Your Code</label>
+                    <div class="settings-row-desc" data-account-code-desc></div>
+                </div>
+                <div class="account-form">
+                    <input class="enc-input account-code-input" id="account-code" type="text" data-account-code
+                           inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456">
+                    <button class="button-primary" type="submit" data-account-verify>Sign In</button>
+                    <button class="button-secondary" type="button" data-account-restart>Use Another Email</button>
+                </div>
+            </form>
+
+            <!-- Signed in, but the subscription doesn't open the app: it
+                 lapsed, or it hasn't been confirmed for 30 days. -->
+            <div class="settings-row" data-account-view="signed-in" hidden>
+                <div class="settings-row-label">
+                    <div class="settings-row-name">Signed In</div>
+                    <div class="settings-row-desc" data-account-email-text></div>
+                </div>
+                <button class="button-secondary" type="button" data-account-signout>Sign Out</button>
+            </div>
+            <div class="settings-row" data-account-view="signed-in" hidden>
+                <div class="settings-row-label">
+                    <div class="settings-row-name">Subscription</div>
+                    <div class="settings-row-desc" data-account-status role="status" aria-live="polite"></div>
+                </div>
+                <div class="update-actions">
+                    <button class="button-secondary" type="button" data-account-check>Check Now</button>
+                    <button class="button-primary" type="button" data-account-pricing hidden>See Plans</button>
+                </div>
+            </div>
+
+            <div class="settings-row" data-account-view="email">
+                <div class="settings-row-label">
+                    <div class="settings-row-name">No Subscription Yet?</div>
+                    <div class="settings-row-desc">Basic is Aventurine Manage. Pro adds Aventurine Planner.</div>
+                </div>
+                <button class="button-secondary" type="button" data-account-pricing>See Plans</button>
+            </div>
+            <div class="settings-row account-error-row" data-account-error-row hidden>
+                <div class="update-error" data-account-error role="alert"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Only what the sign-in form needs: toasts (ui.js, which uses escape.js),
+         the subscription state, the form, and the title bar's window controls.
+         None of them call the backend. -->
+    <script src="/static/js/core/escape.js"></script>
+    <script src="/static/js/shell/ui.js"></script>
+    <script src="/static/js/core/subscription.js"></script>
+    <script src="/static/js/shell/account.js"></script>
+    <script src="/static/js/shell/titlebar.js"></script>
+    <script src="/static/js/shell/signin.js"></script>
+</body>
+</html>
