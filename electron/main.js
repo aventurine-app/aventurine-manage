@@ -178,7 +178,20 @@ function startBackend() {
     const { createConn } = require('./backend/conn');
     const { dispatch } = require('./backend/routes');
     conn = createConn();
-    conn.init();
+    try {
+        conn.init();
+    } catch (err) {
+        // A database from a NEWER build: migrate.js climbs and never descends,
+        // so this install will never open that file. Don't strand the user —
+        // let them pick another database or start a new one (the file itself
+        // is left untouched for the newer version).
+        if (!(err && err.code === 'db_schema_too_new')) throw err;
+        if (!recoverFromUnopenableDb(conn.state.path)) {
+            const quit = new Error('quit');
+            quit.code = 'user_quit';
+            throw quit;
+        }
+    }
 
     // Renderer-trust-boundary containment for file writes (see conn.js). The
     // backend writes only to paths the renderer sends; for anything not chosen
@@ -216,6 +229,87 @@ function startBackend() {
         }
         return dispatch(conn, method, url, body ?? null);
     });
+}
+
+/**
+ * The database the app was about to open was written by a newer version.
+ * Offer: open another database, create a new one, or quit. Loops until a
+ * database opens (true) or the user quits (false). Runs before any window
+ * exists, so it uses the native dialogs only.
+ */
+function recoverFromUnopenableDb(badPath) {
+    const { validateFinanceDb } = require('./backend/handlers/database');
+    const { connect } = require('./backend/db');
+    const { defaultDbDir } = require('./backend/dbstate');
+    let current = badPath;
+
+    for (;;) {
+        const choice = dialog.showMessageBoxSync({
+            type:      'warning',
+            title:     'Aventurine Manage',
+            buttons:   ['Open Another Database…', 'Create New Database…', 'Quit'],
+            defaultId: 0,
+            cancelId:  2,
+            noLink:    true,
+            message:   'This database was created by a newer version of Aventurine Manage, so this version can’t open it.',
+            detail:    `${current || '(unknown location)'}\n\n`
+                     + 'Open a different database or create a new one. This file is left unchanged — '
+                     + 'install the newer version of Aventurine Manage to open it again.',
+        });
+        if (choice !== 0 && choice !== 1) return false;
+
+        let target;
+        if (choice === 0) {
+            const picked = dialog.showOpenDialogSync({
+                title:       'Open Database',
+                properties:  ['openFile'],
+                filters:     DB_FILE_FILTERS,
+                defaultPath: current ? path.dirname(current) : undefined,
+            });
+            if (!picked || !picked.length) continue;
+            target = picked[0];
+        } else {
+            target = dialog.showSaveDialogSync({
+                title:       'New Database',
+                defaultPath: path.join(defaultDbDir(current), 'finance.db'),
+                filters:     DB_FILE_FILTERS,
+            });
+            if (!target) continue;
+            if (fs.existsSync(target)) {
+                dialog.showErrorBox('Aventurine Manage',
+                    `A file already exists at that location:\n${target}\n\nChoose a new file name.`);
+                continue;
+            }
+        }
+
+        try {
+            if (choice === 0) {
+                // An encrypted file can't be checked without its passphrase;
+                // it opens locked and the unlock prompt checks it. A plaintext
+                // file must be a Manage database, or bootstrapSchema would
+                // write the app's tables into someone else's SQLite file.
+                const fd = fs.openSync(target, 'r');
+                const head = Buffer.alloc(16);
+                const n = fs.readSync(fd, head, 0, 16, 0);
+                fs.closeSync(fd);
+                if (n === 16 && head.toString('latin1') === 'SQLite format 3\x00') {
+                    const problem = validateFinanceDb(() => connect(target, null));
+                    if (problem) throw new Error(problem);
+                }
+            } else {
+                fs.mkdirSync(path.dirname(target), { recursive: true });
+            }
+            conn.openAtStartup(target, { create: choice === 1 });
+            return true;
+        } catch (err) {
+            if (err && err.code === 'db_schema_too_new') {
+                current = target;  // same problem, new file: ask again about it
+                continue;
+            }
+            dialog.showErrorBox('Aventurine Manage',
+                `Could not ${choice === 0 ? 'open' : 'create'} the database:\n${target}\n\n${err.message}`);
+        }
+    }
 }
 
 // ─── Window-control + zoom IPC (unchanged from the Flask era) ───────────────
@@ -556,20 +650,11 @@ app.whenReady().then(async () => {
     try {
         startBackend();
     } catch (err) {
-        console.error('[electron] backend failed to start:', err);
-        // A database from a NEWER build is the one startup failure the user can
-        // actually act on, and the action is not "try again" — migrate.js climbs
-        // and never descends, so this install will never open this file. Name the
-        // file and both ways out, rather than reporting it as a generic crash.
-        if (err && err.code === 'db_schema_too_new') {
-            const dbPath = (conn && conn.state && conn.state.path) || '(unknown location)';
-            dialog.showErrorBox('Aventurine Manage',
-                'This database was created by a newer version of Aventurine Manage, so this '
-                + 'version cannot open it.\n\n'
-                + `${dbPath}\n\n`
-                + 'Install the newer version of Aventurine Manage to open it — or rename this '
-                + 'file and Aventurine Manage will start again with a new, empty database.');
-        } else {
+        // A too-new database was already offered a way out in startBackend
+        // (recoverFromUnopenableDb); reaching here with user_quit means the
+        // user chose Quit there.
+        if (!(err && err.code === 'user_quit')) {
+            console.error('[electron] backend failed to start:', err);
             dialog.showErrorBox('Aventurine Manage', `The database backend failed to start:\n${err.message}`);
         }
         app.quit();

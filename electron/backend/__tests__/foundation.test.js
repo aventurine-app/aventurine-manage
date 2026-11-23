@@ -506,3 +506,50 @@ test('a successful migration cleans up its backup', () => {
   assert.ok(!fs.existsSync(`${file}.v13-premigration-bak`), 'backup removed on success');
   db.close();
 });
+
+// ─── Startup recovery from a database written by a newer build ──────────────
+// conn.openAtStartup is what main.js calls once the user picks another file or
+// a new one, so a too-new database no longer leaves the app unable to start.
+
+function tooNewFile() {
+  const file = tmpFile();
+  const db = connect(file);
+  bootstrapSchema(db);
+  db.pragma(`user_version = ${SCHEMA_VERSION + 1}`);
+  db.close();
+  return file;
+}
+
+function startupConn(dataDir) {
+  process.env.AVENTURINE_DATA_DIR = dataDir;
+  delete process.env.AVENTURINE_DB_PATH;
+  const { createConn } = require('../conn');
+  return createConn();
+}
+
+test('openAtStartup: a new database replaces a too-new one and becomes the pointer', () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-data-'));
+  const bad = tooNewFile();
+  fs.writeFileSync(path.join(dataDir, 'active-db.json'), JSON.stringify({ path: bad, encrypted: false }));
+  const conn = startupConn(dataDir);
+  assert.throws(() => conn.init(), (err) => err.code === 'db_schema_too_new');
+
+  const fresh = tmpFile();
+  conn.openAtStartup(fresh, { create: true });
+  assert.equal(conn.state.path, fresh);
+  assert.equal(conn.db().pragma('user_version', { simple: true }), SCHEMA_VERSION);
+  const ptr = JSON.parse(fs.readFileSync(path.join(dataDir, 'active-db.json'), 'utf8'));
+  assert.equal(ptr.path, fresh);
+  // The too-new file is left as it was.
+  const check = connect(bad);
+  assert.equal(check.pragma('user_version', { simple: true }), SCHEMA_VERSION + 1);
+  check.close();
+  conn.closeAll();
+});
+
+test('openAtStartup: picking another too-new file throws and keeps the pointer', () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-data-'));
+  const conn = startupConn(dataDir);
+  assert.throws(() => conn.openAtStartup(tooNewFile()), (err) => err.code === 'db_schema_too_new');
+  assert.ok(!fs.existsSync(path.join(dataDir, 'active-db.json')));
+});

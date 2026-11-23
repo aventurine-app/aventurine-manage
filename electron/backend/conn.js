@@ -104,6 +104,23 @@ function shredFile(p) {
   }
 }
 
+const SQLITE_MAGIC = Buffer.from('SQLite format 3\x00', 'latin1');
+
+/** A plaintext SQLite file starts with a fixed 16-byte header; a SQLCipher
+ *  file does not. An empty file counts as plaintext (SQLite will initialise
+ *  it). Read errors propagate. */
+function isEncryptedFile(p) {
+  const fd = fs.openSync(p, 'r');
+  try {
+    const header = Buffer.alloc(16);
+    const n = fs.readSync(fd, header, 0, 16, 0);
+    if (n === 0) return false;
+    return !(n === 16 && header.equals(SQLITE_MAGIC));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 function createConn() {
   const dbstate = createDbState();
   const { state } = dbstate;
@@ -389,6 +406,44 @@ function createConn() {
     return statusPayload();
   }
 
+  /**
+   * Startup recovery: make `p` the active database when the one the pointer
+   * named could not be opened (main.js — e.g. it was written by a newer
+   * build). `create` makes a new, empty, unencrypted database at `p` (the file
+   * must not exist yet). An existing encrypted file is adopted LOCKED, like
+   * any encrypted database at launch: the renderer's unlock prompt takes the
+   * passphrase. Throws on failure (SchemaTooNewError included) without saving
+   * the pointer, so the caller can offer the choice again.
+   */
+  function openAtStartup(p, { create = false } = {}) {
+    closeAll();
+    const encrypted = !create && isEncryptedFile(p);
+    state.path = p;
+    state.encrypted = encrypted;
+    state.key = null;
+    if (state.locked) {
+      dbstate.savePointer();
+      return;
+    }
+    let candidate = null;
+    try {
+      candidate = connect(p, null);
+      bootstrapSchema(candidate);
+      seedDefaults(candidate);
+    } catch (err) {
+      if (candidate) {
+        try { candidate.close(); } catch { /* already closed */ }
+      }
+      if (create) {
+        try { fs.unlinkSync(p); } catch { /* never created / already gone */ }
+      }
+      throw err;
+    }
+    handle = candidate;
+    secureChmod(p);
+    dbstate.savePointer();
+  }
+
   function closeAll() {
     if (handle) {
       try { handle.close(); } catch { /* already closed */ }
@@ -397,7 +452,7 @@ function createConn() {
   }
 
   return {
-    state, init, db, statusPayload, switchTo, lock, rekey, closeAll,
+    state, init, db, statusPayload, switchTo, lock, rekey, closeAll, openAtStartup,
     setWriteGuard, approveWrite, authorizeWrite,
     setSubscriptionCheck, subscriptionTier, requireSubscription,
   };

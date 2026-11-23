@@ -282,4 +282,4 @@ const routes = [
 
 // normalisePath is shared with the transactions-export route, which accepts
 // a user-chosen destination path under the same rules as create/open.
-module.exports = { routes, normalisePath };
+module.exports = { routes, normalisePath, validateFinanceDb };
