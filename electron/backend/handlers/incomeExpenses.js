@@ -5,7 +5,8 @@
 // write routes it shares with the Balance Sheet come from yearTable.js.
 
 const { yearEntryRoutes } = require('./yearTable');
-const { computedCells, manualCells, blendCells } = require('../services/statement');
+const { computedCells, manualCells, blendCells, tagCells } = require('../services/statement');
+const { listTags, serialiseTag } = require('../services/tags');
 
 function columnsPayload(db) {
   return db
@@ -36,8 +37,19 @@ function dataGet(ctx) {
   };
 }
 
+/** The statement's cells split by tag, for the Cash Flow Sankey's tag layer
+ *  (see services/statement.js tagCells), with the tags they name. */
+function dataTags(ctx) {
+  const db = ctx.db();
+  return {
+    tags: listTags(db).map(serialiseTag),
+    cells: tagCells(db),
+  };
+}
+
 const routes = [
   ['GET', '/api/data', dataGet],
+  ['GET', '/api/data/tags', dataTags],
   ...yearEntryRoutes({
     prefix: '/api',
     yearTable: 'active_years',

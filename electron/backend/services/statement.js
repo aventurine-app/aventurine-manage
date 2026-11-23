@@ -114,6 +114,49 @@ function blendCells(computed, manual) {
   return entries;
 }
 
+/**
+ * The tagged part of each computed cell, split by tag:
+ * {yearStr -> {monthName -> {catKey -> {tagId -> total}}}}. The Cash Flow
+ * Sankey's tag layer reads it. A transaction has at most one tag, so a cell's
+ * tag totals never add up to more than the cell itself; whatever is left over
+ * is untagged money.
+ *
+ * Only cells the statement computes from transactions are split. A cell a
+ * manual Entry overrides shows a hand-typed figure that no transaction backs,
+ * so splitting it by its transactions' tags would draw money the cell does not
+ * show. Such a cell carries no tags at all.
+ */
+function tagCells(db, years = null) {
+  const out = {};
+  const activeYears = years || activeYearSet(db);
+  if (!activeYears.size) return out;
+
+  const keyById = new Map(
+    db.prepare('SELECT id, "key" FROM categories').all().map((c) => [c.id, c.key])
+  );
+  const manual = manualCells(db);
+  // Reads only tagged rows through ix_transactions_tag_id, so a ledger with
+  // few tags costs little however large it is.
+  const groups = db.prepare(
+    `SELECT substr(date, 1, 7) AS ym, category_id, tx_type, tag_id, SUM(amount) AS total
+       FROM transactions
+      WHERE tag_id IS NOT NULL
+      GROUP BY substr(date, 1, 7), category_id, tx_type, tag_id`
+  ).all();
+
+  for (const g of groups) {
+    const year = g.ym.slice(0, 4);
+    if (!activeYears.has(year)) continue;
+    const month = VALID_MONTHS[parseInt(g.ym.slice(5, 7), 10) - 1];
+    const key = cellKey(g.category_id, g.tx_type, keyById);
+    if (!month || !key) continue;
+    if (manual[year]?.[month]?.[key] !== undefined) continue;
+    const tags = (((out[year] ??= {})[month] ??= {})[key] ??= {});
+    tags[g.tag_id] = (tags[g.tag_id] || 0) + g.total;
+  }
+  return out;
+}
+
 /** What the statement shows, cell for cell. The one call the reports make. */
 function statementCells(db) {
   return blendCells(computedCells(db), manualCells(db));
@@ -140,6 +183,7 @@ module.exports = {
   computedCells,
   manualCells,
   blendCells,
+  tagCells,
   statementCells,
   ensureActiveYear,
 };

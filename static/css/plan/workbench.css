@@ -64,8 +64,8 @@ div.page.plan-page {
     --island-inset: var(--space-20);
 }
 .builder > .plan-tabs { grid-row: 1; }
-.builder > .library { grid-row: 2; }
-.builder > .inspector { grid-row: 3; }
+.builder > .library { grid-row: 2; grid-column: 1; }
+.builder > .inspector { grid-row: 2 / 4; }
 .builder > .scrubber { grid-row: 4; }
 
 /* The module bar: a card as wide as its modules, 20px into the canvas. */
@@ -81,8 +81,19 @@ div.page.plan-page {
     box-shadow: var(--box-shadow-tertiary);
 }
 
-/* The inspector already floats; here it keeps to the grid's pad and gap. */
-.builder > .inspector { margin: 0; }
+/* The inspector already floats; here it keeps to the grid's pad and gap. It
+   starts at the top, beside the module bar, and runs down to the scrubber;
+   anything taller scrolls inside it (.insp-scroll) rather than growing it. */
+.builder > .inspector {
+    margin: 0;
+    align-self: start;
+    max-height: 100%;
+}
+/* While the inspector is open the module bar stops short of it (it scrolls
+   sideways when its modules don't fit). */
+.builder:has(> .inspector:not([data-collapsed="true"])) > .library {
+    max-width: calc(100% - var(--inspector-width) - var(--space-16));
+}
 
 /* The scrubber: a card across the bottom. */
 .builder > .scrubber {

@@ -2,11 +2,12 @@
 
 // ─── Transactions page ────────────────────────────────────────────────────────
 // The ledger, drawn in Ant Design (ant.css, widgets/ant.js). Above the table,
-// six filters: a search over descriptions and notes, a date range, Type,
-// Account and Category (each several values at once) and an Amount range. The
-// table is one page of the rows they leave, sortable by date, description or
-// amount, with a selection column. Two cells edit in place: a row's category
-// (a Select over the categories on its side of the ledger) and its note. Four
+// seven filters: a search over descriptions and notes, a date range, Type,
+// Account, Category and Tag (each several values at once) and an Amount range.
+// The table is one page of the rows they leave, sortable by date, description
+// or amount, with a selection column. Three cells edit in place: a row's
+// category (a Select over the categories on its side of the ledger), its tag
+// (widgets/txtags.js, which also holds the Manage tags dialog) and its note. Four
 // dialogs act on rows: Add transaction, Edit (one row field by field, several
 // as one change, with "apply to similar"), Import (widgets/txfileimport.js) and
 // Export (widgets/txexport.js).
@@ -17,9 +18,10 @@
 // State:
 //   state.rows        — every transaction, newest first (the API's order)
 //   state.categories  — the category vocabulary
+//   state.tags        — the tag vocabulary, [{ id, name }] alphabetical
 //   state.accounts    — the Balance Sheet accounts a row can belong to,
 //                       [{ key, label }] in column order
-//   state.filters     — the six filters; a blank value or an empty list is off.
+//   state.filters     — the seven filters; a blank value or an empty list is off.
 //                       Mirrored into the query string and the window's view
 //                       state on every change (see "Filters in the URL")
 //   state.sort        — { key: 'date' | 'description' | 'amount', order:
@@ -41,12 +43,13 @@
     const MATCH_DEFAULT = 0.8;
 
     const EMPTY_FILTERS = () => ({
-        name: '', dateFrom: '', dateTo: '', type: [], account: [], category: [], amountMin: '', amountMax: '',
+        name: '', dateFrom: '', dateTo: '', type: [], account: [], category: [], tag: [], amountMin: '', amountMax: '',
     });
 
     const state = {
         rows: [],
         categories: [],
+        tags: [],
         accounts: [],
         filters: EMPTY_FILTERS(),
         sort: { key: 'date', order: 'descend' },
@@ -57,7 +60,7 @@
     };
 
     // The widgets built once at start-up (see init()).
-    const ui = { dates: null, type: null, account: null, category: null, pager: null };
+    const ui = { dates: null, type: null, account: null, category: null, tag: null, pager: null };
 
     function readPageSize() {
         try {
@@ -94,6 +97,7 @@
             ]);
             state.rows = data.transactions || [];
             state.categories = data.categories || [];
+            state.tags = data.tags || [];
             state.accounts = (cols || []).map((c) => ({ key: c.key, label: c.label }));
         } catch (err) {
             console.error(err);
@@ -103,6 +107,7 @@
 
     // ─── Lookups and formats ─────────────────────────────────────────────────
     const catById = (id) => state.categories.find((c) => c.id === id) || null;
+    const tagById = (id) => (id == null ? null : state.tags.find((g) => g.id === id) || null);
     const accountLabel = (key) => state.accounts.find((a) => a.key === key)?.label ?? null;
     const label = (t) => t.display_name || t.description || '';
     // Money in or out: income is in; expenses and transfers go out.
@@ -140,6 +145,16 @@
         return `<span class="ant-tag ant-tag-hue tx-cat-tag" style="--ant-tag-hue: ${hue}">${esc(c.name)}</span>`;
     }
 
+    /** The Tag cell: the row's tag as the button that changes it or, with no
+     *  tag, an "Add tag" button that waits for the row to be pointed at or
+     *  focused (as an empty note's pencil does). */
+    function tagCellHtml(t, name) {
+        const tag = tagById(t.tag_id);
+        return tag
+            ? `<button type="button" class="tx-tag-btn" data-tag-edit aria-label="Tag: ${esc(tag.name)}. Change the tag of ${esc(name)}">${TxTags.tagHtml(tag.name)}</button>`
+            : `<button type="button" class="tx-tag-btn tx-tag-add" data-tag-edit aria-label="Tag ${esc(name)}">${Ant.icon('plus')}Add tag</button>`;
+    }
+
     function accountTag(key) {
         return `<span class="ant-tag ant-tag-filled tx-acct-tag">${esc(accountLabel(key) ?? 'No account')}</span>`;
     }
@@ -161,6 +176,11 @@
     const selectHtml = (inner, attrs = '', small = false) =>
         `<span class="ant-select${small ? ' ant-select-sm' : ''}"><select class="ant-select-selector" ${attrs}>${inner}</select><span class="ant-select-arrow">${Ant.icon('down')}</span></span>`;
 
+    /** A tag field: the text input TxTags.picker turns into a searchable
+     *  Select, drawn with the Selects' arrow so it reads as one of them. */
+    const tagFieldHtml = (attrs, small = false) =>
+        `<span class="ant-select${small ? ' ant-select-sm' : ''}"><input type="text" class="ant-input tx-tag-field" ${attrs}><span class="ant-select-arrow">${Ant.icon('down')}</span></span>`;
+
     function sortRows() {
         state.rows.sort((a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : b.id - a.id));
     }
@@ -180,6 +200,7 @@
         if (f.type.length && !f.type.includes(t.tx_type)) return false;
         if (f.account.length && !f.account.includes(t.account_key ?? 'none')) return false;
         if (f.category.length && !f.category.includes(t.category_id == null ? 'none' : String(t.category_id))) return false;
+        if (f.tag.length && !f.tag.includes(t.tag_id == null ? 'none' : String(t.tag_id))) return false;
         const min = parseAmount(f.amountMin);
         const max = parseAmount(f.amountMax);
         if (min !== null && t.amount < min) return false;
@@ -236,6 +257,9 @@
             <th class="tx-col-account">Account</th>
             <th class="tx-col-category">Category</th>
             ${sortableTh('amount', 'Amount', 'tx-col-amount ant-table-cell-end')}
+            <th class="tx-col-tag"><span class="tx-th-tag">Tag
+                <button type="button" class="ant-btn ant-btn-text ant-btn-sm ant-btn-icon-only tx-manage-tags" data-manage-tags
+                    aria-label="Manage tags" data-tip="Manage tags">${Ant.icon('setting')}</button></span></th>
             <th class="tx-col-notes">Notes</th>
         </tr>`;
     }
@@ -257,6 +281,7 @@
             <td class="tx-col-category"><button type="button" class="tx-cat-btn" data-cat-edit
                 aria-label="Category: ${esc(catById(t.category_id)?.name ?? 'Uncategorized')}. Change the category of ${esc(name)}">${categoryTag(t.category_id)}</button></td>
             <td class="tx-col-amount ant-table-cell-end${sorted('amount')}">${amountHtml(t)}</td>
+            <td class="tx-col-tag">${tagCellHtml(t, name)}</td>
             <td class="tx-col-notes"><div class="tx-notes${notes ? '' : ' tx-notes-empty'}">
                 <span class="tx-notes-text ant-typography-secondary" data-notes-edit>${esc(notes)}</span>
                 <button type="button" class="ant-typography-edit" data-notes-edit aria-label="Edit the note on ${esc(name)}" data-tip="Edit note">${Ant.icon('edit')}</button>
@@ -268,14 +293,14 @@
         const inner = state.rows.length
             ? Ant.empty({ title: 'No matching transactions', desc: 'Try clearing a filter.', action: { label: 'Clear filters', name: 'tx-clear-filters' } })
             : Ant.empty({ title: 'No transactions yet', desc: 'Import a bank export or add one by hand.', action: { label: 'Import transactions', name: 'tx-import' } });
-        return `<tr class="tx-empty-row"><td colspan="7">${inner}</td></tr>`;
+        return `<tr class="tx-empty-row"><td colspan="8">${inner}</td></tr>`;
     }
 
     function skeletonRows(n) {
         const cell = (w) => `<td><div class="skeleton skeleton-line sk-w-${w}"></div></td>`;
         return `<tr class="tx-skeleton-row"><td class="tx-col-select"></td>${cell(75)}
             <td class="tx-col-desc"><div class="tx-desc"><div class="skeleton skeleton-circle"></div><div class="skeleton skeleton-line sk-w-60"></div></div></td>
-            <td class="tx-col-account"><div class="skeleton skeleton-line sk-w-60"></div></td>${cell(50)}${cell(50)}<td class="tx-col-notes"></td></tr>`.repeat(n);
+            <td class="tx-col-account"><div class="skeleton skeleton-line sk-w-60"></div></td>${cell(50)}${cell(50)}<td class="tx-col-tag"></td><td class="tx-col-notes"></td></tr>`.repeat(n);
     }
 
     /** Redraw everything that follows the rows: the table, the pages, the
@@ -353,6 +378,7 @@
         ui.type.setValue(f.type);
         ui.account.setValue(f.account);
         ui.category.setValue(f.category);
+        ui.tag.setValue(f.tag);
     }
 
     function categoryFilterOptions() {
@@ -365,6 +391,8 @@
         }
         return items;
     }
+
+    const tagFilterOptions = () => [{ value: 'none', label: 'No tag' }, ...state.tags.map((g) => ({ value: String(g.id), label: g.name }))];
 
     const accountFilterOptions = () => [{ value: 'none', label: 'No account' }, ...state.accounts.map((a) => ({ value: a.key, label: a.label }))];
 
@@ -472,6 +500,13 @@
             options: categoryFilterOptions(),
             onChange: (v) => setFilters({ category: v }),
         });
+        ui.tag = Ant.multiSelect(document.getElementById('tx-filter-tag'), {
+            placeholder: 'Tag',
+            ariaLabel: 'Filter by tag',
+            search: true,
+            options: tagFilterOptions(),
+            onChange: (v) => setFilters({ tag: v }),
+        });
 
         document.getElementById('tx-amount-btn').addEventListener('click', (e) => openAmountPopover(e.currentTarget));
         document.getElementById('tx-clear-filters').addEventListener('click', clearFilters);
@@ -485,14 +520,16 @@
         syncUrl();
     }
 
-    /** After a reload: drop picks that name a category or an account that is
-     *  gone, and give the Selects the current lists. */
+    /** After a reload: drop picks that name a category, an account or a tag
+     *  that is gone, and give the Selects the current lists. */
     function reconcileFilters() {
         const f = state.filters;
         f.category = f.category.filter((c) => c === 'none' || catById(Number(c)));
         f.account = f.account.filter((a) => a === 'none' || accountLabel(a) !== null);
+        f.tag = f.tag.filter((g) => g === 'none' || tagById(Number(g)));
         ui.category.setOptions(categoryFilterOptions());
         ui.account.setOptions(accountFilterOptions());
+        ui.tag.setOptions(tagFilterOptions());
         syncControlsFromState();
     }
 
@@ -504,14 +541,15 @@
     // the sidebar (a bare /transactions) restores. Both hold the same string.
     //
     // Other pages link in pre-filtered: Cash Flow and Budgets send
-    // ?year=&month=&cat=<category key>, Recurring sends ?name=<merchant term>.
+    // ?year=&month=&cat=<category key>, Recurring sends ?name=<merchant term>,
+    // and the Cash Flow Sankey's tag bands send ?tag=<tag id>.
     // Those are explicit requests and beat anything remembered. Values travel
     // as stable keys and are checked against the live vocabulary on the way
     // in, so one naming something deleted since simply drops out.
     //
     // replaceState, never pushState: the search writes on every keystroke,
     // and narrowing a filter changes what is shown, not where you are.
-    const URL_PARAMS = ['year', 'month', 'from', 'to', 'name', 'type', 'cat', 'acct', 'min', 'max', 'page'];
+    const URL_PARAMS = ['year', 'month', 'from', 'to', 'name', 'type', 'cat', 'acct', 'tag', 'min', 'max', 'page'];
     const VIEW_KEY = 'transactions.filters';
     const csv = (raw) => (raw || '').split(',').map((s) => s.trim()).filter(Boolean);
     const isoParam = (raw) => (/^\d{4}-\d{2}-\d{2}$/.test(raw || '') ? raw : '');
@@ -528,6 +566,7 @@
         put('type', f.type.join(','));
         put('cat', f.category.map((v) => (v === 'none' ? 'none' : catById(Number(v))?.key || '')).filter(Boolean).join(','));
         put('acct', f.account.join(','));
+        put('tag', f.tag.join(','));
         if (state.page > 1) put('page', String(state.page));
         return params.toString();
     }
@@ -581,6 +620,10 @@
             return cat ? (cat.locked ? 'none' : String(cat.id)) : '';
         }).filter(Boolean))];
         f.account = csv(params.get('acct')).filter((a) => a === 'none' || accountLabel(a) !== null);
+        // Tags travel as ids (a rename keeps the link); one deleted since drops out.
+        f.tag = [...new Set(csv(params.get('tag'))
+            .map((v) => (v === 'none' ? 'none' : tagById(Number(v)) ? String(Number(v)) : ''))
+            .filter(Boolean))];
 
         const page = parseInt(params.get('page'), 10);
         state.page = Number.isInteger(page) && page > 0 ? page : 1;
@@ -630,7 +673,7 @@
         Ant.message.success(`Deleted ${plural(ids.length, 'transaction')}`);
     }
 
-    // ─── Editing in place: category and note ─────────────────────────────────
+    // ─── Editing in place: category, tag and note ────────────────────────────
     const rowById = (id) => state.rows.find((t) => t.id === id);
 
     function replaceRow(saved) {
@@ -686,6 +729,58 @@
         });
         sel.focus();
         try { sel.showPicker(); } catch { /* the Select is focused; Space opens it */ }
+    }
+
+    /** Add a tag just created to the vocabulary and the Tag filter's list. */
+    function addTag(tag) {
+        if (tagById(tag.id)) return;
+        state.tags = [...state.tags, tag].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        ui.tag.setOptions(tagFilterOptions());
+    }
+
+    // Tag: the cell turns into the tag picker (widgets/txtags.js), already
+    // open. Picking saves, creating a new tag first; Escape or leaving puts the
+    // cell back.
+    function editTag(td, t) {
+        td.innerHTML = tagFieldHtml(`aria-label="Tag of ${esc(label(t))}"`, true);
+        const input = td.querySelector('input');
+        let done = false;
+        const restore = (refocus) => {
+            if (done) return;
+            done = true;
+            if (refocus) renderKeepingFocus(t.id, '[data-tag-edit]');
+            else render();
+        };
+        // Registered before the picker's own keys, so Escape ends the edit
+        // outright rather than only closing the list.
+        input.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            e.stopPropagation();
+            restore(true);
+        });
+        const tag = tagById(t.tag_id);
+        TxTags.picker(input, {
+            tags: () => state.tags,
+            value: tag ? { kind: 'tag', id: tag.id, name: tag.name } : TxTags.NONE,
+            onChoose: async (choice) => {
+                if (done) return;
+                done = true;
+                try {
+                    const { tagId, created } = await TxTags.resolve(choice);
+                    if (created) addTag(created);
+                    if (tagId !== (t.tag_id ?? null)) {
+                        const { transaction } = await api(`/api/transactions/${t.id}`, { method: 'PUT', body: { tag_id: tagId } });
+                        replaceRow(transaction);
+                    }
+                } catch {
+                    Ant.message.error('The tag could not be saved.');
+                }
+                renderKeepingFocus(t.id, '[data-tag-edit]');
+            },
+            onBlur: () => restore(false),
+        });
+        input.focus();
     }
 
     // Note: Typography's editable text. A text area takes the note's place;
@@ -783,7 +878,7 @@
     // ─── Add transaction ─────────────────────────────────────────────────────
     // Money out or in first, since it decides which categories fit; then the
     // date and amount, the description (with the ledger's descriptions offered
-    // as it is typed), the account and the category, and a note. While the
+    // as it is typed), the account and the category, a tag and a note. While the
     // category is untouched, the description's learned or recognized category
     // fills it in, tagged as such.
     function openAddDialog() {
@@ -813,6 +908,8 @@
                     <span class="ant-tag ant-tag-processing tx-suggest-tag" hidden></span></span>
                     ${selectHtml('', 'data-f="category"')}</label>
             </div>
+            <label class="ant-form-item"><span class="ant-form-item-label">Tag</span>
+                ${tagFieldHtml('data-f="tag"')}</label>
             <label class="ant-form-item"><span class="ant-form-item-label">Notes</span>
                 <textarea class="ant-input tx-notes-field" data-f="notes" rows="1" maxlength="500"></textarea></label>`;
         const footer = `<button type="button" class="ant-btn ant-btn-default" data-act="cancel">Cancel</button>
@@ -859,6 +956,7 @@
         }, 250);
 
         fillCategories();
+        const tagPicker = TxTags.picker(field('tag'), { tags: () => state.tags });
         Ant.autocomplete(field('description'), {
             source: (q) => {
                 const needle = q.trim().toLowerCase();
@@ -902,7 +1000,11 @@
                 account_key: field('account').value || null,
                 notes: notes.value.trim(),
             };
-            const saved = await Ant.whileLoading(btn, () => api('/api/transactions', { method: 'POST', body: payload }));
+            const saved = await Ant.whileLoading(btn, async () => {
+                const { tagId, created } = await TxTags.resolve(tagPicker.value());
+                if (created) addTag(created);
+                return api('/api/transactions', { method: 'POST', body: { ...payload, tag_id: tagId } });
+            });
             if (!saved) {
                 Ant.message.error('The transaction could not be added.');
                 return;
@@ -932,14 +1034,20 @@
 
     // ─── Edit ────────────────────────────────────────────────────────────────
     // A wizard in one Modal. Step 1 edits: one row's date, amount and
-    // description, and for any number of rows the account, the category and
-    // the note, each starting at "Keep current" so only what is set changes.
+    // description, and for any number of rows the account, the category, the
+    // tag and the note, each starting at "Keep current" so only what is set
+    // changes. A tag typed that does not exist yet is created on Save.
     // The rows are listed under the fields as they will read, the changed
     // values in the primary colour. With a category set, "Apply to similar
     // transactions" adds a step that finds rows with close descriptions (the
     // match strength is a slider) and ticks them all to take the category too.
     // The last step says what will change, behind one Save.
     const KEEP = '__keep';
+    // A row's tag_id while the new tag it is to take has not been created yet.
+    const NEW_TAG = '__new_tag';
+
+    /** The tag_id a picker choice sets: null, an id, or NEW_TAG. */
+    const tagIdOf = (choice) => (choice.kind === 'none' ? null : choice.kind === 'tag' ? choice.id : NEW_TAG);
 
     function openEditDialog(ids) {
         const rows = state.rows.filter((t) => ids.includes(t.id));
@@ -975,12 +1083,14 @@
                     ${selectHtml(flow
                         ? `<option value="${KEEP}">${keepLabel}</option><option value="none">Uncategorized</option>${categoryOptionsHtml(flow)}`
                         : '<option value="">Mixed money in and out</option>', `data-e="category"${flow ? '' : ' disabled'}`)}</label>
-                <label class="ant-form-item tx-edit-wide"><span class="ant-form-item-label">Notes</span>
+                <label class="ant-form-item"><span class="ant-form-item-label">Tag</span>
+                    ${tagFieldHtml('data-e="tag"')}</label>
+                <label class="ant-form-item"><span class="ant-form-item-label">Notes</span>
                     <input type="text" class="ant-input" data-e="notes" maxlength="500" placeholder="${single ? '' : keepLabel}" value="${esc(single ? single.notes || '' : '')}"></label>
             </div>
             <div class="ant-table-wrapper tx-edit-preview">
                 <table class="ant-table ant-table-small ant-table-fixed">
-                    <thead><tr><th class="tx-p-date">Date</th><th>Description</th><th class="tx-p-acct">Account</th><th class="tx-p-cat">Category</th><th class="tx-p-amt ant-table-cell-end">Amount</th></tr></thead>
+                    <thead><tr><th class="tx-p-date">Date</th><th>Description</th><th class="tx-p-acct">Account</th><th class="tx-p-cat">Category</th><th class="tx-p-tag">Tag</th><th class="tx-p-amt ant-table-cell-end">Amount</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>`;
@@ -1002,6 +1112,13 @@
         const $ = (sel) => dialog.querySelector(sel);
         const control = (name) => $(`[data-e="${name}"]`);
         const cascadeBox = $('.tx-cascade input');
+        const singleTag = single && tagById(single.tag_id);
+        const tagPicker = TxTags.picker(control('tag'), {
+            tags: () => state.tags,
+            allowKeep: !single,
+            value: single ? (singleTag ? { kind: 'tag', id: singleTag.id, name: singleTag.name } : TxTags.NONE) : TxTags.KEEP,
+            onChoose: () => syncEditStep(),
+        });
         const nextBtn = $('[data-act="next"]');
 
         const target = () => (edit.category && edit.category !== 'none' ? Number(edit.category) : null);
@@ -1018,6 +1135,8 @@
             edit.account = acct === KEEP ? undefined : acct;
             const cat = control('category').value;
             edit.category = !flow || cat === KEEP ? undefined : cat;
+            const tag = tagPicker.value();
+            edit.tag = tag.kind === 'keep' ? undefined : tag;
             const notes = control('notes').value.trim();
             edit.notes = single ? notes : (notes || undefined);
         }
@@ -1037,6 +1156,7 @@
                     const id = edit.category === 'none' ? null : Number(edit.category);
                     if (id !== t.category_id) patch.category_id = id;
                 }
+                if (edit.tag !== undefined && tagIdOf(edit.tag) !== (t.tag_id ?? null)) patch.tag_id = tagIdOf(edit.tag);
                 if (edit.notes !== undefined && edit.notes !== (t.notes || '')) patch.notes = edit.notes;
                 if (Object.keys(patch).length) out.push({ id: t.id, patch, t });
             }
@@ -1063,11 +1183,14 @@
                 const acct = edit.account !== undefined ? edit.account || null : t.account_key;
                 const cat = edit.category !== undefined ? (edit.category === 'none' ? null : Number(edit.category)) : t.category_id;
                 const amount = single && edit.amount > 0 ? edit.amount : t.amount;
+                const tagName = edit.tag !== undefined ? (edit.tag.name ?? null) : tagById(t.tag_id)?.name ?? null;
+                const tagChanged = edit.tag !== undefined && tagIdOf(edit.tag) !== (t.tag_id ?? null);
                 return `<tr>
                     <td class="tx-num">${changed(date !== t.date, esc(formatDate(date)))}</td>
                     <td class="ant-table-cell-ellipsis" title="${esc(desc)}">${changed(single && edit.description !== t.description, esc(desc))}</td>
                     <td>${edit.account !== undefined ? changed(true, esc(accountLabel(acct) ?? 'No account')) : accountTag(acct)}</td>
                     <td>${categoryTag(cat)}</td>
+                    <td>${tagName ? changed(tagChanged, TxTags.tagHtml(tagName)) : changed(tagChanged, 'No tag')}</td>
                     <td class="ant-table-cell-end">${amountHtml({ ...t, amount })}</td></tr>`;
             }).join('');
         }
@@ -1202,6 +1325,9 @@
             const parts = [];
             if (edit.category !== undefined) parts.push(`category to ${edit.category === 'none' ? 'Uncategorized' : catById(Number(edit.category))?.name}`);
             if (edit.account !== undefined) parts.push(`account to ${accountLabel(edit.account || null) ?? 'No account'}`);
+            if (edit.tag !== undefined && changes().some((c) => 'tag_id' in c.patch)) {
+                parts.push(edit.tag.kind === 'none' ? 'the tag cleared' : `tag to ${edit.tag.name}${edit.tag.kind === 'new' ? ' (new)' : ''}`);
+            }
             if (edit.notes !== undefined && changes().some((c) => 'notes' in c.patch)) parts.push(edit.notes ? 'a new note' : 'the note cleared');
             if (single && changes().some((c) => 'date' in c.patch || 'description' in c.patch || 'amount' in c.patch)) {
                 parts.push('the date, description or amount edited');
@@ -1234,6 +1360,12 @@
             const cascading = cascade && target() ? [...picked] : [];
             saving = true;
             const ok = await Ant.whileLoading(nextBtn, async () => {
+                // A new tag is created only now, once, for every row taking it.
+                if (own.some((c) => c.patch.tag_id === NEW_TAG)) {
+                    const { tagId, created } = await TxTags.resolve(edit.tag);
+                    if (created) addTag(created);
+                    for (const c of own) if (c.patch.tag_id === NEW_TAG) c.patch.tag_id = tagId;
+                }
                 if (own.length) {
                     const { transactions } = await api('/api/transactions/bulk-update', {
                         method: 'POST', body: { updates: own.map(({ id, patch }) => ({ id, ...patch })) },
@@ -1292,6 +1424,10 @@
             document.querySelector(`[data-sort="${key}"]`)?.focus();
             return;
         }
+        if (e.target.closest('[data-manage-tags]')) {
+            TxTags.manage({ onChanged: () => reloadLedger({ keepPlace: true }) });
+            return;
+        }
         const empty = e.target.closest('[data-empty-action]');
         if (empty) {
             if (empty.dataset.emptyAction === 'tx-import') TxFileImport.run();
@@ -1303,6 +1439,7 @@
         const t = rowById(Number(tr.dataset.id));
         if (!t) return;
         if (e.target.closest('[data-cat-edit]')) editCategory(e.target.closest('td'), t);
+        else if (e.target.closest('[data-tag-edit]')) editTag(e.target.closest('td'), t);
         else if (e.target.closest('[data-notes-edit]')) editNotes(e.target.closest('td'), t);
     }
 
@@ -1321,6 +1458,7 @@
         if (f.type.length) out.tx_type = [...f.type];
         if (f.category.length) out.category_id = f.category.map((v) => (v === 'none' ? null : Number(v)));
         if (f.account.length) out.account_key = f.account.map((v) => (v === 'none' ? null : v));
+        if (f.tag.length) out.tag_id = f.tag.map((v) => (v === 'none' ? null : Number(v)));
         const min = parseAmount(f.amountMin);
         const max = parseAmount(f.amountMax);
         if (min !== null) out.amount_min = min;
@@ -1379,13 +1517,19 @@
 
     document.addEventListener('DOMContentLoaded', init);
 
-    // Re-fetch and redraw after an import.
-    window.addEventListener('transactions:reload', async () => {
-        state.selected.clear();
-        state.page = 1;
+    /** Re-fetch and redraw: after an import (back to the first page, nothing
+     *  ticked), and after Manage tags changed the vocabulary, since a rename,
+     *  merge or delete reaches rows on every page (`keepPlace`: stay put). */
+    async function reloadLedger({ keepPlace = false } = {}) {
+        if (!keepPlace) {
+            state.selected.clear();
+            state.page = 1;
+        }
         await load();
         reconcileFilters();
         render();
         syncUrl();
-    });
+    }
+
+    window.addEventListener('transactions:reload', () => reloadLedger());
 }());

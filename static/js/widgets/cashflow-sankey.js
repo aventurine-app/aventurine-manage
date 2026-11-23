@@ -9,14 +9,23 @@
 // category's total over the span on screen, and every ribbon is a gradient
 // running between the colours of the two bars it joins.
 //
+// Tags add one more junction at each outer edge. A category's tagged money
+// flows on to a node per tag, and a tag gathers from every category on its side
+// whose rows carry it, so "Vacation" shows what it took from Travel, Dining and
+// the rest. A transaction has at most one tag, so no money reaches two tag
+// nodes; untagged money simply ends at its category. A side with no tagged
+// money in the span draws no tag column at all, and the diagram is the
+// four-column one.
+//
 // Nothing balances the two sides here: they are two sums over the same span,
 // not one amount conserved through the diagram. So the channel is sized by the
 // income alone, and the outflow bar is sized by the spending — a year that
 // outspent its income reaches past the channel by the difference.
 //
-// Pure renderer — no dedicated backend. It reuses GET /api/data (the Cash Flow
-// table payload) and aggregates each category on the client, over the span the
-// header's joined year+month picker names: a whole year, or one month of it. Self-contained inline SVG, the same approach as
+// Pure renderer. It reuses GET /api/data (the Cash Flow table payload) and
+// GET /api/data/tags (the same cells split by tag) and aggregates each
+// category and tag on the client, over the span the header's joined
+// year+month picker names: a whole year, or one month of it. Self-contained inline SVG, the same approach as
 // forecast.js / dashboard.js (CSP-clean: no CDN library, no inline handlers). Styled
 // in forecast.css under the .cashflow-sankey namespace.
 //
@@ -68,12 +77,14 @@
   // take one end's colour, which left a seam at the other end.
   const NET_FALLBACK = '#4e5153';
   const INCOME_FALLBACK = ['#0a5b47', '#10744c', '#1a8b52', '#2ba25b', '#48b76b', '#72c983'];
+  const TAG_FALLBACK = '#c9c2b3';
 
   function readSankeyPalettes() {
     const cs = getComputedStyle(document.documentElement);
     const v = (name, fb) => cs.getPropertyValue(name).trim() || fb;
     return {
       net: v('--chart-net', NET_FALLBACK),
+      tag: v('--chart-tag', TAG_FALLBACK),
       income: INCOME_FALLBACK.map((fb, i) => v(`--chart-inflow-${i + 1}`, fb)),
       expense: ChartRamp.outflow(),
     };
@@ -137,6 +148,8 @@
 
   const state = {
     data: null,   // last /api/data payload
+    tagNames: new Map(),  // tag id → name, from /api/data/tags
+    tagCells: {},         // {year → {month → {catKey → {tagId → total}}}}
     year: null,   // selected year (number)
     month: null,  // selected month name, or null for the whole year
   };
@@ -155,6 +168,13 @@
     // band clicked while January is on screen does not open the whole year.
     const month = state.month ? `&month=${MONTHS.indexOf(state.month) + 1}` : '';
     return `/transactions?year=${state.year}${month}&cat=${encodeURIComponent(key)}`;
+  }
+
+  // A tag band links the same way, narrowed to its side of the ledger: a tag
+  // can carry income and spending both, and each side's band is only one.
+  function tagHref(id, type) {
+    const month = state.month ? `&month=${MONTHS.indexOf(state.month) + 1}` : '';
+    return `/transactions?year=${state.year}${month}&tag=${id}&type=${type}`;
   }
 
   // ─── Currency helpers ──────────────────────────────────────────────────────
@@ -179,9 +199,21 @@
   // ─── Data ───────────────────────────────────────────────────────────────────
 
   async function load() {
-    const res = await apiFetch('/api/data');
+    const [res, tagRes] = await Promise.all([
+      apiFetch('/api/data'),
+      apiFetch('/api/data/tags').catch((err) => { console.error(err); return null; }),
+    ]);
     if (!res.ok) return;
     state.data = await res.json();
+    // The tag layer is extra: without it the diagram is still whole.
+    if (tagRes && tagRes.ok) {
+      const tags = await tagRes.json();
+      state.tagNames = new Map((tags.tags || []).map((t) => [t.id, t.name]));
+      state.tagCells = tags.cells || {};
+    } else {
+      state.tagNames = new Map();
+      state.tagCells = {};
+    }
 
     const years = (state.data.years || []).slice().sort((a, b) => b - a);
     if (state.year === null || !years.includes(state.year)) {
@@ -223,6 +255,35 @@
     const expense = side('expense');
     const sum = (arr) => arr.reduce((a, c) => a + c.total, 0);
     return { income, expense, totalIncome: sum(income), totalExpense: sum(expense) };
+  }
+
+  /** The tag nodes for one side: the tagged money in `categories` (one side's
+   *  aggregate() output) over the same span, gathered per tag. Returns
+   *  [{ id, label, total, flows: [{ key, value }] }], where each flow is the
+   *  part of one category that carries the tag. */
+  function tagSide(categories, year, month) {
+    const months = state.tagCells[String(year)] || {};
+    const span = month ? [month] : MONTHS;
+    const onSide = new Set(categories.map((c) => c.key));
+    const byTag = new Map();   // tag id -> { id, label, total, flows: Map(key -> value) }
+    for (const m of span) {
+      for (const [key, tags] of Object.entries(months[m] || {})) {
+        if (!onSide.has(key)) continue;
+        for (const [rawId, value] of Object.entries(tags)) {
+          const id = Number(rawId);
+          const label = state.tagNames.get(id);
+          if (label === undefined || !(value > 0)) continue;
+          let node = byTag.get(id);
+          if (!node) byTag.set(id, (node = { id, label, total: 0, flows: new Map() }));
+          node.total += value;
+          node.flows.set(key, (node.flows.get(key) || 0) + value);
+        }
+      }
+    }
+    return [...byTag.values()].map((n) => ({
+      ...n,
+      flows: [...n.flows].map(([key, value]) => ({ key, value })),
+    }));
   }
 
   // ─── SVG builder ─────────────────────────────────────────────────────────────
@@ -267,13 +328,15 @@
     const k = boxW / W;   // 1 when the box was wide enough to lay out in directly
     const { income, expense, totalIncome, totalExpense } = aggregate(state.year, state.month);
     if (totalIncome <= 0 && totalExpense <= 0) return null; // caller → empty state
+    const incomeTags = tagSide(income, state.year, state.month);
+    const expenseTags = tagSide(expense, state.year, state.month);
 
     // Read fresh so an accent/theme swap retones the diagram.
-    const { net: NET_COLOR, income: INCOME_PALETTE, expense: EXPENSE_PALETTE } = readSankeyPalettes();
+    const { net: NET_COLOR, tag: TAG_COLOR, income: INCOME_PALETTE, expense: EXPENSE_PALETTE } = readSankeyPalettes();
 
-    // Tall enough that every category label on the busier side gets LABEL_GAP of
+    // Tall enough that every label in the busiest column gets LABEL_GAP of
     // vertical room, so the spread pass below never overlaps labels.
-    const labelRoom = Math.max(income.length, expense.length) * LABEL_GAP
+    const labelRoom = Math.max(income.length, expense.length, incomeTags.length, expenseTags.length) * LABEL_GAP
       + PAD.t + PAD.b + LABEL_MARGIN * 2 + 12;
     // Height comes from the BOX when the page gave it one (see the
     // #rep-panel-cashflow rules in forecast.css): the card is stretched to the
@@ -293,26 +356,36 @@
     const TOP = PAD.t + LABEL_MARGIN;
     const availH = H - TOP - PAD.b - LABEL_MARGIN;
 
-    // One value→px scale shared by all four columns so band widths line up. Each
-    // side column also needs its inter-node gaps to fit, so take the tightest.
-    // Each term already caps its own side at availH, and the two hub bars are
-    // sized off those same totals, so nothing else needs clamping here.
+    // One value→px scale shared by every column so band widths line up. Each
+    // stacked column also needs its inter-node gaps to fit, so take the
+    // tightest. Each term already caps its own column at availH, and the two hub
+    // bars are sized off the side totals, so nothing else needs clamping here.
     const gaps = (n) => Math.max(0, n - 1) * GAP;
+    const fit = (nodes, total) => (availH - gaps(nodes.length)) / (total || 1);
+    const sum = (nodes) => nodes.reduce((a, n) => a + n.total, 0);
     const scale = Math.min(
-      (availH - gaps(income.length)) / (totalIncome || 1),
-      (availH - gaps(expense.length)) / (totalExpense || 1)
+      fit(income, totalIncome),
+      fit(expense, totalExpense),
+      incomeTags.length ? fit(incomeTags, sum(incomeTags)) : Infinity,
+      expenseTags.length ? fit(expenseTags, sum(expenseTags)) : Infinity
     );
 
     // FOUR columns, not three: the income bars, the bar their total gathers
     // into, the bar the expenses leave from, and the expense bars. That gives
     // the total a CHANNEL across the middle instead of a single bar the two
-    // fans meet at, so the diagram reads as three stages of one journey. The
-    // span between the side columns is split into three equal ribbon runs.
-    const incomeX = EDGE_PAD;
-    const expenseX = W - EDGE_PAD - NODE_W;
-    const run = Math.max(0, (expenseX - incomeX - NODE_W * 3) / 3);
-    const hubInX = incomeX + NODE_W + run;      // where the income arrives
-    const hubOutX = hubInX + NODE_W + run;      // where the expenses leave
+    // fans meet at, so the diagram reads as three stages of one journey. A side
+    // with tagged money adds its tag column at the outer edge. The width
+    // between the outermost columns is split into equal ribbon runs.
+    const columns = 4 + (incomeTags.length ? 1 : 0) + (expenseTags.length ? 1 : 0);
+    const run = Math.max(0, (W - EDGE_PAD * 2 - NODE_W * columns) / (columns - 1));
+    let nextX = EDGE_PAD;
+    const column = () => { const x = nextX; nextX += NODE_W + run; return x; };
+    const incomeTagX = incomeTags.length ? column() : null;
+    const incomeX = column();
+    const hubInX = column();       // where the income arrives
+    const hubOutX = column();      // where the expenses leave
+    const expenseX = column();
+    const expenseTagX = expenseTags.length ? column() : null;
     // Each hub bar is sized to the total it actually seats: the inflow bar to
     // the income that stacks against it, the outflow bar to the expenses that
     // leave it. The CHANNEL between them stays at the inflow height, because
@@ -347,6 +420,37 @@
 
     const incomeNodes = layoutSide(income, incomeX, INCOME_PALETTE);
     const expenseNodes = layoutSide(expense, expenseX, EXPENSE_PALETTE);
+
+    // A tag column is placed by where its money comes from: each tag aims for
+    // the value-weighted mean height of the categories feeding it, so a tag fed
+    // by one category sits level with it and its ribbon runs nearly straight.
+    // Where two tags would overlap, the later one is pushed down by GAP (the
+    // same spacing every stacked column keeps); a column that then runs past
+    // the bottom is settled back upward from its end.
+    const layoutTags = (tags, parents, x) => {
+      const centre = new Map(parents.map((n) => [n.key, n.y + n.h / 2]));
+      const aim = (t) => t.flows.reduce((a, f) => a + centre.get(f.key) * f.value, 0) / t.total;
+      const nodes = tags
+        .map((t) => {
+          const h = Math.max(t.total * scale, MIN_BAND);
+          return { ...t, x, h, y: aim(t) - h / 2, color: TAG_COLOR };
+        })
+        .sort((a, b) => a.y - b.y);
+      const bottom = TOP + availH;
+      let floor = TOP;
+      for (const n of nodes) {
+        n.y = Math.max(n.y, floor);
+        floor = n.y + n.h + GAP;
+      }
+      let ceiling = bottom;
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        nodes[i].y = Math.min(nodes[i].y, ceiling - nodes[i].h);
+        ceiling = nodes[i].y - GAP;
+      }
+      return nodes;
+    };
+    const incomeTagNodes = incomeTags.length ? layoutTags(incomeTags, incomeNodes, incomeTagX) : [];
+    const expenseTagNodes = expenseTags.length ? layoutTags(expenseTags, expenseNodes, expenseTagX) : [];
 
     // Nodes + labels. GAP already holds adjacent bands a label's height apart, so
     // in the normal case every label lands on its own band's centreline. This pass
@@ -398,10 +502,12 @@
     };
     // A side bar as a path: the two corners on the card-edge side are rounded,
     // the two on the ribbon side are square. outer: -1 → rounded on the left
-    // (income), +1 → rounded on the right (expense).
+    // (income), +1 → rounded on the right (expense), 0 → square all round, for
+    // a category bar with tag ribbons leaving its outer face too.
     const capPath = (x, y, w, h, outer) => {
       const r = Math.min(CAP_R, h / 2, w / 2);
       const x0 = r1(x), x1 = r1(x + w), y0 = r1(y), y1 = r1(y + h);
+      if (outer === 0) return `M ${x0} ${y0} L ${x1} ${y0} L ${x1} ${y1} L ${x0} ${y1} Z`;
       if (outer < 0) {
         return `M ${x1} ${y0} L ${r1(x + r)} ${y0} Q ${x0} ${y0} ${x0} ${r1(y + r)}`
              + ` L ${x0} ${r1(y + h - r)} Q ${x0} ${y1} ${r1(x + r)} ${y1} L ${x1} ${y1} Z`;
@@ -417,7 +523,7 @@
     // dir points from the bar toward its labels, which sit on the INNER face:
     // +1 → income (labels to the right, over the ribbon), -1 → expense (labels
     // to the left).
-    const sideMarkup = (sideNodes, anchor, dir, isIncome) => {
+    const sideMarkup = (sideNodes, anchor, dir, isIncome, rounded) => {
       const labelYs = spreadLabels(sideNodes);
       let waves = '';
       let bars = '';
@@ -458,15 +564,83 @@
         waves += g;
 
         // Bare node cap, painted on top of the waves layer (outside the link).
-        bars += `<path class="sankey-node" d="${capPath(n.x, n.y, NODE_W, n.h, -dir)}" fill="${n.color}">`
+        bars += `<path class="sankey-node" d="${capPath(n.x, n.y, NODE_W, n.h, rounded ? -dir : 0)}" fill="${n.color}">`
               + `<title>${escapeHtml(n.label)}: ${fmtMoney(n.total)}</title></path>`;
         slot += h;
       });
       return { waves, bars };
     };
 
-    const inc = sideMarkup(incomeNodes, 'start', 1, true);
-    const exp = sideMarkup(expenseNodes, 'end', -1, false);
+    const inc = sideMarkup(incomeNodes, 'start', 1, true, !incomeTagNodes.length);
+    const exp = sideMarkup(expenseNodes, 'end', -1, false, !expenseTagNodes.length);
+
+    // The tag junction on one side. Ribbons run between each category's OUTER
+    // face and the tags it feeds: on the category, its tags stack in the tag
+    // column's order; on the tag, its categories stack in theirs, so the two
+    // ends keep the same order and ribbons cross only where they must. Each tag
+    // is one link (its ribbons and its label) to its rows in the ledger, and
+    // its label hangs off its inner face over those ribbons, as a category's
+    // does over its own.
+    const tagMarkup = (tagNodes, parents, isIncome) => {
+      if (!tagNodes.length) return { waves: '', bars: '' };
+      const sideTotal = isIncome ? totalIncome : totalExpense;
+      const parentAt = new Map(parents.map((n, i) => [n.key, i]));
+      const catSlot = new Map(parents.map((n) => [n.key, n.y]));
+      // `${key}|${tagId}` -> where that ribbon meets its category. Filled in tag
+      // order, so each category's stack follows the tag column's.
+      const catY = new Map();
+      for (const t of tagNodes) {
+        for (const f of [...t.flows].sort((a, b) => parentAt.get(a.key) - parentAt.get(b.key))) {
+          const y = catSlot.get(f.key);
+          catY.set(`${f.key}|${t.id}`, y);
+          catSlot.set(f.key, y + f.value * scale);
+        }
+      }
+      const labelYs = spreadLabels(tagNodes);
+      const dir = isIncome ? 1 : -1;
+      let waves = '';
+      let bars = '';
+      tagNodes.forEach((t, i) => {
+        const money = fmtMoney(t.total);
+        const aria = `${t.label}: ${money} of ${isIncome ? 'income' : 'spending'} — view its transactions for ${state.year}`;
+        let g = `<a class="sankey-cat" href="${escapeHtml(tagHref(t.id, isIncome ? 'income' : 'expense'))}" tabindex="0" role="link" aria-label="${escapeHtml(aria)}">`
+              + `<title>${escapeHtml(t.label)}: ${money}</title>`;
+        let slot = t.y;
+        for (const f of [...t.flows].sort((a, b) => parentAt.get(a.key) - parentAt.get(b.key))) {
+          const parent = parents[parentAt.get(f.key)];
+          const h = f.value * scale;
+          const bh = Math.max(h, MIN_BAND);
+          const y = catY.get(`${f.key}|${t.id}`);
+          const d = isIncome
+            ? ribbon(t.x + NODE_W, slot, parent.x, y, bh)
+            : ribbon(parent.x + NODE_W, y, t.x, slot, bh);
+          const fill = isIncome
+            ? rampFill(t.x + NODE_W, parent.x, TAG_COLOR, parent.color)
+            : rampFill(parent.x + NODE_W, t.x, parent.color, TAG_COLOR);
+          g += `<path class="sankey-link" d="${d}" fill="${fill}"></path>`;
+          slot += h;
+        }
+        const cy = t.y + t.h / 2;
+        const ly = labelYs[i];
+        const edgeX = isIncome ? t.x + NODE_W : t.x;
+        const labelX = edgeX + dir * LABEL_OFFSET;
+        const anchor = isIncome ? 'start' : 'end';
+        if (Math.abs(ly - cy) > 1) {
+          g += `<path class="sankey-leader" d="M ${r1(edgeX)} ${r1(cy)} L ${r1(labelX)} ${r1(ly)}" fill="none"/>`;
+        }
+        const share = fmtShare(t.total, sideTotal);
+        g += `<text class="sankey-label" x="${labelX}" y="${r1(ly - 3)}" text-anchor="${anchor}">${escapeHtml(t.label)}</text>`
+           + `<text class="sankey-amount" x="${labelX}" y="${r1(ly + 13)}" text-anchor="${anchor}">${escapeHtml(money)}`
+           + (share ? ` <tspan class="sankey-share">${escapeHtml(share)}</tspan>` : '')
+           + '</text></a>';
+        waves += g;
+        bars += `<path class="sankey-node sankey-node-tag" d="${capPath(t.x, t.y, NODE_W, t.h, -dir)}" fill="${t.color}">`
+              + `<title>${escapeHtml(t.label)}: ${money}</title></path>`;
+      });
+      return { waves, bars };
+    };
+    const incTags = tagMarkup(incomeTagNodes, incomeNodes, true);
+    const expTags = tagMarkup(expenseTagNodes, expenseNodes, false);
     // The middle stage: an inflow bar, an outflow bar, and the channel running
     // straight across between them at the inflow height. None of it is a
     // category, so none of it is a link; ribbons meet both bars on both faces,
@@ -480,8 +654,9 @@
                   + ` d="${ribbon(hubInX + NODE_W, inflowTop, hubOutX, inflowTop, inflowH)}"`
                   + ` fill="${NET_COLOR}">${inflowTitle}</path>`;
 
-    const waves = channel + inc.waves + exp.waves;  // bottom layer: ribbons + labels (clickable)
-    let bars = inc.bars + exp.bars;                 // top layer: bare node caps
+    // bottom layer: ribbons + labels (clickable); top layer: bare node caps
+    const waves = channel + inc.waves + exp.waves + incTags.waves + expTags.waves;
+    let bars = inc.bars + exp.bars + incTags.bars + expTags.bars;
 
     const hubBar = (x, y, h, title) =>
       `<rect class="sankey-node sankey-node-center" x="${r1(x)}" y="${r1(y)}"`

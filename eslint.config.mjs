@@ -110,10 +110,11 @@ const appGlobals = {
   // pages/stmtmanagers.js (the Statements page's Manage Years / Manage Columns)
   StatementManagers: 'readonly',
   // widgets/txparse.js (pure parsing core; also require()d by the backend
-  // test suite) / txfileimport.js / txexport.js
+  // test suite) / txfileimport.js / txexport.js / txtags.js
   TxParse: 'readonly',
   TxFileImport: 'readonly',
   TxFileExport: 'readonly',
+  TxTags: 'readonly',
   // widgets/onboarding.js (first-run setup; loaded by Home only)
   Onboarding: 'readonly',
   // electron/preload.js contextBridge surface (undefined in plain browsers;

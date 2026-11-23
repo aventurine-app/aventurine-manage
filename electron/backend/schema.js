@@ -17,7 +17,7 @@
 //   - the v_* views pre-join the normalized tables into human-readable,
 //     chronologically-sortable shapes for ad-hoc querying.
 
-const SCHEMA_VERSION = 22;
+const SCHEMA_VERSION = 23;
 
 // Months persist as 1-12 integers so `ORDER BY year, month` sorts
 // chronologically (the app translates to/from English names at its API
@@ -161,6 +161,16 @@ const DDL = [
      PRIMARY KEY (id),
      FOREIGN KEY (account_id) REFERENCES portfolio_accounts (id)
    )`,
+  `CREATE TABLE tags (
+     -- Transaction tags: free-form labels a user gives transactions, a second
+     -- grouping beside the category (a trip, a project, "reimbursable"). A
+     -- transaction carries at most one (transactions.tag_id), so splitting a
+     -- report by tag never counts the same money twice. Names are unique
+     -- ignoring case (ix_tags_name).
+     id INTEGER NOT NULL,
+     name VARCHAR(30) NOT NULL,
+     PRIMARY KEY (id)
+   )`,
   `CREATE TABLE transactions (
      -- The transaction ledger. category_id NULL means uncategorized. amount is a
      -- positive magnitude in dollars (rounded to cents at write); direction is
@@ -178,6 +188,9 @@ const DDL = [
                                -- balance_columns."key"); NULL = unassigned. One
                                -- import = one account; powers dedup scoping and
                                -- per-account spend (e.g. the Credit Cards tool).
+     tag_id INTEGER REFERENCES tags (id),  -- the row's one tag; NULL = untagged.
+                               -- Declared inline because ADD COLUMN (the v23
+                               -- migration) can only add it in this position.
      PRIMARY KEY (id),
      FOREIGN KEY (category_id) REFERENCES categories (id),
      FOREIGN KEY (account_key) REFERENCES balance_columns ("key")
@@ -298,6 +311,8 @@ const DDL = [
   // covering a column that appears only inside an indexed expression.
   `CREATE INDEX ix_transactions_month_cat ON transactions (substr(date, 1, 7), category_id, tx_type, amount, date)`,
   `CREATE INDEX ix_forecast_planned_date ON forecast_planned (date)`,
+  `CREATE UNIQUE INDEX ix_tags_name ON tags (name COLLATE NOCASE)`,
+  `CREATE INDEX ix_transactions_tag_id ON transactions (tag_id)`,
 
   // ── Convenience views ──────────────────────────────────────────────────────
   // Read-only, pre-joined shapes for users querying the DB directly. They add
@@ -325,10 +340,13 @@ const DDL = [
        c.name  AS category_name,
        t.account_key,
        bc.label AS account_name,
+       t.tag_id,
+       tg.name AS tag_name,
        t.notes
      FROM transactions t
      LEFT JOIN categories c ON c.id = t.category_id
-     LEFT JOIN balance_columns bc ON bc."key" = t.account_key`,
+     LEFT JOIN balance_columns bc ON bc."key" = t.account_key
+     LEFT JOIN tags tg ON tg.id = t.tag_id`,
 
   `CREATE VIEW v_cash_flow AS
      -- Cash Flow manual entries (per-cell overrides of the transaction-computed

@@ -5,6 +5,7 @@
 // strings end-to-end.
 
 const { isFiniteNumber, parseIsoDate, round2 } = require('../validate');
+const { getTag } = require('./tags');
 
 const TX_TYPES = ['income', 'expense', 'transfer'];
 
@@ -29,6 +30,7 @@ function serialiseTx(t, catTypeById = null) {
     amount: t.amount,
     notes: t.notes,
     account_key: t.account_key ?? null,
+    tag_id: t.tag_id ?? null,
   };
 }
 
@@ -101,6 +103,14 @@ function applyTxFields(db, t, data, { requireAll }) {
     }
     t.account_key = val;
   }
+  if ('tag_id' in data) {
+    const val = data.tag_id;
+    if (val !== null) {
+      if (!Number.isInteger(val)) return 'invalid tag_id';
+      if (!getTag(db, val)) return 'unknown tag_id';
+    }
+    t.tag_id = val;
+  }
   return null;
 }
 
@@ -113,8 +123,8 @@ function insertTx(db, t) {
   let stmt = insertStmts.get(db);
   if (!stmt) {
     stmt = db.prepare(
-      `INSERT INTO transactions (date, description, display_name, category_id, tx_type, amount, notes, account_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO transactions (date, description, display_name, category_id, tx_type, amount, notes, account_key, tag_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     insertStmts.set(db, stmt);
   }
@@ -126,7 +136,8 @@ function insertTx(db, t) {
       t.tx_type ?? 'expense',
       t.amount ?? 0,
       t.notes ?? '',
-      t.account_key ?? null
+      t.account_key ?? null,
+      t.tag_id ?? null
     );
   t.id = info.lastInsertRowid;
   return t;
@@ -136,9 +147,12 @@ function insertTx(db, t) {
 function updateTx(db, t) {
   db.prepare(
     `UPDATE transactions
-        SET date = ?, description = ?, display_name = ?, category_id = ?, tx_type = ?, amount = ?, notes = ?, account_key = ?
+        SET date = ?, description = ?, display_name = ?, category_id = ?, tx_type = ?, amount = ?, notes = ?, account_key = ?, tag_id = ?
       WHERE id = ?`
-  ).run(t.date, t.description, t.display_name ?? null, t.category_id, t.tx_type, t.amount, t.notes, t.account_key ?? null, t.id);
+  ).run(
+    t.date, t.description, t.display_name ?? null, t.category_id, t.tx_type, t.amount, t.notes,
+    t.account_key ?? null, t.tag_id ?? null, t.id
+  );
 }
 
 /** Fresh tx object carrying the table's column defaults. */
@@ -153,6 +167,7 @@ function newTx() {
     amount: 0,
     notes: '',
     account_key: null,
+    tag_id: null,
   };
 }
 

@@ -18,6 +18,7 @@ const {
   accountExists,
 } = require('../services/transactions');
 const { serialiseCategory } = require('../services/categories');
+const { listTags, serialiseTag } = require('../services/tags');
 const {
   recordMatch,
   forgetMatch,
@@ -42,7 +43,8 @@ const { adoptAccount } = require('../services/accounts');
 const MAX_LIST_LIMIT = 100;
 
 /**
- * The ledger, newest first, with the categories its rows' ids resolve to.
+ * The ledger, newest first, with the categories and tags its rows' ids
+ * resolve to.
  *
  * With no query this is every row, which is what the Transactions page loads.
  * `limit` bounds it for a reader that wants only the newest rows: the
@@ -70,6 +72,7 @@ function list(ctx, { query = {} } = {}) {
   return {
     transactions: rows.map((t) => serialiseTx(t, catTypes)),
     categories: cats.map(serialiseCategory),
+    tags: listTags(db).map(serialiseTag),
   };
 }
 
@@ -643,9 +646,9 @@ const EXPORT_CHUNK = 500;
 // and the renderer use, so the file matches what the table shows.
 const EXPORT_TX_TYPES = ['income', 'expense', 'transfer'];
 
-// tx_type / category_id / account_key each accept either a single value (the
-// shape a one-pick filter has always sent) or a LIST of them OR-ed together —
-// those three chips are multi-select. An empty list is rejected rather than
+// tx_type / category_id / account_key / tag_id each accept either a single
+// value (the shape a one-pick filter has always sent) or a LIST of them OR-ed
+// together — those four chips are multi-select. An empty list is rejected rather than
 // read as "no filter": a filter with nothing picked must never quietly widen
 // the export to the whole ledger.
 function filterList(value, field) {
@@ -748,6 +751,20 @@ function exportFilterSql(filters) {
     if (anyNull) parts.push('t.account_key IS NULL');
     conds.push(parts.length > 1 ? `(${parts.join(' OR ')})` : parts[0]);
   }
+  if ('tag_id' in filters) {
+    // Same shape again: a null means "no tag", an integer names one tag.
+    const ids = [];
+    let anyNull = false;
+    for (const value of filterList(filters.tag_id, 'tag_id')) {
+      if (value === null) anyNull = true;
+      else if (Number.isInteger(value)) ids.push(value);
+      else bad('filters.tag_id must be an integer or null');
+    }
+    const parts = [];
+    if (ids.length) { parts.push(inClause('t.tag_id', ids)); args.push(...ids); }
+    if (anyNull) parts.push('t.tag_id IS NULL');
+    conds.push(parts.length > 1 ? `(${parts.join(' OR ')})` : parts[0]);
+  }
   return { where: conds.length ? ` WHERE ${conds.join(' AND ')}` : '', args };
 }
 
@@ -787,8 +804,10 @@ function exportTx(ctx, { body }) {
     .prepare(
       `SELECT t.id, t.date, t.description, t.amount, t.notes,
               COALESCE(c.cat_type, t.tx_type) AS tx_type,
-              c.name AS category_name
-         FROM transactions t LEFT JOIN categories c ON c.id = t.category_id${where}
+              c.name AS category_name, tg.name AS tag_name
+         FROM transactions t
+         LEFT JOIN categories c ON c.id = t.category_id
+         LEFT JOIN tags tg ON tg.id = t.tag_id${where}
         ORDER BY t.date, t.id
         LIMIT ? OFFSET ?`
     )

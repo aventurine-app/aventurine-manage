@@ -35,9 +35,9 @@
 
     <section class="ant-card tx-ledger" aria-label="Ledger">
 
-        <!-- The six filters in the table's order of interest: a search, the
-             dates, then Type, Account and Category (each several values at
-             once) and Amount. transactions.js builds the Selects and the date
+        <!-- The seven filters in the table's order of interest: a search, the
+             dates, then Type, Account, Category and Tag (each several values
+             at once) and Amount. transactions.js builds the Selects and the date
              range into their slots. Clear filters shows while any is set. -->
         <div class="tx-filters">
             <div class="tx-filter-row" role="search" aria-label="Filter transactions">
@@ -52,6 +52,7 @@
                 <div class="tx-filter-type" id="tx-filter-type"></div>
                 <div class="tx-filter-account" id="tx-filter-account"></div>
                 <div class="tx-filter-category" id="tx-filter-category"></div>
+                <div class="tx-filter-tag" id="tx-filter-tag"></div>
                 <button type="button" class="ant-btn ant-btn-default" id="tx-amount-btn" aria-haspopup="dialog" aria-expanded="false">
                     <span class="anticon" data-ant-icon="filter" aria-hidden="true"></span><span id="tx-amount-text">Amount</span>
                 </button>
@@ -100,6 +101,7 @@
     <script src="/static/js/widgets/txparse.js"></script>
     <script src="/static/js/widgets/txfileimport.js"></script>
     <script src="/static/js/widgets/txexport.js"></script>
+    <script src="/static/js/widgets/txtags.js"></script>
     <script src="/static/js/pages/transactions.js"></script>
 </body>
 </html>

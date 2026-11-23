@@ -47,6 +47,11 @@
 //                                   options are { value, label, grouped } and
 //                                   { group } headings
 //   Ant.autocomplete(input, { source(text) → strings, max, onPick })
+//   Ant.listbox(anchor, { box, items, multiple, isSelected, onPick, onDismiss, emptyText })
+//                                 → { el, update(items), refresh, move(step),
+//                                   activeItem, close }; the options list the
+//                                   two above drop under their box, for a page
+//                                   building a combobox of its own
 //   Ant.rangePicker(root, { value: [from, to], presets, format, placeholder,
 //                   ariaLabel, weekStart, onChange([from, to]) }) → { setValue }
 //   Ant.pagination(ul, { current, pageSize, total, pageSizeOptions, showTotal,
@@ -1720,7 +1725,7 @@
 
     window.Ant = {
         icon, empty, modal, confirm, popconfirm, monthPicker, monthPanel, message, tabs, isLoading, whileLoading,
-        popover, multiSelect, autocomplete, rangePicker, pagination, notification, steps, slider, spin,
+        popover, listbox, multiSelect, autocomplete, rangePicker, pagination, notification, steps, slider, spin,
         dropdown, drawer, categoryHue,
     };
 }());

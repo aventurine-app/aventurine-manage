@@ -88,14 +88,9 @@
     if (localStorage.getItem('nav-rail') === '1') {
         document.documentElement.classList.add('has-rail');
     }
-    // Likewise the sidebar's folded sections ('manage', 'plan'; nav.js). Only
-    // one is open at a time; with nothing saved yet, open the one that holds
-    // this page so the other never flashes open first.
-    const navHere = /\/plan(\.html)?$/.test(location.pathname) ? 'plan' : 'manage';
-    let navClosed = localStorage.getItem('nav-closed');
-    if (navClosed === null) {
-        navClosed = ['manage', 'plan'].filter((s) => s !== navHere).join(' ');
-    }
+    // Likewise the sidebar's folded sections ('manage', 'plan'; nav.js).
+    // Each folds on its own; with nothing saved yet, all are open.
+    const navClosed = localStorage.getItem('nav-closed');
     if (navClosed) document.documentElement.dataset.navClosed = navClosed;
 
     // Tag the host OS so the custom title bar (titlebar.css) can match the

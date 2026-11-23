@@ -281,6 +281,11 @@
        channel between them all take it. */
     --chart-net: var(--ant-chart-green);
 
+    /* The Sankey's tag bands, at its outer edges: a quiet grey, since a tag
+       regroups money its category already counted rather than being a kind
+       of money of its own. Ribbons fade into it from their category. */
+    --chart-tag: var(--ant-chart-neutral);
+
     /* Money that only moved. */
     --chart-transfer: var(--ant-chart-1);
 }
@@ -797,6 +802,12 @@ a.ant-btn { text-decoration: none; }
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02),
         0 2px 4px 0 rgba(0, 0, 0, 0.02);
     color: var(--ant-color-text);
+}
+/* Dark: the elevated surface is barely lighter than the track on the page
+   (and darker than it on a card), so the chosen option takes the spotlight
+   grey, lighter than the track on any surface. */
+html[data-theme="dark"] .ant-segmented-item[aria-pressed="true"] {
+    background: var(--ant-color-bg-spotlight);
 }
 .ant-segmented-item:focus-visible {
     outline: 2px solid var(--ant-color-primary);

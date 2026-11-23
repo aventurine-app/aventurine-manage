@@ -37,6 +37,19 @@ function tableExists(db, name) {
     .get(name);
 }
 
+/**
+ * v_transactions is built from the baseline's text, and that text always names
+ * the NEWEST ledger columns. So a step partway up the ladder cannot rebuild it:
+ * on a database still climbing, a column a later step adds (tag_id, v23) does
+ * not exist yet, and the CREATE VIEW fails. Every step that changes the view's
+ * shape drops it instead, and only the HIGHEST such step (now v23) recreates it
+ * from the baseline. A step added above v23 that changes the view takes over
+ * that job, and v23 becomes a drop like the rest.
+ */
+function dropTransactionsView(db) {
+  db.exec('DROP VIEW IF EXISTS v_transactions');
+}
+
 // Numbered, in-place migrations from an existing DB up to SCHEMA_VERSION. Keyed
 // by the version they bring the DB TO; each runs only when the stored
 // user_version is below its key. Keep them additive + idempotent.
@@ -136,10 +149,8 @@ const MIGRATIONS = [
     if (!hasCol) {
       db.exec('ALTER TABLE transactions ADD COLUMN display_name VARCHAR(200)');
     }
-    // Recreate v_transactions from the baseline text so a migrated DB's view
-    // exposes display_name exactly like a fresh DB's.
-    db.exec('DROP VIEW IF EXISTS v_transactions');
-    db.exec(DDL.find((s) => s.includes('CREATE VIEW v_transactions')));
+    // The view changes shape; see dropTransactionsView for who rebuilds it.
+    dropTransactionsView(db);
   }],
   // v9 — per-category sync mode is retired: every Cash Flow cell of an active
   // year now computes from transactions by default, and a stored Entry
@@ -168,15 +179,14 @@ const MIGRATIONS = [
   // scoping dedup and enabling per-account spend (the Credit Cards tool). ADD
   // COLUMN is not idempotent, so guard on the column already existing. Existing
   // rows stay NULL (unassigned) — pre-migration imports carried no account.
-  // v_transactions is recreated from the baseline text so a migrated DB's view
-  // exposes account_key/account_name exactly like a fresh DB's.
+  // v_transactions changes shape to expose account_key/account_name; see
+  // dropTransactionsView for who rebuilds it.
   [10, (db) => {
     const hasCol = db.pragma('table_info(transactions)').some((c) => c.name === 'account_key');
     if (!hasCol) {
       db.exec('ALTER TABLE transactions ADD COLUMN account_key VARCHAR(50)');
     }
-    db.exec('DROP VIEW IF EXISTS v_transactions');
-    db.exec(DDL.find((s) => s.includes('CREATE VIEW v_transactions')));
+    dropTransactionsView(db);
   }],
   // v11 — Retire the 'savings' and 'investing' directions: categories and
   // transactions now carry only 'income', 'expense', or 'transfer'. Money moved
@@ -191,8 +201,9 @@ const MIGRATIONS = [
     // Drop every view that reads the two tables first: ALTER TABLE … RENAME
     // reparses all views to fix up references, and it would trip over a view
     // pointing at `categories` in the window before the rebuilt table is back.
-    // They are recreated from the baseline DDL at the end.
-    db.exec('DROP VIEW IF EXISTS v_transactions');
+    // They are recreated from the baseline DDL at the end, except
+    // v_transactions (see dropTransactionsView).
+    dropTransactionsView(db);
     db.exec('DROP VIEW IF EXISTS v_cash_flow');
     db.exec('DROP VIEW IF EXISTS v_budget');
 
@@ -247,7 +258,6 @@ const MIGRATIONS = [
     db.exec('CREATE INDEX IF NOT EXISTS ix_transactions_date ON transactions (date)');
 
     // Recreate the dropped views from the baseline text.
-    db.exec(DDL.find((s) => s.includes('CREATE VIEW v_transactions')));
     db.exec(DDL.find((s) => s.includes('CREATE VIEW v_cash_flow')));
     db.exec(DDL.find((s) => s.includes('CREATE VIEW v_budget')));
   }],
@@ -461,6 +471,26 @@ const MIGRATIONS = [
   [22, (db) => {
     if (tableExists(db, 'plans')) return;
     db.exec(DDL.find((stmt) => stmt.startsWith('CREATE TABLE plans')));
+  }],
+  // v23 — transaction tags (see schema.js baseline): the tags table, one
+  // nullable tag_id per transaction, and the indexes for both. Existing rows
+  // stay untagged. The table and indexes come from the baseline's own text, and
+  // v_transactions is recreated from it to expose tag_id/tag_name, so a
+  // migrated database and a fresh one cannot drift apart. ADD COLUMN is not
+  // idempotent, so it is guarded on the column already existing.
+  [23, (db) => {
+    const ddl = (prefix) => DDL.find((stmt) => stmt.startsWith(prefix));
+    if (!tableExists(db, 'tags')) {
+      db.exec(ddl('CREATE TABLE tags'));
+      db.exec(ddl('CREATE UNIQUE INDEX ix_tags_name'));
+    }
+    const hasCol = db.pragma('table_info(transactions)').some((c) => c.name === 'tag_id');
+    if (!hasCol) db.exec('ALTER TABLE transactions ADD COLUMN tag_id INTEGER REFERENCES tags (id)');
+    const hasIndex = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'ix_transactions_tag_id'").get();
+    if (!hasIndex) db.exec(ddl('CREATE INDEX ix_transactions_tag_id'));
+    // The highest step that changes v_transactions, so the one that rebuilds it.
+    dropTransactionsView(db);
+    db.exec(ddl('CREATE VIEW v_transactions'));
   }],
 ];
 

@@ -85,11 +85,13 @@ function escapeXml(s) {
 }
 
 const csv = {
-  header: () => 'Date,Description,Type,Category,Amount,Notes' + CRLF,
+  // Tag comes last so a reader that maps the first six columns by position
+  // (older Aventurine builds among them) still lines up.
+  header: () => 'Date,Description,Type,Category,Amount,Notes,Tag' + CRLF,
   // Per column, not one map over the row: date and amount go through csvField
   // (quoting only), the free-text columns through csvText (quoting plus the
   // formula guard above). tx_type is one of three fixed words and category
-  // names are user-typed, so both take the text path.
+  // and tag names are user-typed, so all three take the text path.
   row: (t) => [
     csvField(t.date),
     csvText(t.description),
@@ -97,6 +99,7 @@ const csv = {
     csvText(t.category_name || ''),
     csvField(signedAmount(t)),
     csvText(t.notes || ''),
+    csvText(t.tag_name || ''),
   ].join(',') + CRLF,
   footer: () => '',
 };

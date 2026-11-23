@@ -17,6 +17,7 @@
      5. Add transaction
      6. Edit wizard
      7. Export
+     8. Manage tags
    ============================================================================ */
 
 
@@ -78,6 +79,7 @@
 .tx-filter-type { min-width: 120px; max-width: 220px; }
 .tx-filter-account { min-width: 130px; max-width: 240px; }
 .tx-filter-category { min-width: 140px; max-width: 260px; }
+.tx-filter-tag { min-width: 120px; max-width: 220px; }
 
 /* The rows ticked: a tinted band between the filters and the table. */
 .tx-batch {
@@ -101,7 +103,7 @@
 
 /* ─── 3. The table: columns, cells, narrow widths ───────────────────────────
    A fixed layout over the header's widths, the Description column taking
-   what is left. Notes, then Account, step out as the card narrows, so
+   what is left. Notes, then Tag, then Account step out as the card narrows, so
    Description never gets squeezed to nothing; past that the table keeps its
    minimum width and scrolls sideways inside the card. */
 .tx-table { min-width: 760px; }
@@ -112,12 +114,16 @@
 .tx-table th.tx-col-account { width: 160px; }
 .tx-table th.tx-col-category { width: 180px; }
 .tx-table th.tx-col-amount { width: 140px; }
+.tx-table th.tx-col-tag { width: 152px; }
 .tx-table th.tx-col-notes { width: 200px; }
 .tx-table td { vertical-align: middle; }
 .tx-col-date { white-space: nowrap; }
 
 @container tx-ledger (max-width: 1099px) {
     .tx-table .tx-col-notes { display: none; }
+}
+@container tx-ledger (max-width: 1019px) {
+    .tx-table .tx-col-tag { display: none; }
 }
 @container tx-ledger (max-width: 819px) {
     .tx-table { min-width: 600px; }
@@ -175,6 +181,65 @@ html[data-theme="dark"] .tx-cat-btn:hover .tx-cat-tag { filter: brightness(1.15)
     outline-offset: 2px;
 }
 .tx-col-category .ant-select { width: 100%; }
+
+/* Tag: like the category, the row's tag is the button that changes it. With
+   no tag, a quiet "+ Add tag" waits for the row to be pointed at or focused,
+   so an untagged ledger is not a column of buttons. The header carries the
+   way to Manage tags. */
+.tx-th-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.tx-manage-tags { color: var(--ant-color-text-tertiary); }
+.tx-tag {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+.tx-tag-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ant-radius-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+.tx-tag-btn:hover .tx-tag { filter: brightness(0.96); }
+html[data-theme="dark"] .tx-tag-btn:hover .tx-tag { filter: brightness(1.15); }
+.tx-tag-btn:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+.tx-tag-add {
+    height: 24px;
+    padding-inline: 4px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+    opacity: 0;
+    transition: opacity var(--ant-motion-mid), color var(--ant-motion-mid);
+}
+.tx-tag-add:hover { color: var(--ant-color-primary-text); }
+.tx-tag-add:active { color: var(--ant-color-primary-active, var(--ant-color-primary-text)); }
+.tx-row:hover .tx-tag-add,
+.tx-tag-add:focus-visible { opacity: 1; }
+/* A tag field (the cell's picker and the dialogs'): an input with a Select's
+   arrow, room kept for it on the right. In the cell it is Select's
+   size="small". */
+.tx-tag-field { padding-inline-end: 28px; }
+.ant-select-sm .tx-tag-field {
+    height: var(--ant-control-height-sm);
+    padding-block: 0;
+    padding-inline: 7px 24px;
+    border-radius: var(--ant-radius-sm);
+}
+.tx-col-tag .ant-select { width: 100%; }
 
 /* The note, then Typography's pencil. With no note the pencil waits for the
    row to be pointed at or focused, so an empty column is not a column of
@@ -282,6 +347,11 @@ html[data-theme="dark"] .tx-cat-btn:hover .tx-cat-tag { filter: brightness(1.15)
 .tx-match-table:has(.ant-empty) { border: 0; }
 .tx-edit-preview .ant-table,
 .tx-match-table .ant-table { min-width: 600px; }
+/* The preview carries a Tag column the import tables do not, so its account
+   and category columns give up some width to keep Description readable. */
+.tx-edit-preview .tx-p-acct,
+.tx-edit-preview .tx-p-cat { width: 140px; }
+.tx-edit-preview .tx-p-tag { width: 120px; }
 .tx-edit-preview thead th,
 .tx-match-table thead th {
     position: sticky;
@@ -350,3 +420,47 @@ html[data-theme="dark"] .tx-cat-btn:hover .tx-cat-tag { filter: brightness(1.15)
 }
 .tx-export-progress .ant-progress { font-size: var(--ant-font-size); }
 .tx-export-path-text { overflow-wrap: anywhere; }
+
+
+/* ─── 8. Manage tags ────────────────────────────────────────────────────────
+   A field to add one over the list of every tag: its name, how many
+   transactions carry it, then Rename and Delete. */
+.tx-tags-add {
+    display: flex;
+    gap: 8px;
+}
+.tx-tags-add .ant-input { flex: 1; }
+.tx-tags-explain:empty { display: none; }
+.tx-tags-list {
+    max-height: 320px;
+    margin-top: 16px;
+    overflow-y: auto;
+}
+.tx-tags-rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.tx-tags-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-border-secondary);
+}
+.tx-tags-row:last-child { border-bottom: 0; }
+.tx-tags-name {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+}
+.tx-tags-count {
+    font-size: var(--ant-font-size-sm);
+    white-space: nowrap;
+}
+.tx-tags-rename {
+    height: var(--ant-control-height-sm);
+    padding-block: 0;
+    padding-inline: 7px;
+    border-radius: var(--ant-radius-sm);
+}

@@ -357,8 +357,8 @@ test('migration ladder: SCHEMA_VERSION is the top of it, with no gaps', () => {
 // comment-only edit.) Then bump SCHEMA_VERSION, add the migration, and update
 // the hash below in the same commit.
 test('baseline schema is pinned: changing it requires a migration', () => {
-  const EXPECTED_SCHEMA_VERSION = 22;
-  const EXPECTED_DDL_HASH = '4a29554419cd2a6ddf5219874a6288a71031eee1b123726e9496376f6eff7bed';
+  const EXPECTED_SCHEMA_VERSION = 23;
+  const EXPECTED_DDL_HASH = '1b8291f3bcf156791fa65249098be6312a5e6171fa6b370f3e3ec5981ca7469c';
 
   const actual = crypto.createHash('sha256').update(DDL.join('\n')).digest('hex');
   assert.equal(
@@ -431,6 +431,21 @@ test('a migrated database matches a fresh one', () => {
     20: (db) => db.exec('DROP TABLE dashboard_layouts'),
     // v21 — before Aventurine Planner's plans moved into the database (climbs v22 alone).
     21: (db) => db.exec('DROP TABLE plans'),
+    // v22 — before transaction tags (climbs v23 alone). The ledger is rebuilt
+    // without tag_id, as a v22 database holds it, so the step's ADD COLUMN runs
+    // for real; the view goes too, since v22's never named a tag.
+    22: (db) => {
+      const transactionsDdl = DDL.find((s) => s.startsWith('CREATE TABLE transactions'));
+      const v22Transactions = transactionsDdl.replace(/\n\s*tag_id [^\n]*(\n\s*--[^\n]*)*/, '');
+      assert.notEqual(v22Transactions, transactionsDdl, 'the rewind must take tag_id out');
+      db.exec('DROP VIEW v_transactions');
+      db.exec('DROP TABLE transactions');
+      db.exec('DROP TABLE tags');
+      db.exec(v22Transactions);
+      for (const stmt of DDL) {
+        if (/^CREATE INDEX ix_transactions_\w+ ON transactions/.test(stmt) && !stmt.includes('tag_id')) db.exec(stmt);
+      }
+    },
   };
 
   for (const [version, rewind] of Object.entries(cases)) {

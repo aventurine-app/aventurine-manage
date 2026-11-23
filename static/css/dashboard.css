@@ -164,7 +164,9 @@
     position: absolute;
     z-index: -1;
     top: calc(-1 * var(--page-pad));
-    bottom: -14px;
+    /* Stops short of the first row's outline (2px out) and focus ring (3px
+       out, 2px wide), which begin 13px and 11px under the bar. */
+    bottom: -10px;
     left: -8px;
     right: -8px;
     background: var(--ant-color-bg-layout);

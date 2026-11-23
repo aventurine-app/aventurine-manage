@@ -30,9 +30,9 @@
 }());
 
 // ── Sections: Manage and Plan ────────────────────────────────────────────
-// Each header folds its links away, accordion-style: at most one section is
-// open, so opening one folds all the others (folding the open one leaves
-// none open). The folded ones are kept as one space-separated list
+// Each header folds its own links away; the sections are independent, so
+// any mix of them can be open at once. The folded ones are kept as one
+// space-separated list
 // ('nav-closed' in localStorage), which theme-init.js puts on
 // <html data-nav-closed> before first paint; nav.css reads it from there, so
 // this file only rewrites the list and keeps aria-expanded and inert in step
@@ -57,35 +57,16 @@
     }
   }
 
-  const sections = toggles.map((btn) => btn.dataset.section);
-
-  // Open `section` and fold every other one; null folds them all.
-  function openOnly(section) {
-    const value = sections.filter((s) => s !== section).join(' ');
+  // Fold or unfold one section, leaving the others as they are.
+  function toggle(section) {
+    const closed = closedSet();
+    if (closed.has(section)) closed.delete(section);
+    else closed.add(section);
+    const value = [...closed].join(' ');
     if (value) root.dataset.navClosed = value;
     else delete root.dataset.navClosed;
     try { localStorage.setItem(KEY, value); } catch { /* storage blocked: the fold lasts this page */ }
     sync();
-  }
-
-  function toggle(section) {
-    openOnly(closedSet().has(section) ? section : null);
-  }
-
-  // The section holding the current page's link, if any.
-  function activeSection() {
-    const btn = toggles.find((b) =>
-      document.getElementById(b.getAttribute('aria-controls'))?.querySelector('a.active'));
-    return btn ? btn.dataset.section : null;
-  }
-
-  // A list saved before the accordion (or none, on first run) can leave
-  // several sections open; keep only the current page's one (else the first).
-  const closed = closedSet();
-  const open = sections.filter((s) => !closed.has(s));
-  if (open.length > 1) {
-    const active = activeSection();
-    openOnly(open.includes(active) ? active : open[0]);
   }
 
   for (const btn of toggles) btn.addEventListener('click', () => toggle(btn.dataset.section));

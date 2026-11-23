@@ -11,6 +11,10 @@
     position: relative;
     flex: 1;
     min-width: 0;
+    /* Without this a flex item's minimum height is its content's, so a tall
+       inspector (a two-way link's two rules) stretched the builder past the
+       page and pushed the scrubber off the bottom. */
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }

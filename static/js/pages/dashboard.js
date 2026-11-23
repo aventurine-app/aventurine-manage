@@ -130,7 +130,7 @@
         return {
             id: raw.id,
             name: String(raw.name || '').trim().slice(0, NAME_MAX) || 'Dashboard',
-            cards: DashGrid.pack(list.slice(0, MAX_CARDS)),
+            cards: DashGrid.settle(list.slice(0, MAX_CARDS)),
         };
     }
 
@@ -939,8 +939,8 @@
         if (at) {
             layout.cards = DashGrid.arrangeMove(layout.cards, { ...card, x: at.x, y: at.y });
         } else {
-            const spot = DashGrid.firstFit(layout.cards, card.w);
-            layout.cards = DashGrid.stack([...DashGrid.pack(layout.cards), { ...card, ...spot }]);
+            const spot = DashGrid.firstFit(layout.cards, card.w, card.h);
+            layout.cards = [...layout.cards, { ...card, ...spot }];
         }
         renderCanvas();
         if (drawer) renderWidgets();
@@ -956,7 +956,7 @@
         const title = cardTitle(card);
         checkpoint();
         const layout = activeLayout();
-        layout.cards = DashGrid.pack(layout.cards.filter((c) => c.id !== id));
+        layout.cards = layout.cards.filter((c) => c.id !== id);
         renderCanvas();
         if (drawer) renderWidgets();
         Ant.message.success(`Removed ${title}`);
@@ -1625,7 +1625,7 @@
                 if (w !== card.w || h !== card.h) next = DashGrid.arrangeInPlace(layout.cards, { ...card, w, h });
             } else if (dx) {
                 const x = clamp(card.x + dx, 0, COLS - card.w);
-                if (x !== card.x) next = DashGrid.arrangeMove(layout.cards, { ...card, x });
+                if (x !== card.x) next = DashGrid.arrangeInPlace(layout.cards, { ...card, x });
             } else {
                 next = DashGrid.moveVertical(layout.cards, card.id, dy);
             }
