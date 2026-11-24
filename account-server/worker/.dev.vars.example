@@ -1,0 +1,16 @@
+# Copy to worker/.dev.vars (ignored by git) for `npm run dev`.
+# These override the [vars] in wrangler.toml for local runs only.
+APP_ORIGIN=http://127.0.0.1:8787
+# Any value: signs the webhooks you send yourself with curl.
+PADDLE_WEBHOOK_SECRET=pdl_ntfset_local_dev
+# Cancels a subscription when its owner deletes their data. Without a key, such
+# a deletion stays queued. A sandbox key needs the sandbox API.
+# PADDLE_API_KEY=pdl_sdbx_apikey_replace_me
+PADDLE_API_URL=https://sandbox-api.paddle.com
+# Sign Manage in as this address with no purchase (Pro). With no RESEND_API_KEY
+# set, the sign-in code is printed in the wrangler console instead of emailed.
+COMPLIMENTARY_EMAILS=you@example.com
+# Signs Aventurine Manage's licenses. Make a key pair for local use with
+# `node scripts/make-license-key.mjs <file>`, paste the file's contents
+# here, and run Manage with AVENTURINE_LICENSE_PUBLIC_KEY set to the public key.
+# LICENSE_SIGNING_KEY=MC4CAQAwBQYDK2VwBCIEI...

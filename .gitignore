@@ -10,6 +10,11 @@ node_modules/
 electron/dist/
 electron/out/
 static/dist/
+# Account server (account-server/): its build, local secrets and wrangler state.
+account-server/dist/
+account-server/worker/.dev.vars
+account-server/.wrangler/
+account-server/worker/.wrangler/
 
 # Claude Code local config — machine-local settings + product strategy; keep private.
 .claude/

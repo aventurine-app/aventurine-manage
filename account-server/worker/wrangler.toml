@@ -1,0 +1,81 @@
+# The Aventurine account server: Aventurine Manage's sign-in and license
+# check, the beta signup, Paddle webhooks, and the privacy page. Aventurine is a desktop app;
+# nothing of it is hosted here.
+#
+# `dist/` (from `npm run build`) holds only the privacy page and the files it
+# names. It is bound as ASSETS, and run_worker_first makes the Worker see every
+# request, so nothing in dist/ is reachable without passing through src/index.js.
+
+# The name is the workers.dev address installed copies of Aventurine Manage
+# call (ACCOUNT_ORIGIN in its electron/licensePolicy.js). Renaming it signs
+# every install out.
+name = "aventurine-planner"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# Once aventurine-app.com's DNS is on Cloudflare, this can move to its own
+# subdomain (see README.md, "Domain"). Until then the worker runs on its
+# workers.dev address, and APP_ORIGIN below must match whichever one is in use.
+#
+# routes = [
+#   { pattern = "app.aventurine-app.com", custom_domain = true }
+# ]
+
+[assets]
+directory = "../dist"
+binding = "ASSETS"
+run_worker_first = true
+# Serve files exactly as named. The Worker maps /auth/privacy to privacy.html itself.
+html_handling = "none"
+not_found_handling = "none"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aventurine-prism"
+# From `wrangler d1 create aventurine-prism`. An identifier, not a secret.
+database_id = "f77bc192-7a79-48b6-a364-02647df8a642"
+migrations_dir = "migrations"
+
+# Per-IP throttle on sign-in codes and privacy links, so neither form can be
+# used to flood an inbox or to probe for customers.
+[[unsafe.bindings]]
+name = "RATE_LIMIT"
+type = "ratelimit"
+namespace_id = "2001"
+simple = { limit = 10, period = 60 }
+
+# Once a day: drop expired codes and links, and finish queued deletions.
+[triggers]
+crons = ["17 4 * * *"]
+
+[vars]
+# This server's address. The emailed privacy links and the privacy page's
+# same-origin check use this exact origin. For `wrangler dev` use
+# http://127.0.0.1:8787. This is the worker's workers.dev address.
+APP_ORIGIN = "https://aventurine-planner.aventurine-app.workers.dev"
+# The verified sending domain in Resend (DNS records at the registrar).
+EMAIL_FROM = "Aventurine <signin@aventurine-app.com>"
+# Paddle's API, for cancelling a subscription when its owner has their data
+# deleted. https://sandbox-api.paddle.com for a sandbox key.
+PADDLE_API_URL = "https://api.paddle.com"
+# The Paddle prices that buy Pro (Manage + Planner); every other price is Basic
+# (Manage only). See src/access.js. The Pro monthly and annual prices on
+# aventurine-app.com. Public ids, not secrets. Add new Pro prices here when
+# they are made.
+PRO_PRICE_IDS = "pri_01m84gkbwcv7t436nbz1g392ym pri_01m84gkr84rfm85sb9xh9e98y1"
+# Where the checklist for each deletion goes (worker/PRIVACY.md).
+PRIVACY_EMAIL = "support@aventurine-app.com"
+# The marketing site: the beta signup on its pricing page is the one other
+# origin allowed to call this server (src/beta.js).
+SITE_ORIGIN = "https://aventurine-app.com"
+# How many beta spots (a free Pro license each, no end date). 0 closes the
+# beta; lowering it takes no spot away.
+BETA_LIMIT = "50"
+
+# Secrets (set with `wrangler secret put NAME`, never in this file):
+#   PADDLE_WEBHOOK_SECRET   the notification destination's secret (pdl_ntfset_...)
+#   PADDLE_API_KEY          read customers, read and write subscriptions; nothing else
+#   RESEND_API_KEY          sends the sign-in email
+#   COMPLIMENTARY_EMAILS    optional: emails with free access, comma separated
+#   LICENSE_SIGNING_KEY     signs Aventurine Manage's licenses (src/license.js);
+#                           make one with `node scripts/make-license-key.mjs`

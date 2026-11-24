@@ -1,0 +1,20 @@
+{
+  "name": "aventurine-account-server",
+  "version": "1.0.0",
+  "description": "The Aventurine account server: Manage sign-in and licenses, the beta signup, Paddle webhooks and the privacy page. Runs on Cloudflare Workers.",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "dev": "npm run build && wrangler dev --config worker/wrangler.toml",
+    "deploy": "npm run build && wrangler deploy --config worker/wrangler.toml",
+    "smoke": "node scripts/smoke-worker.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

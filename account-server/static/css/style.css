@@ -1,0 +1,431 @@
+/* ============================================================================
+   style.css — Aventurine Planner's design language: Ant Design (v5).
+   ============================================================================
+   Tokens and the base layout. Every other stylesheet consumes these and
+   declares none of its own. The colour tokens (palettes, text, surfaces,
+   lines, the accent, status) are theme.css's, shared with Aventurine Manage. The names and values follow Ant Design's tokens
+   (colorText, colorBgContainer, borderRadius, controlHeight, boxShadow…), in
+   kebab-case: --color-text, --color-bg-container, --border-radius…
+
+   The app has no framework, so Ant Design's components are rebuilt here and in
+   the other stylesheets from its specs (sizes, states, motion), not imported.
+
+   Departures from Ant's defaults, for legibility (WCAG AA): tertiary
+   text is 0.55 alpha (Ant: 0.45, 3.4:1) and text in the status colours (tags,
+   alerts, figures) takes a darker step of each palette than Ant's (green-8,
+   orange-8, red-7, blue-7 on light).
+
+     1-2. Palettes and semantic tokens: theme.css
+     3. Module roles and chart colours
+     4. Typography
+     5. Size, radius, elevation and motion
+     6. Base layout
+     7. Modal (Ant's Modal)
+     8. Form controls (Ant's Input, Select, InputNumber addons)
+   ============================================================================ */
+
+
+/* ─── 1-2. Palettes and semantic tokens ─────────────────────────────────────
+ * In theme.css, the Aventurine theme shared with Aventurine Manage. It loads
+ * before this file (partials/head.html). */
+
+
+/* ─── 3. Module roles and chart colours ─────────────────────────────────────
+ * Every module wears its ROLE's colour (catalog.js): its avatar, its ports and
+ * its bar. Five roles, five Ant hues: green is money arriving, blue money held,
+ * gold money leaving, red money owed, teal (Ant's cyan) money changing on the
+ * way through.
+ * A budget group, which only splits, wears a neutral grey (catalog.js, swatchOf).
+ *
+ * Picked from Ant's palettes with the dataviz validator against the card
+ * surface, all pairs, since any two roles can sit side by side on the canvas
+ * (.scratch/rainbow/roles-antd.mjs). Light: cyan-7, blue-6, gold-8, red-8,
+ * purple-6 passed every check (CVD 9.9, normal 16.8, contrast 3.5:1 or more).
+ * Since moved: Income to green-7 (3.5:1) and Modifiers to cyan-7. Green-7
+ * against Spending's gold-8 is only ΔE 2.9 under simulated protan/deutan
+ * vision (the other pairs are 13+), so colour alone may not tell income from
+ * spending for colour-blind users.
+ * Dark (themes.css) passes all but the lightness band, as the earlier roles did. */
+:root,
+.settings-theme-swatch[data-theme="light"] {
+    --role-source:   var(--green-7);
+    --role-account:  var(--blue-6);
+    --role-expense:  var(--gold-8);
+    --role-debt:     var(--red-8);
+    --role-modifier: var(--cyan-7);
+    /* A budget group only splits, so it wears a neutral, a step darker than
+       Unassigned's so the two stay apart. */
+    --role-group:    #636363;
+
+    /* Unassigned money: no role, so it takes the neutral that recedes. */
+    --role-none: #8c8c8c;
+
+    /* Runner-up medals (Compare's All plans): silver, bronze. */
+    --medal-silver: #8c8c8c;
+    --medal-bronze: var(--orange-7);
+
+    /* Every link on the canvas, whatever it carries. */
+    --link-line: var(--blue-4);
+    /* A two-way link (one that turns around): purple, so it reads apart from
+       the one-way blue. */
+    --link-twoway: var(--purple-6);
+
+    /* Net worth bands wear the colour of the module they stand for: accounts
+       blue, debts red, as on the canvas. Several of one role are told apart by
+       alternating lighter and darker shades of it, in module order (outlook.js,
+       worthBands). Mixed from the role colours, so a theme switch carries them
+       along. Unassigned and folded "Other" bands are the neutral. */
+    --chart-account-1: var(--role-account);
+    --chart-account-2: color-mix(in srgb, var(--role-account) 70%, white);
+    --chart-account-3: color-mix(in srgb, var(--role-account) 80%, black);
+    --chart-account-4: color-mix(in srgb, var(--role-account) 45%, white);
+    --chart-account-5: color-mix(in srgb, var(--role-account) 62%, black);
+    --chart-account-6: color-mix(in srgb, var(--role-account) 28%, white);
+
+    --chart-debt-1: var(--red-6);
+    --chart-debt-2: color-mix(in srgb, var(--red-6) 70%, white);
+    --chart-debt-3: color-mix(in srgb, var(--red-6) 80%, black);
+    --chart-debt-4: color-mix(in srgb, var(--red-6) 45%, white);
+    --chart-debt-5: color-mix(in srgb, var(--red-6) 62%, black);
+    --chart-debt-6: color-mix(in srgb, var(--red-6) 28%, white);
+    /* What a loan is secured by (a home, a car): green, apart from the
+       accounts, since it is worth something but is not money to spend. */
+    --chart-asset-1: var(--green-6);
+    --chart-asset-2: color-mix(in srgb, var(--green-6) 70%, white);
+    --chart-asset-3: color-mix(in srgb, var(--green-6) 80%, black);
+    --chart-asset-4: color-mix(in srgb, var(--green-6) 45%, white);
+    --chart-asset-5: color-mix(in srgb, var(--green-6) 62%, black);
+    --chart-asset-6: color-mix(in srgb, var(--green-6) 28%, white);
+    --chart-unassigned: var(--role-none);
+
+    /* Headline lines are the text colour, as in Ant's charts; the cash-flow
+       pair is the arriving green against the leaving gold. */
+    --chart-networth:   var(--color-text);
+    --chart-worth-line: var(--color-text);
+    --chart-in:         var(--green-6);
+    --chart-out:        var(--gold-6);
+    --chart-growth:     var(--blue-6);
+    --chart-interest:   var(--red-5);
+    --chart-grid:       var(--color-split);
+    /* Compare's four plans: Ant's blue, orange, cyan and purple. */
+    --chart-plan-a: var(--blue-6);
+    --chart-plan-b: var(--orange-6);
+    --chart-plan-c: var(--cyan-7);
+    --chart-plan-d: var(--purple-6);
+
+    /* The Sankey: money arriving on the green ramp, money leaving on the gold
+       one, both deepest first (they grade size; every band prints its own
+       name), and a purple hub, Money in, that is neither. Past the hub, money splits into
+       groups that wear their modules' role colours (accounts blue, debts red,
+       taxes and fees teal), so the pipes read like the canvas. */
+    --chart-inflow-1: var(--green-8);
+    --chart-inflow-2: var(--green-7);
+    --chart-inflow-3: var(--green-6);
+    --chart-inflow-4: var(--green-5);
+    --chart-inflow-5: var(--green-4);
+    --chart-inflow-6: var(--green-3);
+    --chart-outflow-1: var(--gold-8);
+    --chart-outflow-2: var(--gold-7);
+    --chart-outflow-3: var(--gold-6);
+    --chart-outflow-4: var(--gold-5);
+    --chart-outflow-5: var(--gold-4);
+    --chart-hub:       var(--purple-6);
+    --chart-fee-1: var(--role-modifier);
+    --chart-fee-2: color-mix(in srgb, var(--role-modifier) 70%, white);
+    --chart-fee-3: color-mix(in srgb, var(--role-modifier) 80%, black);
+    --chart-fee-4: color-mix(in srgb, var(--role-modifier) 45%, white);
+}
+
+
+/* ─── 4. Typography ─────────────────────────────────────────────────────────
+ * Ant's: the system font stack at 14px, and its heading scale. */
+:root {
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+        'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-family-code: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+
+    --font-size:           14px;
+    --font-size-sm:        12px;
+    --font-size-lg:        16px;
+    --font-size-xl:        20px;
+    --font-size-heading-1: 38px;
+    --font-size-heading-2: 30px;
+    --font-size-heading-3: 24px;
+    --font-size-heading-4: 20px;
+    --font-size-heading-5: 16px;
+
+    --line-height:    1.5714285714;
+    --line-height-sm: 1.6666666667;
+    --line-height-lg: 1.5;
+    --line-height-heading: 1.4;
+
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-strong: 600;
+}
+
+
+/* ─── 5. Size, radius, elevation and motion ─────────────────────────────── */
+:root {
+    --space-4:   4px;
+    --space-8:   8px;
+    --space-12: 12px;
+    --space-16: 16px;
+    --space-20: 20px;
+    --space-24: 24px;
+    --space-32: 32px;
+    --space-48: 48px;
+    --space-64: 64px;
+
+    --line-width: 1px;
+    --control-height:    32px;
+    --control-height-sm: 24px;
+    --control-height-lg: 40px;
+    --border-radius-xs: 2px;
+    --border-radius-sm: 4px;
+    --border-radius:    6px;
+    --border-radius-lg: 8px;
+
+    /* Ant's three shadows: pop-ups and modals, then cards and small chrome. */
+    --box-shadow:           0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+    --box-shadow-secondary: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+    --box-shadow-tertiary:  0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+    /* A hoverable card lifted under the pointer. */
+    --box-shadow-card-hover: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 0 3px 6px 0 rgba(0, 0, 0, 0.12), 0 5px 12px 4px rgba(0, 0, 0, 0.09);
+
+    --motion-duration-fast: 0.1s;
+    --motion-duration-mid:  0.2s;
+    --motion-duration-slow: 0.3s;
+    --motion-ease-in-out:   cubic-bezier(0.645, 0.045, 0.355, 1);
+    --motion-ease-out:      cubic-bezier(0.215, 0.61, 0.355, 1);
+
+    --titlebar-height: 48px;
+    /* The open navigation's width. --sidebar-width is the nav's current width
+       (nav.css narrows it to the rail); the title bar keeps this one. */
+    --sidebar-open-width: 224px;
+    --sidebar-width:   var(--sidebar-open-width);
+    --inspector-width: 320px;
+}
+
+
+/* ─── 6. Base layout ──────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    background-color: var(--color-bg-layout);
+    color: var(--color-text);
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* Every element that sets display: flex outranks the UA's [hidden] rule. */
+[hidden] { display: none !important; }
+
+.body_container {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* One thin scrollbar treatment for every scrolling panel. */
+.scroll-y {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-fill) transparent;
+}
+
+.icon { width: 1em; height: 1em; flex-shrink: 0; display: block; }
+
+
+/* ─── 7. Modal ──────────────────────────────────────────────────────────────
+ * Every dialog: Ant's Modal. A mask, a white panel with an 8px radius and the
+ * pop-up shadow, a 16px semibold title, the close cross in its corner. */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-32) var(--space-16);
+    background: var(--color-bg-mask);
+}
+
+.modal {
+    position: relative;
+    width: 520px;
+    max-width: 100%;
+    max-height: calc(100vh - 96px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--color-bg-elevated);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--box-shadow);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-16);
+    padding: var(--space-20) var(--space-24) var(--space-8);
+}
+
+.modal-title {
+    margin: 0;
+    color: var(--color-text);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-strong);
+    line-height: var(--line-height-lg);
+    word-wrap: break-word;
+}
+
+.modal-close {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    padding: 0;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-icon);
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color var(--motion-duration-mid), color var(--motion-duration-mid);
+}
+.modal-close:hover { background: var(--color-bg-text-hover); color: var(--color-icon-hover); }
+.modal-close:active { background: var(--color-bg-text-active); }
+.modal-close:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; }
+
+.modal-body {
+    padding: var(--space-8) var(--space-24) var(--space-12);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-fill) transparent;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-8);
+    padding: var(--space-12) var(--space-24) var(--space-20);
+}
+
+
+/* ─── 8. Form controls ──────────────────────────────────────────────────────
+ * Ant's Input and Select: 32px, a 6px radius, a grey border that turns the
+ * primary hover colour under the pointer and the primary colour, with a soft
+ * ring, when focused. */
+.field-input,
+.field-select {
+    height: var(--control-height);
+    min-width: 0;
+    padding: 4px 11px;
+    background: var(--color-bg-container);
+    border: var(--line-width) solid var(--color-border);
+    border-radius: var(--border-radius);
+    color: var(--color-text);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color var(--motion-duration-mid), box-shadow var(--motion-duration-mid), background-color var(--motion-duration-mid);
+}
+.field-input:hover,
+.field-select:hover { border-color: var(--color-primary-hover); }
+.field-input:focus,
+.field-select:focus,
+.field-input:focus-visible,
+.field-select:focus-visible {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--control-outline);
+}
+.field-input::placeholder { color: var(--color-text-quaternary); }
+.field-input:disabled,
+.field-select:disabled {
+    background: var(--color-bg-container-disabled);
+    border-color: var(--color-border);
+    color: var(--color-text-disabled);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+.field-input[aria-invalid="true"] { border-color: var(--color-error); }
+.field-input[aria-invalid="true"]:focus { box-shadow: 0 0 0 2px var(--color-error-outline); }
+
+/* Ant's Select arrow, drawn with two gradients (the CSP allows no data: images). */
+.field-select {
+    appearance: none;
+    padding-right: 28px;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--color-text-quaternary) 50%),
+        linear-gradient(135deg, var(--color-text-quaternary) 50%, transparent 50%);
+    background-position: calc(100% - 15px) 52%, calc(100% - 11px) 52%;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+}
+.field-select option { background: var(--color-bg-elevated); color: var(--color-text); }
+
+/* A field with a unit stuck to it, as Ant's addons: "$ [ 1,800 ]", "[ 4.5 ] %". */
+.field-affix {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+}
+.field-affix > .field-input { flex: 1; width: 100%; }
+.field-affix-text {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 11px;
+    background: var(--color-fill-alter);
+    border: var(--line-width) solid var(--color-border);
+    color: var(--color-text);
+    font-size: var(--font-size);
+    white-space: nowrap;
+}
+.field-affix-text:first-child { border-radius: var(--border-radius) 0 0 var(--border-radius); border-right: 0; }
+.field-affix-text:last-child  { border-radius: 0 var(--border-radius) var(--border-radius) 0; border-left: 0; }
+.field-affix > .field-input:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.field-affix > .field-input:not(:last-child)  { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+/* The addon keeps the field's ring company: it sits behind the focused field. */
+.field-affix > .field-input:focus { position: relative; z-index: 1; }
+
+/* A section heading inside a panel: a small all-caps label. */
+.eyebrow {
+    margin: 0;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-strong);
+    line-height: var(--line-height-sm);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}

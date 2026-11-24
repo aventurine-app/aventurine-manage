@@ -1,0 +1,267 @@
+/* ============================================================================
+   theme.css — the Aventurine theme: one set of colours for every Aventurine app.
+   ============================================================================
+   Ant Design's palettes and map tokens (kebab-cased: colorText → --color-text,
+   colorBgContainer → --color-bg-container…), on a warm paper ramp with a
+   charcoal accent. Light is :root; dark is html[data-theme="dark"], Ant's dark
+   algorithm on the same ramp (see the dark block's note).
+
+   This file is the ONE definition. Aventurine Planner loads it first, and
+   Aventurine Manage carries a generated copy (static/css/theme.css there,
+   written by its electron/scripts/copy-planner.js) and maps its own token
+   names onto these. So a colour changed here changes both apps; change it
+   nowhere else, then copy the Planner into Manage again.
+
+   Only colour lives here. What each app draws with it (the Planner's module
+   roles and charts, Manage's chart palette) stays in that app's own sheets.
+
+   The swatch selectors put the theme picker's previews in each theme's own
+   context, whatever theme the page is painted in.
+
+     1. Palettes (light)
+     2. Semantic tokens (light)
+     3. Dark: palettes and semantic tokens
+   ============================================================================ */
+
+
+/* ─── 1. Palettes ───────────────────────────────────────────────────────────
+ * Ant Design's preset palettes (@ant-design/colors), the steps the app uses.
+ * themes.css swaps in Ant's dark palettes, so a component that reads --blue-1
+ * gets the right tint in either theme. */
+:root,
+.settings-theme-swatch[data-theme="light"] {
+    --blue-1: #e6f4ff;   --blue-2: #bae0ff;   --blue-3: #91caff;   --blue-4: #69b1ff;   --blue-5: #4096ff;
+    --blue-6: #1677ff;   --blue-7: #0958d9;   --blue-8: #003eb3;   --blue-9: #002c8c;   --blue-10: #001d66;
+    /* Charcoal: the accent. Not an Ant preset; the warm neutral ramp (hue ~80°)
+       laid out in Ant's ten steps, 6 the solid, 1-2 the tints. */
+    --charcoal-1: #eae6da; --charcoal-2: #e0dbcd; --charcoal-3: #c9c2b3; --charcoal-4: #a39c8e; --charcoal-5: #6f695f;
+    --charcoal-6: #3a3630; --charcoal-7: #24211d; --charcoal-8: #1a1815; --charcoal-9: #12110f; --charcoal-10: #0b0a09;
+
+    --cyan-1: #e6fffb;   --cyan-2: #b5f5ec;   --cyan-3: #87e8de;   --cyan-4: #5cdbd3;   --cyan-5: #36cfc9;
+    --cyan-6: #13c2c2;   --cyan-7: #08979c;   --cyan-8: #006d75;   --cyan-9: #00474f;   --cyan-10: #002329;
+
+    --green-1: #f6ffed;  --green-2: #d9f7be;  --green-3: #b7eb8f;  --green-4: #95de64;  --green-5: #73d13d;
+    --green-6: #52c41a;  --green-7: #389e0d;  --green-8: #237804;  --green-9: #135200;  --green-10: #092b00;
+
+    --gold-1: #fffbe6;   --gold-2: #fff1b8;   --gold-3: #ffe58f;   --gold-4: #ffd666;   --gold-5: #ffc53d;
+    --gold-6: #faad14;   --gold-7: #d48806;   --gold-8: #ad6800;   --gold-9: #874d00;   --gold-10: #613400;
+
+    --orange-1: #fff7e6; --orange-2: #ffe7ba; --orange-3: #ffd591; --orange-4: #ffc069; --orange-5: #ffa940;
+    --orange-6: #fa8c16; --orange-7: #d46b08; --orange-8: #ad4e00; --orange-9: #873800; --orange-10: #612500;
+
+    --red-1: #fff1f0;    --red-2: #ffccc7;    --red-3: #ffa39e;    --red-4: #ff7875;    --red-5: #ff4d4f;
+    --red-6: #f5222d;    --red-7: #cf1322;    --red-8: #a8071a;    --red-9: #820014;    --red-10: #5c0011;
+
+    --purple-1: #f9f0ff; --purple-2: #efdbff; --purple-3: #d3adf7; --purple-4: #b37feb; --purple-5: #9254de;
+    --purple-6: #722ed1; --purple-7: #531dab; --purple-8: #391085; --purple-9: #22075e; --purple-10: #120338;
+
+    --magenta-1: #fff0f6; --magenta-2: #ffd6e7; --magenta-3: #ffadd2; --magenta-4: #ff85c0; --magenta-5: #f759ab;
+    --magenta-6: #eb2f96; --magenta-7: #c41d7f; --magenta-8: #9e1068; --magenta-9: #780650; --magenta-10: #520339;
+}
+
+
+/* ─── 2. Semantic tokens ────────────────────────────────────────────────────
+ * Ant Design's map tokens, light algorithm. themes.css overrides them for dark.
+ * The swatch selectors put the theme picker's previews in each theme's own
+ * context. */
+:root,
+.settings-theme-swatch[data-theme="light"] {
+    color-scheme: light;
+
+    /* Text and icons. */
+    --color-text:            #3a3630;
+    --color-text-secondary:  #544f47;
+    --color-text-tertiary:   #6f695f;
+    --color-text-quaternary: rgba(28, 26, 22, 0.25);
+    --color-text-disabled:   rgba(28, 26, 22, 0.25);
+    --color-text-light-solid: #f5f2ea;
+    --color-icon:            rgba(28, 26, 22, 0.45);
+    --color-icon-hover:      rgba(28, 26, 22, 0.88);
+
+    /* Surfaces: the page (layout), cards (container), pop-ups (elevated). */
+    --color-bg-layout:             #f5f2ea;
+    --color-bg-container:          #fcfaf4;
+    --color-bg-elevated:           #fefcf7;
+    --color-bg-spotlight:          rgba(28, 26, 22, 0.85);
+    --color-bg-mask:               rgba(28, 26, 22, 0.45);
+    --color-bg-container-disabled: rgba(28, 26, 22, 0.04);
+    --color-bg-text-hover:         rgba(28, 26, 22, 0.06);
+    --color-bg-text-active:        rgba(28, 26, 22, 0.15);
+
+    /* Lines and fills. */
+    --color-border:           #d4cec1;
+    --color-border-secondary: #eae6da;
+    --color-split:            rgba(28, 26, 22, 0.06);
+    --color-fill:             rgba(28, 26, 22, 0.15);
+    --color-fill-secondary:   rgba(28, 26, 22, 0.06);
+    --color-fill-tertiary:    rgba(28, 26, 22, 0.04);
+    --color-fill-quaternary:  rgba(28, 26, 22, 0.02);
+    --color-fill-alter:       rgba(28, 26, 22, 0.02);
+
+    /* The accent: warm charcoal, and its states. Text in it is the body
+       text's charcoal (charcoal-6), well over 4.5:1 on the paper and its tint. */
+    --color-primary:              var(--charcoal-6);
+    --color-primary-hover:        var(--charcoal-5);
+    --color-primary-active:       var(--charcoal-7);
+    --color-primary-bg:           var(--charcoal-1);
+    --color-primary-bg-hover:     var(--charcoal-2);
+    --color-primary-border:       var(--charcoal-3);
+    --color-primary-border-hover: var(--charcoal-4);
+    --color-primary-text:         var(--charcoal-6);
+    --color-link:                 var(--charcoal-6);
+    --color-link-hover:           var(--charcoal-5);
+    --color-link-active:          var(--charcoal-7);
+
+    /* Status colours: the fill (icons, bars, dots), its tint, its border, and
+       the darker step for text. */
+    --color-success:        var(--green-6);
+    --color-success-bg:     var(--green-1);
+    --color-success-border: var(--green-3);
+    --color-success-text:   var(--green-8);
+    --color-warning:        var(--gold-6);
+    --color-warning-bg:     var(--gold-1);
+    --color-warning-border: var(--gold-3);
+    --color-warning-text:   var(--orange-8);
+    --color-error:          var(--red-5);
+    --color-error-hover:    var(--red-4);
+    --color-error-active:   var(--red-7);
+    --color-error-bg:       var(--red-1);
+    --color-error-border:   var(--red-2);
+    --color-error-text:     var(--red-7);
+    /* Information wears the accent, as Ant's does. */
+    --color-info:           var(--blue-6);
+    --color-info-bg:        var(--blue-1);
+    --color-info-border:    var(--blue-3);
+    --color-info-text:      var(--blue-7);
+
+    /* Controls: list rows under the pointer and chosen, and the soft ring a
+       focused field wears. */
+    --control-item-bg-hover:        rgba(0, 0, 0, 0.04);
+    --control-item-bg-active:       var(--color-primary-bg);
+    --control-item-bg-active-hover: var(--color-primary-bg-hover);
+    --control-outline:              rgba(58, 54, 48, 0.1);
+    --color-error-outline:          rgba(255, 38, 5, 0.06);
+    --color-warning-outline:        rgba(255, 215, 5, 0.1);
+
+    /* Buttons' own drop shadows. */
+    --button-shadow:         0 2px 0 rgba(0, 0, 0, 0.02);
+    --button-primary-shadow: 0 2px 0 rgba(28, 26, 22, 0.06);
+    --button-danger-shadow:  0 2px 0 rgba(255, 38, 5, 0.06);
+
+    /* The canvas: the page grey with a dot grid. */
+    --canvas-bg:  var(--color-bg-layout);
+    --canvas-dot: rgba(28, 26, 22, 0.14);
+
+    /* Ant's Table: the header, a row under the pointer, the sorted column.
+       The header is a step down the paper ramp from the page (the website's
+       aventurine-100), so it reads as a band apart from both the card and the
+       page, as dark's does, and keeps the paper's warmth that a grey ink
+       overlay would wash out. It must not be the layout colour: a header
+       flush in a card would look like a hole through to the page. */
+    --table-header-bg:    #efeadf;
+    --table-row-hover-bg: #f5f2ea;
+    --table-sort-bg:      #f5f2ea;
+}
+
+
+/* ─── 3. Dark ─────────────────────────────────────────────────────────────────
+ * Ant's dark palettes (presetDarkPalettes) and the map tokens its dark
+ * algorithm derives from the same seed. The neutrals are Ant's dark greys
+ * warmed to the shared paper ramp (the website's css/warm-ramp.css): each keeps
+ * Ant's OKLCH lightness and takes the ramp's chroma and hue (~80°) at that
+ * lightness. White inks and fills are the paper, #fcf8f0, at Ant's alphas. The
+ * layout is lifted off pure black to #080706 so it can carry the warmth. The
+ * theme lands on <html data-theme> before first paint. */
+html[data-theme="dark"],
+.settings-theme-swatch[data-theme="dark"] {
+    color-scheme: dark;
+
+    /* Ant's dark palettes. */
+    --blue-1: #111a2c;   --blue-2: #112545;   --blue-3: #15325b;   --blue-4: #15417e;   --blue-5: #1554ad;
+    --blue-6: #1668dc;   --blue-7: #3c89e8;   --blue-8: #65a9f3;   --blue-9: #8dc5f8;   --blue-10: #b7dcfa;
+    /* Charcoal, dark: tints rise off the card, as Ant's dark palettes do. */
+    --charcoal-1: #262420; --charcoal-2: #33302a; --charcoal-3: #46423a; --charcoal-4: #5a554c; --charcoal-5: #6a645a;
+    --charcoal-6: #7d766a; --charcoal-7: #968f82; --charcoal-8: #b3ac9e; --charcoal-9: #d0c9bb; --charcoal-10: #e8e3d7;
+
+    --cyan-1: #112123;   --cyan-2: #113536;   --cyan-3: #144848;   --cyan-4: #146262;   --cyan-5: #138585;
+    --cyan-6: #13a8a8;   --cyan-7: #33bcb7;   --cyan-8: #58d1c9;   --cyan-9: #84e2d8;   --cyan-10: #b2f1e8;
+
+    --green-1: #162312;  --green-2: #1d3712;  --green-3: #274916;  --green-4: #306317;  --green-5: #3c8618;
+    --green-6: #49aa19;  --green-7: #6abe39;  --green-8: #8fd460;  --green-9: #b2e58b;  --green-10: #d5f2bb;
+
+    --gold-1: #2b2111;   --gold-2: #443111;   --gold-3: #594214;   --gold-4: #7c5914;   --gold-5: #aa7714;
+    --gold-6: #d89614;   --gold-7: #e8b339;   --gold-8: #f3cc62;   --gold-9: #f8df8b;   --gold-10: #faedb5;
+
+    --orange-1: #2b1d11; --orange-2: #442a11; --orange-3: #593815; --orange-4: #7c4a15; --orange-5: #aa6215;
+    --orange-6: #d87a16; --orange-7: #e89a3c; --orange-8: #f3b765; --orange-9: #f8cf8d; --orange-10: #fae4b6;
+
+    --red-1: #2a1215;    --red-2: #431418;    --red-3: #58181c;    --red-4: #791a1f;    --red-5: #a61d24;
+    --red-6: #d32029;    --red-7: #e84749;    --red-8: #f37370;    --red-9: #f89f9a;    --red-10: #fac8c3;
+
+    --purple-1: #1a1325; --purple-2: #24163a; --purple-3: #301c4d; --purple-4: #3e2069; --purple-5: #51258f;
+    --purple-6: #642ab5; --purple-7: #854eca; --purple-8: #ab7ae0; --purple-9: #cda8f0; --purple-10: #ebd7fa;
+
+    --magenta-1: #291321; --magenta-2: #40162f; --magenta-3: #551c3b; --magenta-4: #75204f; --magenta-5: #a02669;
+    --magenta-6: #cb2b83; --magenta-7: #e0529c; --magenta-8: #f37fb7; --magenta-9: #f8a8cc; --magenta-10: #fad2e3;
+
+    /* Text and icons. Tertiary is 0.5 (Ant: 0.45) for 4.5:1 on the cards. */
+    --color-text:            rgba(252, 248, 240, 0.85);
+    --color-text-secondary:  rgba(252, 248, 240, 0.65);
+    --color-text-tertiary:   rgba(252, 248, 240, 0.5);
+    --color-text-quaternary: rgba(252, 248, 240, 0.25);
+    --color-text-disabled:   rgba(252, 248, 240, 0.25);
+    --color-icon:            rgba(252, 248, 240, 0.45);
+    --color-icon-hover:      rgba(252, 248, 240, 0.85);
+
+    --color-bg-layout:             #080706;
+    --color-bg-container:          #161411;
+    --color-bg-elevated:           #211f1a;
+    --color-bg-spotlight:          #46423a;
+    --color-bg-mask:               rgba(0, 0, 0, 0.45);
+    --color-bg-container-disabled: rgba(252, 248, 240, 0.08);
+    --color-bg-text-hover:         rgba(252, 248, 240, 0.12);
+    --color-bg-text-active:        rgba(252, 248, 240, 0.18);
+
+    --color-border:           #46423a;
+    --color-border-secondary: #33302a;
+    --color-split:            rgba(252, 248, 240, 0.12);
+    --color-fill:             rgba(252, 248, 240, 0.18);
+    --color-fill-secondary:   rgba(252, 248, 240, 0.12);
+    --color-fill-tertiary:    rgba(252, 248, 240, 0.08);
+    --color-fill-quaternary:  rgba(252, 248, 240, 0.04);
+    --color-fill-alter:       rgba(252, 248, 240, 0.04);
+
+    /* The primary and status tokens re-resolve against the dark palettes
+       above; only the steps that differ from light are restated. */
+    /* The solid steps down to charcoal-5 so the light label keeps 4.5:1;
+       text in the accent takes a light step to read on the dark card. */
+    --color-primary:        var(--charcoal-5);
+    --color-primary-hover:  var(--charcoal-6);
+    --color-primary-active: var(--charcoal-4);
+    --color-primary-text:   var(--charcoal-9);
+    --color-link:           var(--charcoal-9);
+    --color-link-hover:     var(--charcoal-10);
+    --color-link-active:    var(--charcoal-8);
+    --color-success-text:   var(--green-7);
+    --color-warning-text:   var(--gold-6);
+    --color-error:          #dc4446;
+    --color-error-hover:    #e86e6b;
+    --color-error-active:   #ad393a;
+    --color-error-bg:       #2c1618;
+    --color-error-border:   #5b2526;
+    --color-error-text:     var(--red-7);
+    --color-info-text:      var(--blue-7);
+
+    --control-item-bg-hover:  rgba(252, 248, 240, 0.08);
+    --control-outline:        rgba(252, 248, 240, 0.12);
+    --color-error-outline:    rgba(238, 38, 56, 0.11);
+    --color-warning-outline:  rgba(173, 107, 0, 0.15);
+    --button-primary-shadow:  0 2px 0 rgba(0, 0, 0, 0.2);
+    --button-danger-shadow:   0 2px 0 rgba(238, 38, 56, 0.11);
+
+    --canvas-dot: rgba(252, 248, 240, 0.12);
+
+    --table-header-bg:    #1f1d19;
+    --table-row-hover-bg: #292621;
+    --table-sort-bg:      #292621;
+}

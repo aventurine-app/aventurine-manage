@@ -1,0 +1,132 @@
+/* ============================================================================
+   titlebar.css — the bar across the top of the app, as Ant Design Pro's dark
+   header: the app's name, whether the plans are saved, and the signed-in
+   user. Pure black in both themes.
+   ============================================================================ */
+
+/* The bar is dark in both themes, so what sits on it uses light inks of its
+   own rather than the theme's text colours. */
+:root {
+    --titlebar-bg: #1c1a16;
+    --titlebar-ink: rgba(252, 248, 240, 0.65);
+    --titlebar-ink-strong: rgba(252, 248, 240, 0.85);
+    --titlebar-hover: rgba(252, 248, 240, 0.12);
+    --titlebar-edge: transparent;
+}
+
+.titlebar {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    align-items: stretch;
+    height: var(--titlebar-height);
+    flex-shrink: 0;
+    background: var(--titlebar-bg);
+    border-bottom: var(--line-width) solid var(--titlebar-edge);
+    color: var(--titlebar-ink);
+    user-select: none;
+}
+/* As wide as the open navigation below. It stays this width when the nav
+   collapses to the rail, so the name never moves or fades. */
+.titlebar-lead {
+    display: flex;
+    align-items: center;
+    gap: var(--space-12);
+    width: var(--sidebar-open-width);
+    flex-shrink: 0;
+    padding-left: var(--space-20);
+    overflow: hidden;
+    white-space: nowrap;
+}
+/* The company logo. At 24px with the lead's 20px inset it sits centred over
+   the collapsed 64px rail and over the nav's icons. */
+.titlebar-logo {
+    display: block;
+    flex: none;
+    width: 24px;
+    height: 24px;
+}
+/* The name and its Beta mark, which sits at the name's top right corner. */
+.titlebar-title {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+}
+.titlebar-name {
+    color: #fcf8f0;
+    /* As tall as the 24px logo beside it. */
+    font-size: 24px;
+    line-height: 1;
+    font-weight: var(--font-weight-strong);
+}
+
+/* Supertext on the name: small, the bar's strong ink, a little tracked. */
+.titlebar-beta {
+    margin-top: 1px;
+    color: var(--titlebar-ink-strong);
+    font-size: 11px;
+    line-height: 1;
+    font-weight: var(--font-weight-strong);
+    letter-spacing: 0.04em;
+    vertical-align: baseline;
+}
+
+.titlebar-drag {
+    flex: 1;
+    min-width: var(--space-48);
+}
+
+/* Whether the plans are saved: a status dot and a word. */
+.titlebar-save {
+    align-self: center;
+    min-width: 88px;
+    margin-right: var(--space-8);
+    color: var(--titlebar-ink);
+    font-size: var(--font-size);
+    white-space: nowrap;
+}
+
+/* With sync on, the status is a cloud icon alone (titlebar.js renderSave):
+   green synced, orange not synced, grey offline or on its way. Fixed colours,
+   as the bar is dark in both themes. */
+.titlebar-sync {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    margin-right: var(--space-4);
+    cursor: default;
+}
+.titlebar-sync .icon { width: 20px; height: 20px; flex: none; }
+.titlebar-sync--synced { color: #52c41a; }
+.titlebar-sync--unsynced { color: #fa8c16; }
+.titlebar-sync--offline,
+.titlebar-sync--saving { color: rgba(252, 248, 240, 0.45); }
+
+/* The signed-in user, at the bar's right edge: a profile icon and the email,
+   a text button on the dark bar. */
+.titlebar-user {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: var(--space-8);
+    height: var(--control-height);
+    max-width: 260px;
+    margin-right: var(--space-12);
+    padding: 0 var(--space-8);
+    border: 0;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--titlebar-ink-strong);
+    font-size: var(--font-size);
+    cursor: pointer;
+    transition: background-color var(--motion-duration-mid), color var(--motion-duration-mid);
+}
+.titlebar-user .icon { width: 20px; height: 20px; flex: none; }
+.titlebar-user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.titlebar-user:hover { background: var(--titlebar-hover); color: #fcf8f0; }
+.titlebar-user:focus-visible { outline: 4px solid rgba(252, 248, 240, 0.4); outline-offset: -2px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .titlebar-user { transition: none; }
+}

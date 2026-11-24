@@ -1,0 +1,167 @@
+/* ============================================================================
+   buttons.css — the button system: Ant Design's Button.
+   ============================================================================
+     .button-primary    primary: the brand fill, white label. One per view.
+     .button-secondary  default: outlined, turns the primary colour on hover
+     .button-danger     default danger: outlined red; with --solid, filled red
+                        (a confirm dialog's destructive action)
+     .button-ghost      text: no fill until hovered, for low-weight actions
+     .button-link       link: brand-coloured text
+     .button-icon       a 32px square holding a glyph, as a text button
+   Sizes: default 32px; .button-sm 24px; .button-lg 40px.
+   ============================================================================ */
+
+.button-primary,
+.button-secondary,
+.button-danger,
+.button-ghost,
+.button-link,
+.button-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-8);
+    height: var(--control-height);
+    padding: 4px 15px;
+    border: var(--line-width) solid transparent;
+    border-radius: var(--border-radius);
+    background: transparent;
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+    transition: all var(--motion-duration-mid) var(--motion-ease-in-out);
+}
+.button-primary .icon,
+.button-secondary .icon,
+.button-danger .icon,
+.button-ghost .icon,
+.button-link .icon { width: 16px; height: 16px; }
+
+/* Primary. */
+.button-primary {
+    background: var(--color-primary);
+    color: var(--color-text-light-solid);
+    box-shadow: var(--button-primary-shadow);
+}
+.button-primary:not(:disabled):hover { background: var(--color-primary-hover); }
+.button-primary:not(:disabled):active { background: var(--color-primary-active); }
+
+/* Default. */
+.button-secondary {
+    background: var(--color-bg-container);
+    border-color: var(--color-border);
+    color: var(--color-text);
+    box-shadow: var(--button-shadow);
+}
+.button-secondary:not(:disabled):hover { border-color: var(--color-primary-hover); color: var(--color-primary-hover); }
+.button-secondary:not(:disabled):active { border-color: var(--color-primary-active); color: var(--color-primary-active); }
+
+/* Danger: default (outlined) and solid. */
+.button-danger {
+    background: var(--color-bg-container);
+    border-color: var(--color-error);
+    color: var(--color-error);
+    box-shadow: var(--button-danger-shadow);
+}
+.button-danger:not(:disabled):hover { border-color: var(--color-error-hover); color: var(--color-error-hover); }
+.button-danger:not(:disabled):active { border-color: var(--color-error-active); color: var(--color-error-active); }
+.button-danger--solid { background: var(--color-error); color: var(--color-text-light-solid); }
+.button-danger--solid:not(:disabled):hover { background: var(--color-error-hover); color: var(--color-text-light-solid); }
+.button-danger--solid:not(:disabled):active { background: var(--color-error-active); color: var(--color-text-light-solid); }
+
+/* Text. */
+.button-ghost { color: var(--color-text); }
+.button-ghost:not(:disabled):hover { background: var(--color-bg-text-hover); }
+.button-ghost:not(:disabled):active { background: var(--color-bg-text-active); }
+
+/* Link. */
+.button-link { padding-inline: 0; height: auto; color: var(--color-link); }
+.button-link:not(:disabled):hover { color: var(--color-link-hover); }
+.button-link:not(:disabled):active { color: var(--color-link-active); }
+
+/* Icon only: a text button the size of a control. */
+.button-icon {
+    width: var(--control-height);
+    padding: 0;
+    color: var(--color-text);
+}
+.button-icon .icon { width: 16px; height: 16px; }
+.button-icon:not(:disabled):hover,
+.button-icon[aria-expanded="true"] { background: var(--color-bg-text-hover); }
+.button-icon:not(:disabled):active { background: var(--color-bg-text-active); }
+.button-icon[aria-pressed="true"] { background: var(--color-primary-bg); color: var(--color-primary); }
+
+/* Sizes. */
+.button-sm { height: var(--control-height-sm); padding: 0 7px; border-radius: var(--border-radius-sm); }
+.button-sm.button-icon { width: var(--control-height-sm); padding: 0; }
+.button-lg { height: var(--control-height-lg); padding: 7px 15px; border-radius: var(--border-radius-lg); font-size: var(--font-size-lg); }
+.button-lg.button-icon { width: var(--control-height-lg); padding: 0; }
+.button-block { width: 100%; }
+
+/* Shared states. */
+.button-primary:focus-visible,
+.button-secondary:focus-visible,
+.button-ghost:focus-visible,
+.button-link:focus-visible,
+.button-icon:focus-visible {
+    outline: 4px solid var(--color-primary-border);
+    outline-offset: 1px;
+    transition: outline-offset 0s, outline 0s;
+}
+.button-danger:focus-visible {
+    outline: 4px solid var(--color-error-border);
+    outline-offset: 1px;
+    transition: outline-offset 0s, outline 0s;
+}
+
+.button-primary:disabled,
+.button-secondary:disabled,
+.button-danger:disabled {
+    background: var(--color-bg-container-disabled);
+    border-color: var(--color-border);
+    color: var(--color-text-disabled);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+.button-ghost:disabled,
+.button-link:disabled,
+.button-icon:disabled {
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+}
+
+/* A button busy with an async action, as Ant's loading button: dimmed, a
+   spinner before its label, and no second press. */
+.is-busy { opacity: 0.65; pointer-events: none; }
+.is-busy::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Ant's Space.Compact: buttons joined edge to edge into one group, their
+   inner corners square and their shared borders overlapped. */
+.button-group { display: inline-flex; align-items: stretch; }
+.button-group > * { border-radius: 0; }
+.button-group > * + * { margin-left: calc(-1 * var(--line-width)); }
+.button-group > :first-child { border-start-start-radius: var(--border-radius); border-end-start-radius: var(--border-radius); }
+.button-group > :last-child { border-start-end-radius: var(--border-radius); border-end-end-radius: var(--border-radius); }
+.button-group > :hover,
+.button-group > :focus-visible { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+    .button-primary, .button-secondary, .button-danger, .button-ghost, .button-link, .button-icon { transition: none; }
+    .is-busy::before { animation-duration: 2s; }
+}

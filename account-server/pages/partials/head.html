@@ -1,0 +1,17 @@
+<!-- Shared <head> chrome: CSP, pre-paint theme, global CSS. Spliced into
+     pages/index.html by scripts/assemble.js at the include marker. The CSP
+     allows no inline script and no remote anything: the page only ever talks
+     to its own origin. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/logo/logo.svg">
+    <script src="/static/js/shell/theme-init.js"></script>
+    <!-- The Aventurine theme (shared with Manage), then what this app builds on it. -->
+    <link rel="stylesheet" href="/static/css/theme.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/themes.css">
+    <link rel="stylesheet" href="/static/css/buttons.css">
+    <link rel="stylesheet" href="/static/css/ui.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/titlebar.css">
+    <link rel="stylesheet" href="/static/css/settings.css">

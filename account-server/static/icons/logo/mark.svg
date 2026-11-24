@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2.8173 2.7004">
+  <!-- The Aventurine mark without its square: the rounded triangle from the
+       website's logo (aventurine-app.com, assets/site-icons/logo/logo.svg),
+       moved to the origin. The sign-in card's watermark (static/css/auth.css) uses
+       it as a mask, so its fill does not matter. -->
+  <path d="M 2.7822 2.3792 C 2.5350 2.8074 0.2823 2.8074 0.0350 2.3792 C -0.2122 1.9509 0.9141 0.0000 1.4086 0.0000 C 1.9031 0.0000 3.0295 1.9509 2.7822 2.3792 Z" fill="#000"/>
+</svg>

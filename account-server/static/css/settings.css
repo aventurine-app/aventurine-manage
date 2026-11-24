@@ -1,0 +1,267 @@
+/* ============================================================================
+   settings.css — Preferences (Appearance, Format, Storage, Account) as
+   an Ant modal with line tabs, bordered setting cards and Segmented switches;
+   and the waiting screen shown while another tab is editing.
+   ============================================================================ */
+
+.settings-modal {
+    width: 640px;
+    height: min(620px, calc(100vh - 96px));
+}
+
+/* Ant's line tabs. */
+.settings-tabs {
+    display: flex;
+    /* Its overflow lets it shrink as a flex item; keep it whole and let the
+       body scroll when a panel (Storage) is taller than the modal. */
+    flex-shrink: 0;
+    gap: var(--space-32);
+    margin: 0 var(--space-24);
+    border-bottom: var(--line-width) solid var(--color-border-secondary);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.settings-tab {
+    position: relative;
+    padding: var(--space-12) 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--motion-duration-slow) var(--motion-ease-in-out);
+}
+.settings-tab:hover { color: var(--color-primary-hover); }
+.settings-tab[aria-selected="true"] { color: var(--color-primary-text); text-shadow: 0 0 0.25px currentColor; }
+.settings-tab[aria-selected="true"]::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--color-primary);
+}
+.settings-tab:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: -4px; border-radius: var(--border-radius-sm); }
+
+.settings-modal .modal-body { padding-top: var(--space-20); padding-bottom: var(--space-24); }
+.settings-panel { display: flex; flex-direction: column; gap: var(--space-16); }
+
+.settings-section { display: flex; flex-direction: column; gap: var(--space-8); }
+/* Its type is the .eyebrow's (style.css). */
+.settings-section-header { padding-left: 2px; }
+
+.settings-card {
+    background: var(--color-bg-container);
+    border: var(--line-width) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-16);
+    padding: var(--space-16) var(--space-20);
+}
+.settings-row + .settings-row { border-top: var(--line-width) solid var(--color-split); }
+.settings-row--stack { flex-direction: column; align-items: flex-start; gap: var(--space-12); }
+.settings-row-name { color: var(--color-text); }
+/* A row whose name carries a line of explanation under it. */
+.settings-row-label {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+}
+.settings-row-desc {
+    max-width: 60ch;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+}
+.settings-value {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size);
+    text-align: right;
+}
+
+/* Theme choices: selectable cards, each a preview of the theme's layout grey
+   over its card white. */
+.theme-options { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+.theme-btn {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    border: var(--line-width) solid var(--color-border);
+    border-radius: var(--border-radius-lg);
+    background: var(--color-bg-container);
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color var(--motion-duration-mid), box-shadow var(--motion-duration-mid);
+}
+.theme-btn:hover { border-color: var(--color-primary-hover); }
+.theme-btn[aria-pressed="true"] { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--control-outline); }
+.theme-btn:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; }
+.settings-theme-swatch {
+    position: relative;
+    width: 88px;
+    height: 52px;
+    background-color: var(--color-bg-container);
+}
+.settings-theme-swatch::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 35%;
+    background: var(--color-bg-layout);
+}
+.settings-theme-swatch--system { background: linear-gradient(105deg, #f5f2ea 0 50%, #161411 50% 100%); }
+.settings-theme-swatch--system::before { display: none; }
+.theme-label {
+    padding: 4px 0 6px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    text-align: center;
+}
+.theme-btn[aria-pressed="true"] .theme-label { color: var(--color-primary-text); }
+
+/* Two-option switch: Ant's Segmented. */
+.seg-switch {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: 2px;
+    background: var(--color-fill-tertiary);
+    border-radius: var(--border-radius);
+}
+.seg-switch-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--motion-duration-mid), color var(--motion-duration-mid), box-shadow var(--motion-duration-mid);
+}
+.seg-switch-btn:hover { color: var(--color-text); background: var(--color-fill-secondary); }
+.seg-switch-btn[aria-pressed="true"] { background: var(--color-bg-elevated); color: var(--color-text); box-shadow: var(--box-shadow-tertiary); }
+.seg-switch-btn:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: -1px; }
+
+/* The currency symbol: three characters at most, centred. */
+.field-input--symbol { width: 72px; text-align: center; }
+
+/* The buttons at the end of a settings row. */
+.settings-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: var(--space-8);
+}
+
+/* ── Waiting screen (another tab is editing): Ant's Result ───────────────── */
+.lockscreen {
+    position: fixed;
+    inset: var(--titlebar-height) 0 0 0;
+    z-index: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-16);
+    background: var(--color-bg-layout);
+}
+.lock-card {
+    width: 420px;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-16);
+    padding: var(--space-32) var(--space-32) var(--space-24);
+    background: var(--color-bg-container);
+    border: var(--line-width) solid var(--color-border-secondary);
+    border-radius: var(--border-radius-lg);
+    text-align: center;
+}
+.lock-card .role-tile--lg { width: 56px; height: 56px; border-radius: 50%; }
+.lock-card .role-tile--lg .icon { width: 28px; height: 28px; }
+.lock-title { margin: 0; font-size: var(--font-size-heading-4); font-weight: var(--font-weight-strong); line-height: var(--line-height-heading); }
+.lock-note { margin: 0; color: var(--color-text-secondary); font-size: var(--font-size); line-height: var(--line-height); }
+
+/* ── Encrypted sync: save or enter the recovery key (shell/vault-gate.js) ── */
+/* The waiting screen's card, a little wider, with a form under its heading. */
+.vault-card { width: 448px; }
+.vault-body {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-12);
+    text-align: left;
+}
+.vault-label { color: var(--color-text); font-weight: var(--font-weight-strong); }
+
+/* The key itself: two lines of four groups, easy to read back and to select. */
+.recovery-key {
+    margin: 0;
+    padding: var(--space-16);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    background: var(--color-fill-tertiary);
+    border: var(--line-width) dashed var(--color-border);
+    border-radius: var(--border-radius-lg);
+    color: var(--color-text);
+    font-family: var(--font-family-code);
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height);
+    letter-spacing: 0.08em;
+    user-select: all;
+}
+.vault-key-actions { display: flex; justify-content: center; gap: var(--space-8); }
+
+/* "I have saved it": a native checkbox in the brand colour. */
+.vault-check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-8);
+    color: var(--color-text);
+    line-height: var(--line-height);
+    cursor: pointer;
+}
+.vault-check input {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 3px 0 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+.vault-check input:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; }
+
+.recovery-key-input { width: 100%; font-family: var(--font-family-code); letter-spacing: 0.04em; text-transform: uppercase; }
+.recovery-key-input::placeholder { letter-spacing: 0.04em; }
+.recovery-key-input[aria-invalid="true"] { border-color: var(--color-error); }
+.recovery-key-input[aria-invalid="true"]:focus { box-shadow: 0 0 0 2px var(--color-error-outline); }
+
+.vault-error { margin: 0; color: var(--color-error-text); line-height: var(--line-height); text-align: left; }
+.vault-card > .vault-error { align-self: stretch; }
+.vault-submit { align-self: stretch; height: var(--control-height-lg); font-size: var(--font-size-lg); }
+
+/* Preferences → Account → New Recovery Key. */
+.vault-dialog { width: 448px; }
+.vault-dialog .modal-body { display: flex; flex-direction: column; gap: var(--space-16); }
+.vault-dialog-note { margin: 0; color: var(--color-text-secondary); line-height: var(--line-height); }
+
+/* Account: a line of explanation under the card's last row. */
+.settings-card > .settings-row-desc { padding: 0 var(--space-20) var(--space-16); }
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-tab, .theme-btn, .seg-switch-btn { transition: none; }
+}

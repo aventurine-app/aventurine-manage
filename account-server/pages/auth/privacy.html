@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Your data · Aventurine</title>
+    <!-- @include head -->
+    <link rel="stylesheet" href="/static/css/auth.css">
+</head>
+<body>
+    <main class="auth-page">
+        <canvas class="dot-wave" aria-hidden="true"></canvas>
+        <section class="auth-card" aria-labelledby="auth-title">
+            <h1 class="auth-title" id="auth-title" tabindex="-1">See or delete your data</h1>
+
+            <!-- Without a link: ask for one. -->
+            <div class="auth-step" id="step-request" hidden>
+                <p class="auth-note">Enter your email address and we will send a link that proves it is yours. You do not need an account.</p>
+                <form class="auth-form" id="request-form" novalidate>
+                    <label class="auth-label" for="email">Email</label>
+                    <input class="field-input" id="email" name="email" type="email" autocomplete="email" required autofocus>
+                    <p class="auth-error" id="request-error" role="alert" hidden></p>
+                    <button class="button-primary" type="submit">Send link</button>
+                </form>
+                <p class="auth-foot"><a class="auth-link-underline" href="https://aventurine-app.com/delete-me.html">What we hold and what gets deleted</a></p>
+            </div>
+
+            <div class="auth-step" id="step-sent" hidden>
+                <p class="auth-note" role="status"><strong class="auth-sent-title">Check your email</strong>We sent a link to that address. It expires in 30 minutes. If it does not arrive, check your spam folder, or email <a class="auth-inline-link" href="mailto:support@aventurine-app.com">support@aventurine-app.com</a>.</p>
+            </div>
+
+            <!-- With a link. The token is used only when this button is pressed, so a
+                 mail scanner that merely opens the link can see and do nothing. -->
+            <div class="auth-step" id="step-open" hidden>
+                <p class="auth-note">Continue to see what we hold for your email address. Nothing is deleted yet.</p>
+                <p class="auth-error" id="open-error" role="alert" hidden></p>
+                <button class="button-primary auth-wide" type="button" id="open-button">Continue</button>
+                <p class="auth-foot" id="open-retry" hidden><a class="auth-link-underline" href="/auth/privacy">Send a new link</a></p>
+            </div>
+
+            <div class="auth-step" id="step-report" hidden>
+                <p class="auth-note" id="report-lead"></p>
+                <dl class="privacy-list" id="report-list"></dl>
+                <button class="button-secondary auth-wide" type="button" id="report-download">Download a copy (JSON)</button>
+
+                <div class="privacy-danger">
+                    <h2 class="privacy-danger-title">Delete everything</h2>
+                    <ul class="privacy-effects" id="report-effects"></ul>
+                    <form class="auth-form" id="erase-form" novalidate>
+                        <label class="auth-label" for="confirm">Type DELETE to confirm</label>
+                        <input class="field-input" id="confirm" name="confirm" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" required aria-describedby="erase-error">
+                        <p class="auth-error" id="erase-error" role="alert" hidden></p>
+                        <button class="button-danger button-danger--solid" type="submit">Delete my data</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="auth-step" id="step-done" hidden>
+                <p class="auth-note" role="status"><strong class="auth-sent-title">Your data has been deleted</strong>Your email address, subscription record and sign-in records are gone from Aventurine. We have sent you a confirmation.</p>
+                <p class="auth-note">Your plans and finances were never on our servers: they stay in the database file on your computer until you delete it.</p>
+                <p class="auth-note">We will remove your emails to support within 30 days, keeping only what the law requires. Backups and email logs expire within 30 days.</p>
+                <p class="auth-note">Paddle keeps its own payment records. To ask it to delete yours, use <a class="auth-inline-link" href="https://preferences.paddle.com/form/deletion" rel="noopener">Paddle's deletion form</a>.</p>
+            </div>
+
+            <div class="auth-step" id="step-pending" hidden>
+                <p class="auth-note" role="status"><strong class="auth-sent-title">We have your request</strong>We could not finish yet, because your subscription has to be cancelled first and that step did not go through. Your request is saved. We will keep trying and finish it within 30 days, and email you when it is done.</p>
+                <p class="auth-note">You do not need to do anything. If you have questions, email <a class="auth-inline-link" href="mailto:support@aventurine-app.com">support@aventurine-app.com</a>.</p>
+            </div>
+        </section>
+    </main>
+    <script src="/static/js/auth/common.js"></script>
+    <script src="/static/js/auth/privacy.js"></script>
+    <script src="/static/js/auth/dot-wave.js"></script>
+</body>
+</html>

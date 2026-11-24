@@ -1,0 +1,441 @@
+/* ============================================================================
+   ui.css — shared primitives built by shell/ui.js, as Ant Design draws them:
+   the dropdown menu, the popover, the module picker (a Select's searchable
+   dropdown), the icon and month grids (a DatePicker's month panel), dialogs
+   (Modal.confirm), the toast (message), the segmented control (Segmented),
+   chips (Tag), role tiles (Avatar) and empty states (Empty).
+   ============================================================================ */
+
+/* ─── Pop-ups ───────────────────────────────────────────────────────────────
+ * The one surface under every pop-up ui.js opens: Ant's elevated panel. Each
+ * adds only its own size below. */
+.menu-pop,
+.panel-pop,
+.picker,
+.icon-pop,
+.month-pop {
+    position: fixed;
+    z-index: 1050;
+    background: var(--color-bg-elevated);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--box-shadow-secondary);
+    animation: pop-in var(--motion-duration-mid) var(--motion-ease-out);
+}
+/* Opacity and a short slide only: ui.js measures a pop-up's size as it opens. */
+@keyframes pop-in {
+    from { opacity: 0; transform: translateY(-4px); }
+}
+
+/* ─── Panel of controls (UI.popover): Ant's Popover ──────────────────────── */
+.panel-pop {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-12);
+    min-width: 240px;
+    padding: var(--space-12);
+}
+
+/* ─── Dropdown menu: Ant's Dropdown ──────────────────────────────────────── */
+.menu-pop {
+    min-width: 160px;
+    /* A long menu (a plan's years) scrolls inside itself, as Ant's does. */
+    max-height: min(320px, calc(100vh - 16px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-4);
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    width: 100%;
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size);
+    line-height: 22px;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--motion-duration-mid);
+}
+.menu-item .icon { width: 14px; height: 14px; color: var(--color-text-secondary); }
+.menu-item:hover,
+.menu-item:focus-visible { background: var(--control-item-bg-hover); outline: none; }
+.menu-item[data-danger] { color: var(--color-error); }
+.menu-item[data-danger] .icon { color: currentColor; }
+.menu-item[data-danger]:hover,
+.menu-item[data-danger]:focus-visible { background: var(--color-error); color: var(--color-text-light-solid); }
+.menu-item:disabled { color: var(--color-text-disabled); cursor: not-allowed; }
+.menu-item:disabled .icon { color: currentColor; }
+.menu-item:disabled:hover { background: transparent; }
+/* The ticked choice of a menu that picks one (an icon of 'check'). */
+.menu-item.is-chosen { background: var(--control-item-bg-active); font-weight: var(--font-weight-strong); }
+.menu-item.is-chosen .icon { color: var(--color-primary); }
+.menu-sep { height: 1px; margin: var(--space-4) 0; background: var(--color-split); }
+
+/* ─── Module picker (search + list): a Select's dropdown ──────────────────── */
+.picker {
+    width: 280px;
+    max-height: 380px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.picker-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    margin: var(--space-8) var(--space-8) var(--space-4);
+    padding: 0 11px;
+    height: var(--control-height);
+    border: var(--line-width) solid var(--color-border);
+    border-radius: var(--border-radius);
+    color: var(--color-text-quaternary);
+    transition: border-color var(--motion-duration-mid), box-shadow var(--motion-duration-mid);
+}
+.picker-search:hover { border-color: var(--color-primary-hover); }
+.picker-search:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--control-outline); }
+.picker-search .icon { width: 14px; height: 14px; }
+.picker-search input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size);
+    outline: none;
+}
+.picker-search input::placeholder { color: var(--color-text-quaternary); }
+.picker-list { padding: var(--space-4); }
+/* A group's name, as an option group's: small grey words, not capitals. */
+.picker-group.eyebrow {
+    padding: var(--space-8) 12px var(--space-4);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0;
+    text-transform: none;
+}
+.picker-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    width: 100%;
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size);
+    line-height: 22px;
+    text-align: left;
+    cursor: pointer;
+}
+.picker-item:hover,
+.picker-item.is-active { background: var(--control-item-bg-hover); }
+.picker-empty { padding: var(--space-16); color: var(--color-text-tertiary); font-size: var(--font-size); text-align: center; }
+
+/* ─── Role tile: a module's Avatar ───────────────────────────────────────────
+ * A square avatar in the module's role colour: a tint of it behind the icon
+ * drawn in it. */
+.role-tile {
+    --tile: var(--role-none);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--border-radius);
+    background: color-mix(in srgb, var(--tile) 14%, transparent);
+    color: var(--tile);
+}
+.role-tile .icon { width: 16px; height: 16px; }
+.role-tile--lg { width: 40px; height: 40px; border-radius: var(--border-radius-lg); }
+.role-tile--lg .icon { width: 22px; height: 22px; }
+.role-tile--button { padding: 0; border: 0; cursor: pointer; transition: box-shadow var(--motion-duration-mid); }
+.role-tile--button:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--tile) 40%, transparent); }
+.role-tile--button:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; }
+.role-tile--sm { width: 22px; height: 22px; border-radius: var(--border-radius-sm); }
+.role-tile--sm .icon { width: 14px; height: 14px; }
+/* A tile for the app itself rather than a module (the lock screen). */
+.role-tile--accent { --tile: var(--color-primary); }
+
+[data-role="source"]   { --tile: var(--role-source); }
+[data-role="account"]  { --tile: var(--role-account); }
+[data-role="expense"]  { --tile: var(--role-expense); }
+[data-role="debt"]     { --tile: var(--role-debt); }
+[data-role="modifier"] { --tile: var(--role-modifier); }
+[data-role="group"]    { --tile: var(--role-group); }
+
+/* ─── Dialog (confirm / prompt): Modal.confirm ─────────────────────────────── */
+.dialog { width: 416px; }
+.dialog .modal-header { justify-content: flex-start; gap: var(--space-12); padding-top: var(--space-24); }
+.dialog .modal-close { margin-left: auto; }
+.modal-title-icon { width: 22px; height: 22px; flex: none; color: var(--color-warning); }
+.modal-title-icon.is-danger { color: var(--color-error); }
+/* The body lines up under the title, past the icon when there is one (Modal.confirm). */
+.dialog:has(.modal-title-icon) .modal-body { padding-left: calc(var(--space-24) + 22px + var(--space-12)); }
+.dialog .modal-body p { margin: 0; color: var(--color-text); font-size: var(--font-size); line-height: var(--line-height); }
+
+/* ─── Toast: Ant's message ──────────────────────────────────────────────────
+ * A white pill at the top centre, under the title bar: an icon in the
+ * notice's colour, the words, and an optional link-style action. */
+.toast {
+    position: fixed;
+    left: 50%;
+    top: calc(var(--titlebar-height) + var(--space-12));
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    max-width: min(560px, calc(100vw - 48px));
+    padding: 9px 12px;
+    background: var(--color-bg-elevated);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--box-shadow);
+    color: var(--color-text);
+    font-size: var(--font-size);
+    pointer-events: auto;
+    transform: translate(-50%, -8px);
+    opacity: 0;
+    transition: opacity var(--motion-duration-mid), transform var(--motion-duration-mid) var(--motion-ease-out);
+}
+.toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+.toast .icon { width: 16px; height: 16px; color: var(--color-info); }
+.toast[data-type="error"] .icon { color: var(--color-error); }
+.toast[data-type="success"] .icon { color: var(--color-success); }
+.toast[data-type="warning"] .icon { color: var(--color-warning); }
+.toast-action {
+    margin-left: var(--space-4);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-link);
+    font-size: var(--font-size);
+    cursor: pointer;
+}
+.toast-action:hover { color: var(--color-link-hover); }
+.toast-action:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; border-radius: var(--border-radius-sm); }
+
+/* ─── Segmented control: Ant's Segmented ────────────────────────────────────
+ * A grey track; the chosen option is a raised white thumb. */
+/* The track is a fill rather than Ant's layout grey, so it shows on a grey
+   page as well as on a white card. */
+.segctl {
+    display: inline-flex;
+    align-items: stretch;
+    padding: 2px;
+    background: var(--color-fill-tertiary);
+    border-radius: var(--border-radius);
+    color: var(--color-text-secondary);
+}
+.segctl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size);
+    line-height: 28px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--motion-duration-mid), background-color var(--motion-duration-mid), box-shadow var(--motion-duration-mid);
+}
+.segctl-btn .icon { width: 14px; height: 14px; }
+.segctl-btn:hover { color: var(--color-text); background: var(--color-fill-secondary); }
+.segctl-btn:active { background: var(--color-fill); }
+.segctl-btn[aria-pressed="true"],
+.segctl-btn[aria-selected="true"] {
+    color: var(--color-text);
+    background: var(--color-bg-elevated);
+    box-shadow: var(--box-shadow-tertiary);
+}
+.segctl-btn:disabled { color: var(--color-text-disabled); cursor: not-allowed; }
+.segctl-btn:disabled:hover { background: transparent; }
+.segctl-btn:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: -1px; }
+.segctl--block { display: flex; }
+.segctl--block .segctl-btn { flex: 1; min-width: 0; }
+
+/* The compact version: plan lengths (1Y 5Y 10Y…). */
+.segctl--chips .segctl-btn { padding: 0 8px; font-variant-numeric: tabular-nums; }
+
+/* ─── Chip: a small Tag ──────────────────────────────────────────────────── */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 7px;
+    border: var(--line-width) solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-fill-quaternary);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    line-height: 20px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.chip .icon { width: 12px; height: 12px; }
+.chip--warn { background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-text); }
+
+/* ─── Empty state: Ant's Empty, as a card with its actions ──────────────── */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-16);
+    max-width: 380px;
+    padding: var(--space-32);
+    text-align: center;
+}
+.empty-state-art {
+    display: grid;
+    grid-template-columns: repeat(3, 40px);
+    gap: var(--space-8);
+}
+.empty-state-title {
+    margin: 0;
+    color: var(--color-text);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-strong);
+    line-height: var(--line-height-lg);
+}
+.empty-state-text { margin: 0; color: var(--color-text-secondary); }
+.empty-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-8); }
+
+@media (prefers-reduced-motion: reduce) {
+    .menu-pop, .panel-pop, .picker, .icon-pop, .month-pop { animation: none; }
+    .toast { transition: opacity var(--motion-duration-mid); transform: translate(-50%, 0); }
+    .segctl-btn { transition: none; }
+}
+
+/* ─── Icon picker ─────────────────────────────────────────────────────────── */
+.icon-pop {
+    width: 268px;
+    max-height: 320px;
+    padding: var(--space-8);
+}
+.icon-pop-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--space-4); }
+.icon-pop-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 36px;
+    border: 0;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: background-color var(--motion-duration-mid), color var(--motion-duration-mid);
+}
+.icon-pop-cell .icon { width: 20px; height: 20px; }
+.icon-pop-cell:hover { background: var(--control-item-bg-hover); color: var(--color-text); }
+.icon-pop-cell[aria-pressed="true"] { background: color-mix(in srgb, var(--tile, var(--role-none)) 14%, transparent); color: var(--tile, var(--role-none)); }
+.icon-pop-cell:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: -1px; }
+
+/* ─── Month picker: a DatePicker's month panel ────────────────────────────── */
+.month-pop {
+    width: 280px;
+    padding: 0;
+}
+.month-pop-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+    padding: 0 var(--space-8);
+    border-bottom: var(--line-width) solid var(--color-split);
+}
+.month-pop-head .button-icon { width: 28px; height: 28px; color: var(--color-text-tertiary); }
+.month-pop-head .button-icon:hover { color: var(--color-text); }
+.month-pop-year { font-weight: var(--font-weight-strong); font-variant-numeric: tabular-nums; }
+.month-pop-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-8) 0;
+    padding: var(--space-12) var(--space-8);
+}
+.month-pop-cell {
+    justify-self: center;
+    width: 60px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size);
+    line-height: 24px;
+    cursor: pointer;
+    transition: background-color var(--motion-duration-mid);
+}
+.month-pop-cell:hover { background: var(--control-item-bg-hover); }
+.month-pop-cell[aria-pressed="true"] { background: var(--color-primary); color: var(--color-text-light-solid); }
+.month-pop-cell:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; }
+.month-pop-foot {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-4);
+    border-top: var(--line-width) solid var(--color-split);
+}
+.month-pop-clear { color: var(--color-link); }
+.month-pop-clear .icon { display: none; }
+
+/* The field that opens it: shaped like a DatePicker's input. */
+.field-month {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-8);
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+.field-month > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field-month .icon { width: 14px; height: 14px; color: var(--color-text-quaternary); }
+.field-month.is-empty { color: var(--color-text-quaternary); }
+
+/* ─── Export dialog (app/export-menu.js) ────────────────────────────────────
+ * Three formats, each a full-width button: its file icon, a name and what it
+ * holds. Picking one closes the dialog and makes the file. */
+.export-choices {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    width: min(400px, 100%);
+}
+.export-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-12);
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-12) var(--space-16);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background: var(--color-bg-container);
+    color: var(--color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+.export-choice > .icon { flex: none; width: 24px; height: 24px; margin-top: 2px; color: var(--color-primary); }
+.export-choice:hover { border-color: var(--color-primary-hover); }
+.export-choice:active { background: var(--control-item-bg-active); border-color: var(--color-primary-active); }
+.export-choice:focus-visible { outline: 4px solid var(--color-primary-border); outline-offset: 1px; border-color: var(--color-primary); }
+.export-choice-text { display: flex; flex-direction: column; gap: var(--space-4); }
+.export-choice-title { font-weight: var(--font-weight-strong); line-height: var(--line-height); }
+.export-choice-desc { color: var(--color-text-secondary); font-size: var(--font-size-sm); line-height: 20px; }
+@media (prefers-reduced-motion: reduce) { .export-choice { transition: none; } }
