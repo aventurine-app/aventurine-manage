@@ -160,6 +160,8 @@ export default [
   {
     ignores: [
       'electron/dist/**',
+      // The account server's build output: copies of account-server/static.
+      'account-server/dist/**',
       '**/node_modules/**',
       // Throwaway working files, not app code. See .scratch/README.md.
       '.scratch/**',
@@ -221,6 +223,31 @@ export default [
       sourceType: 'commonjs',
       globals: globals.node,
     },
+  },
+
+  // The account server (account-server/): a Cloudflare Worker (ES modules,
+  // Web APIs), its Node build scripts (CJS) and node:test suites (ESM), and
+  // the privacy page's classic browser scripts.
+  {
+    files: ['account-server/worker/src/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: { ...globals.serviceworker, console: 'readonly' },
+    },
+  },
+  {
+    files: ['account-server/scripts/**/*.js'],
+    languageOptions: { ecmaVersion: 2024, sourceType: 'commonjs', globals: globals.node },
+  },
+  {
+    files: ['account-server/**/*.mjs'],
+    languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: globals.node },
+  },
+  {
+    files: ['account-server/static/js/**/*.js'],
+    // common.js sets window.authPost for the page script after it.
+    languageOptions: { ecmaVersion: 2024, sourceType: 'script', globals: { ...globals.browser, authPost: 'readonly' } },
   },
 
   // This config file itself: Node ESM.

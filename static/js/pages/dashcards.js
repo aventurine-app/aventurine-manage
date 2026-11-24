@@ -1324,21 +1324,16 @@
     }));
 
     // ─── Default layout ──────────────────────────────────────────────────────
-    // The Dashboard as it always was: the Year to Year cards over the Month to
-    // Month ones, so a database that never saved a layout opens on the page its
-    // user already knows.
+    // What a database that never saved a layout opens on: one row of Net Worth,
+    // Spending and Recent Transactions, each a third of the width.
     // A card here is { type, x, y, w, h, period?, settings? }; the page fills in
     // the id and anything left out from the card's own definition.
-    const MONTH_THIS = { preset: 'month', month: null };
     const OVERVIEW = {
         name: 'Overview',
         cards: [
             { type: 'networth', x: 0, y: 0, w: 4, h: 6 },
-            { type: 'accounts', x: 4, y: 0, w: 4, h: 6 },
-            { type: 'incomeExpenses', x: 8, y: 0, w: 4, h: 6 },
-            { type: 'cashflow', x: 0, y: 6, w: 4, h: 6, period: MONTH_THIS },
-            { type: 'balances', x: 4, y: 6, w: 4, h: 6, period: MONTH_THIS },
-            { type: 'spending', x: 8, y: 6, w: 4, h: 6, period: MONTH_THIS },
+            { type: 'spending', x: 4, y: 0, w: 4, h: 6 },
+            { type: 'transactions', x: 8, y: 0, w: 4, h: 6 },
         ],
     };
 

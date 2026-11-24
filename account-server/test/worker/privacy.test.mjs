@@ -448,3 +448,19 @@ test('the daily job drops links after a day, holds after 30 days, and the log af
     await site.cron();
     assert.equal(count(site, 'privacy_requests'), 0);
 });
+
+test('a beta spot is in the report, and a deletion gives it up', async (t) => {
+    const site = setup(t);
+    const joinBeta = (email) => site.call('/api/beta/join', { method: 'POST', origin: SITE, json: { email } });
+    await joinBeta(ALICE);
+    await joinBeta('bob@example.com');
+
+    const held = await (await report(site, await tokenFor(site, ALICE))).json();
+    assert.equal(held.holdsData, true);
+    assert.equal(held.beta.joinedAt, new Date(site.clock.now).toISOString());
+    assert.equal(held.beta.claimedAt, null);
+
+    assert.equal((await erase(site, await tokenFor(site, ALICE))).status, 200);
+    assert.ok(!wholeDatabase(site).includes(ALICE), 'the address survived');
+    assert.equal(count(site, 'beta_members'), 1, 'bob keeps his spot');
+});

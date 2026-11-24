@@ -123,7 +123,8 @@
         }));
 
         document.getElementById('report-download').addEventListener('click', () => {
-            const { ok: _ok, ...copy } = report;
+            const copy = { ...report };
+            delete copy.ok;
             const url = URL.createObjectURL(new Blob([JSON.stringify(copy, null, 2)], { type: 'application/json' }));
             const link = document.createElement('a');
             link.href = url;

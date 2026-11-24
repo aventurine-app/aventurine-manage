@@ -89,7 +89,26 @@
         document.documentElement.classList.add('has-rail');
     }
     // Likewise the sidebar's folded sections ('manage', 'plan'; nav.js).
-    // Each folds on its own; with nothing saved yet, all are open.
+    // Each folds on its own. The app always launches with Manage open and
+    // the rest folded; after that, folds are remembered from page to page.
+    // "After that" is told by a slot in the window's ViewState bag
+    // (core/viewstate.js, loaded later, so its format is read by hand here):
+    // window.name lives as long as the window, so a launch finds it empty.
+    // A database switch clears the bag too, which resets the folds the same way.
+    const VIEWSTATE_TAG = 'aventurine:viewstate';
+    let bag = null;
+    try {
+        const parsed = JSON.parse(window.name);
+        if (parsed && parsed.tag === VIEWSTATE_TAG && parsed.slots) bag = parsed;
+    } catch { /* unset or not ours */ }
+    if (!(bag && bag.slots.navStarted)) {
+        localStorage.setItem('nav-closed', 'plan');
+        if (bag || !window.name) {
+            bag = bag || { tag: VIEWSTATE_TAG, slots: {} };
+            bag.slots.navStarted = true;
+            window.name = JSON.stringify(bag);
+        }
+    }
     const navClosed = localStorage.getItem('nav-closed');
     if (navClosed) document.documentElement.dataset.navClosed = navClosed;
 

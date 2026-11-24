@@ -138,15 +138,19 @@
     text-overflow: ellipsis;
 }
 .tx-import-dupe { flex: none; gap: 6px; }
+/* The auto-fill icon's column is reserved on every row, so the Select is the
+   same width whether or not the row was categorized for the user. */
 .tx-import-cat {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1em;
     align-items: center;
     gap: 6px;
 }
-.tx-import-cat .ant-select { flex: 1; min-width: 0; }
+.tx-import-cat .ant-select { min-width: 0; }
 .tx-import-auto {
     display: inline-flex;
-    flex: none;
+    justify-content: center;
+    width: 1em;
     color: var(--ant-color-primary-text);
     border-radius: var(--ant-radius-sm);
 }
