@@ -184,14 +184,14 @@ html[data-theme="dark"] .tx-cat-btn:hover .tx-cat-tag { filter: brightness(1.15)
 
 /* Tag: like the category, the row's tag is the button that changes it. With
    no tag, a quiet "+ Add tag" waits for the row to be pointed at or focused,
-   so an untagged ledger is not a column of buttons. The header carries the
-   way to Manage tags. */
-.tx-th-tag {
+   so an untagged ledger is not a column of buttons. The Tag and Category
+   headers carry a gear to Manage tags and Manage categories. */
+.tx-th-manage {
     display: inline-flex;
     align-items: center;
     gap: 4px;
 }
-.tx-manage-tags { color: var(--ant-color-text-tertiary); }
+.tx-manage-btn { color: var(--ant-color-text-tertiary); }
 .tx-tag {
     max-width: 100%;
     overflow: hidden;

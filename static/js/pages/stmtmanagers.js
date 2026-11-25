@@ -9,6 +9,9 @@
 // controllers that bootstrapYearTablePage returned (widgets/tables.js), and
 // reload the tables behind the modal as each change lands.
 //
+// Manage categories is Manage Columns' Categories tab on its own, opened by
+// the gear in the Transactions ledger's Category header (transactions.js).
+//
 //   Manage Years — a statement year spans both statements, so adding,
 //     renumbering and removing act on every dataset that holds the year.
 //     A year with transactions is locked: its cells are computed from them,
@@ -640,5 +643,23 @@
         select(tabs.some((t) => t.key === tab) ? tab : tabs[0].key, true);
     }
 
-    window.StatementManagers = { openYears, openColumns };
+    // ─── Manage categories ──────────────────────────────────────────────────
+
+    /** The Categories tab alone, for the Transactions ledger. onChanged runs
+     *  once on close, and only if a change was saved. */
+    function openCategories({ onChanged = null } = {}) {
+        let changed = false;
+        const { dialog, close } = Ant.modal({
+            title: 'Manage categories',
+            width: 640,
+            className: 'stmt-columns-modal',
+            body: '<div class="stmt-modal-panel"></div>',
+            footer: '<button type="button" class="ant-btn ant-btn-primary" data-act="done">Done</button>',
+            onClose: () => { if (changed && onChanged) onChanged(); },
+        });
+        mountCategories(dialog.querySelector('.stmt-modal-panel'), { onChange: async () => { changed = true; } });
+        dialog.querySelector('[data-act="done"]').addEventListener('click', close);
+    }
+
+    window.StatementManagers = { openYears, openColumns, openCategories };
 }());

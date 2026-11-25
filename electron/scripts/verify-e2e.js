@@ -105,6 +105,18 @@ app.whenReady().then(async () => {
     check('tx table boots with data', await evalJs(
       'new Promise(res => setTimeout(() => res(!!document.querySelector(".tx-row, .tx-table tbody tr")), 800))'
     ));
+    // The Category header's gear opens Manage categories: the Statements
+    // Categories editor alone (stmtmanagers.js, loaded here too), no tabs.
+    await evalJs('document.querySelector("[data-manage-categories]").click()');
+    check('Transactions → Category gear opens Manage categories', await evalJs(
+      'new Promise(res => setTimeout(() => res('
+        + 'document.querySelector(".stmt-columns-modal .ant-modal-title")?.textContent === "Manage categories"'
+        + ' && !document.querySelector(".stmt-columns-modal [role=tab]")'
+        + ' && document.querySelectorAll(".stmt-columns-modal .stmt-cat-card").length === 3'
+        + ' && document.querySelectorAll(".stmt-columns-modal .stmt-cat-card [data-id]").length > 0'
+        + '), 800))'
+    ));
+    await evalJs('document.querySelector(".stmt-columns-modal [data-act=\'done\']").click()');
     // Import stack load-order contract: txparse.js (pure parser) must attach
     // TxParse before txfileimport.js destructures it — a broken order leaves
     // TxFileImport undefined and the Import button dead.

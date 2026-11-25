@@ -1,0 +1,93 @@
+/* ============================================================================
+   stmtmanagers.css — the managers in pages/stmtmanagers.js, in Ant Design.
+   ============================================================================
+   Loaded by Statements (Manage Years, Manage Columns) and by Transactions,
+   whose Category header opens Manage categories.
+   ============================================================================ */
+
+/* ─── Managers (stmtmanagers.js) ────────────────────────────────────────────
+   Manage Years, Manage Columns and Manage categories: lists whose rows are a name (with Ant's
+   edit pencil) and its actions, and a joined field-and-button to add one. */
+.stmt-modal-note {
+    margin: 0 0 12px;
+    color: var(--ant-color-text-tertiary);
+}
+
+.stmt-modal-tabs { margin-bottom: 16px; }
+
+/* Manage Columns (and Manage categories, its Categories tab alone) fits the
+   window: the title, tabs and Done stay put and the open tab's list scrolls
+   inside the modal, not the overlay behind it. The
+   cap is the window less the overlay's 100px top and 24px bottom padding. */
+.confirm-dialog.ant-modal.stmt-columns-modal {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 124px);
+}
+.stmt-columns-modal .ant-modal-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.stmt-columns-modal .stmt-modal-tabs { flex: none; }
+.stmt-columns-modal .stmt-modal-panel {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Room for focus rings at the panel's edges, which would be clipped. */
+    padding: 2px;
+    margin: -2px;
+}
+.stmt-columns-modal .stmt-modal-panel[hidden] { display: none; }
+
+.stmt-item-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.stmt-item-main .ant-typography-edit { margin-inline-start: -4px; }
+.stmt-item-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.stmt-year-value {
+    font-weight: var(--ant-font-weight-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The name's field while it is being edited: a small input in the row. */
+.stmt-edit-input {
+    width: 220px;
+    max-width: 100%;
+    height: var(--ant-control-height-sm);
+    padding: 0 7px;
+}
+.stmt-edit-input[type="number"] { width: 96px; }
+
+/* Why a control cannot be used (a year with transactions, a category still
+   in use) is a Tooltip on the pointer and part of the control's name for a
+   screen reader. The Required tag is a tab stop, so its reason can be read
+   from the keyboard too. */
+.stmt-lock,
+.stmt-tip-wrap {
+    display: inline-flex;
+    align-items: center;
+}
+.stmt-lock { color: var(--ant-color-text-tertiary); }
+.stmt-cat-card .ant-tag:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+}
+
+.stmt-year-add { align-self: flex-start; margin-top: 12px; }
+.stmt-year-add .ant-input { width: 120px; font-variant-numeric: tabular-nums; }
+
+.stmt-add-row { margin-top: 8px; }
+.stmt-account-list + .stmt-add-row { margin-top: 12px; }
+.stmt-add-row > .ant-btn { flex: none; }
+.stmt-type-select { width: 130px; flex: none; }
+.stmt-add-row .stmt-type-select { width: 140px; }

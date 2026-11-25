@@ -107,7 +107,8 @@ const appGlobals = {
   fmtShortDate: 'readonly',
   // widgets/tables.js (the Statements grid)
   bootstrapYearTablePage: 'readonly',
-  // pages/stmtmanagers.js (the Statements page's Manage Years / Manage Columns)
+  // pages/stmtmanagers.js (the Statements page's Manage Years / Manage Columns,
+  // and Manage categories on Transactions)
   StatementManagers: 'readonly',
   // widgets/txparse.js (pure parsing core; also require()d by the backend
   // test suite) / txfileimport.js / txexport.js / txtags.js

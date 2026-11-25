@@ -6,7 +6,8 @@
 // Account, Category and Tag (each several values at once) and an Amount range.
 // The table is one page of the rows they leave, sortable by date, description
 // or amount, with a selection column. Three cells edit in place: a row's
-// category (a Select over the categories on its side of the ledger), its tag
+// category (a Select over the categories on its side of the ledger; the
+// header's gear opens Manage categories, pages/stmtmanagers.js), its tag
 // (widgets/txtags.js, which also holds the Manage tags dialog) and its note. Four
 // dialogs act on rows: Add transaction, Edit (one row field by field, several
 // as one change, with "apply to similar"), Import (widgets/txfileimport.js) and
@@ -255,10 +256,12 @@
             ${sortableTh('date', 'Date', 'tx-col-date')}
             ${sortableTh('description', 'Description', 'tx-col-desc')}
             <th class="tx-col-account">Account</th>
-            <th class="tx-col-category">Category</th>
+            <th class="tx-col-category"><span class="tx-th-manage">Category
+                <button type="button" class="ant-btn ant-btn-text ant-btn-sm ant-btn-icon-only tx-manage-btn" data-manage-categories
+                    aria-label="Manage categories" data-tip="Manage categories">${Ant.icon('setting')}</button></span></th>
             ${sortableTh('amount', 'Amount', 'tx-col-amount ant-table-cell-end')}
-            <th class="tx-col-tag"><span class="tx-th-tag">Tag
-                <button type="button" class="ant-btn ant-btn-text ant-btn-sm ant-btn-icon-only tx-manage-tags" data-manage-tags
+            <th class="tx-col-tag"><span class="tx-th-manage">Tag
+                <button type="button" class="ant-btn ant-btn-text ant-btn-sm ant-btn-icon-only tx-manage-btn" data-manage-tags
                     aria-label="Manage tags" data-tip="Manage tags">${Ant.icon('setting')}</button></span></th>
             <th class="tx-col-notes">Notes</th>
         </tr>`;
@@ -1428,6 +1431,10 @@
             TxTags.manage({ onChanged: () => reloadLedger({ keepPlace: true }) });
             return;
         }
+        if (e.target.closest('[data-manage-categories]')) {
+            StatementManagers.openCategories({ onChanged: () => reloadLedger({ keepPlace: true }) });
+            return;
+        }
         const empty = e.target.closest('[data-empty-action]');
         if (empty) {
             if (empty.dataset.emptyAction === 'tx-import') TxFileImport.run();
@@ -1518,7 +1525,8 @@
     document.addEventListener('DOMContentLoaded', init);
 
     /** Re-fetch and redraw: after an import (back to the first page, nothing
-     *  ticked), and after Manage tags changed the vocabulary, since a rename,
+     *  ticked), and after Manage tags or Manage categories changed the
+     *  vocabulary, since a rename,
      *  merge or delete reaches rows on every page (`keepPlace`: stay put). */
     async function reloadLedger({ keepPlace = false } = {}) {
         if (!keepPlace) {
