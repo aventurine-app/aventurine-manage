@@ -20,7 +20,7 @@
 // copy, paste and delete, and draws the border that marks the current cell.
 //
 // Cash Flow cells blend per cell (CLAUDE.md, rule 10): a cell shows the
-// month's transaction sum, in the primary colour, until a typed value
+// month's transaction sum, in italic primary colour, until a typed value
 // overrides it; the ↺ button clears the override. Balance Sheet cells are
 // typed balances; an empty month at or before this one shows, faded, the
 // balance carried forward from the last month that has one, the same
@@ -243,7 +243,7 @@
 
     // ─── Cell provenance (Cash Flow) ────────────────────────────────────────
     // A cell is either computed (no stored entry: the month's transaction sum,
-    // in the primary colour; blank when there is none) or the user's (a stored
+    // in italic primary colour; blank when there is none) or the user's (a stored
     // entry: plain text). A user value over a computed one grows the ↺ button,
     // which clears the entry and hands the cell back to the transactions.
 

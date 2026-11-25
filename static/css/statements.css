@@ -236,9 +236,12 @@ html[data-theme="dark"] .stmt-years { --stmt-pin-shadow: rgba(0, 0, 0, 0.6); }
     color: inherit;
 }
 
-/* Computed from transactions: the primary colour (the legend under the table
-   says so in words). */
-.cell-computed { color: var(--ant-color-primary-text); }
+/* Computed from transactions: the primary colour and italic (the legend under
+   the table says so in words). */
+.cell-computed {
+    color: var(--ant-color-primary-text);
+    font-style: italic;
+}
 
 /* A cleared override fading its computed value back in: the moment that
    shows clearing a cell returns it to the transactions. */
