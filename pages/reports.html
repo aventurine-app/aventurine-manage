@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/static/css/trends.css">
     <link rel="stylesheet" href="/static/css/transfers.css">
     <link rel="stylesheet" href="/static/css/metrics.css">
+    <link rel="stylesheet" href="/static/css/insights.css">
 </head>
 <body>
     <!-- @include titlebar -->
@@ -39,6 +40,10 @@
             data-tab="forecast" aria-controls="rep-panel-forecast" aria-selected="false" tabindex="-1">Forecast</button>
         <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-metrics" role="tab"
             data-tab="metrics" aria-controls="rep-panel-metrics" aria-selected="false" tabindex="-1">Metrics</button>
+        <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-inflation" role="tab"
+            data-tab="inflation" aria-controls="rep-panel-inflation" aria-selected="false" tabindex="-1">Inflation</button>
+        <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-beta" role="tab"
+            data-tab="beta" aria-controls="rep-panel-beta" aria-selected="false" tabindex="-1">Lifestyle Beta</button>
     </div>
 
     <div class="rep-panel" id="rep-panel-cashflow" role="tabpanel"
@@ -385,6 +390,104 @@
 
     </div><!-- /.rep-panel -->
 
+    <div class="rep-panel" id="rep-panel-inflation" role="tabpanel"
+        data-panel="inflation" aria-labelledby="rep-tab-inflation" tabindex="0" hidden>
+
+<!-- Personal Inflation. Three cards laid out to the viewport, like Cash Flow:
+     the headline figures and the chart stay put at the top, and the merchant
+     (or category) table takes what is left and scrolls its body under a fixed header, so the
+     chart stays in view while every merchant is browsed. With no merchant
+     picked the chart is the overall price index; picking a row swaps in that
+     merchant's visits. Controller: static/js/pages/insights.js. Maths:
+     services/inflation.js. -->
+<div class="ins-page ins-infl-page">
+    <section class="ant-card ins-infl-stats" aria-label="Personal inflation">
+        <div class="ant-card-body">
+            <div class="ins-stats ins-stats-even" id="inflation-stats"></div>
+        </div>
+    </section>
+
+    <div class="ins-infl-main" id="inflation-split">
+        <section class="ant-card ins-detail" aria-labelledby="inflation-detail-title">
+            <div class="ant-card-head"><div class="ant-card-head-wrapper">
+                <h2 class="ant-card-head-title" id="inflation-detail-title"></h2>
+                <div class="ant-card-extra ins-detail-extra" id="inflation-detail-link"></div>
+            </div></div>
+            <div class="ant-card-body">
+                <div class="ins-detail-stats" id="inflation-detail-stats"></div>
+                <div class="chart-area"><div class="ins-plot" id="inflation-chart"></div></div>
+            </div>
+        </section>
+
+        <!-- The merchant table, drawn as the Transactions ledger is (ant-table,
+             middle size, sorters in the header). Header and body are two tables
+             over one set of column widths, Ant's scroll.y layout: only the body
+             scrolls, so the scrollbar starts under the header, not beside it.
+             The Segmented above it switches the rows between merchants and
+             categories; both open in the chart the same way. -->
+        <section class="ant-card ant-card-small ins-table-card" aria-label="Merchants">
+            <div class="ant-card-head"><div class="ant-card-head-wrapper">
+                <div class="ant-card-head-title">
+                    <div class="ant-segmented ant-segmented-sm" id="inflation-view" role="group" aria-label="List by">
+                        <button type="button" class="ant-segmented-item" data-view="merchants" aria-pressed="true">Merchants</button>
+                        <button type="button" class="ant-segmented-item" data-view="categories" aria-pressed="false">Categories</button>
+                    </div>
+                </div>
+            </div></div>
+            <div class="ins-table-head">
+                <table class="ant-table ant-table-middle ant-table-fixed ins-table-merchants">
+                    <colgroup><col><col class="ins-col-count"><col class="ins-col-change"></colgroup>
+                    <thead id="inflation-thead"></thead>
+                </table>
+            </div>
+            <div class="ins-table-body" id="inflation-list">
+                <table class="ant-table ant-table-middle ant-table-fixed ins-table-merchants">
+                    <colgroup><col><col class="ins-col-count"><col class="ins-col-change"></colgroup>
+                    <tbody id="inflation-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
+
+    </div><!-- /.rep-panel -->
+
+    <div class="rep-panel" id="rep-panel-beta" role="tabpanel"
+        data-panel="beta" aria-labelledby="rep-tab-beta" tabindex="0" hidden>
+
+<!-- Lifestyle Beta. The answer in a sentence and a number, how much to trust
+     it, then the scatter it was fitted on and the categories it breaks into.
+     Controller: static/js/pages/insights.js. Maths: services/lifestyleBeta.js. -->
+<div class="ins-page">
+    <section class="ant-card" aria-labelledby="beta-title">
+        <div class="ant-card-head"><div class="ant-card-head-wrapper">
+            <h2 class="ant-card-head-title" id="beta-title">Lifestyle Beta<span class="ant-info-tip" tabindex="0" role="note"
+                aria-label="Borrowed from investing: a stock's beta is how much it moves when the market moves. Here the market is your income and the stock is your spending. Beta is how many dollars of spending follow each extra dollar of income, measured on 3-month rolling averages so paycheck timing and one-off bills do not dominate. Transfers to your own accounts are left out of both. The current, incomplete month is excluded."
+                data-tip="Borrowed from investing: a stock's beta is how much it moves when the market moves. Here the market is your income and the stock is your spending. Beta is how many dollars of spending follow each extra dollar of income, measured on 3-month rolling averages so paycheck timing and one-off bills do not dominate. Transfers to your own accounts are left out of both. The current, incomplete month is excluded."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
+        </div></div>
+        <div class="ant-card-body">
+            <div class="ins-stats" id="beta-stats"></div>
+            <div class="ins-split ins-split-even" id="beta-split">
+                <section class="ant-card ant-card-type-inner" aria-labelledby="beta-scatter-title">
+                    <div class="ant-card-head"><div class="ant-card-head-wrapper">
+                        <h3 class="ant-card-head-title" id="beta-scatter-title">Income vs. spending, 3-month averages</h3>
+                    </div></div>
+                    <div class="ant-card-body"><div class="chart-area"><div class="ins-plot" id="beta-chart"></div></div></div>
+                </section>
+                <section class="ant-card ant-card-type-inner" aria-labelledby="beta-cats-title">
+                    <div class="ant-card-head"><div class="ant-card-head-wrapper">
+                        <h3 class="ant-card-head-title" id="beta-cats-title">Where the extra $100 goes</h3>
+                    </div></div>
+                    <div class="ant-card-body" id="beta-cats"></div>
+                </section>
+            </div>
+            <div class="ins-years" id="beta-years"></div>
+        </div>
+    </section>
+</div>
+
+    </div><!-- /.rep-panel -->
+
 </div><!-- /.rep-reports -->
 
         </div>
@@ -413,5 +516,6 @@
     <script src="/static/js/pages/topmerchants.js"></script>
     <script src="/static/js/pages/transfers.js"></script>
     <script src="/static/js/pages/metrics.js"></script>
+    <script src="/static/js/pages/insights.js"></script>
 </body>
 </html>

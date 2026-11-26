@@ -1,0 +1,388 @@
+/* ============================================================================
+   insights.css — Reports → Inflation and Reports → Lifestyle Beta.
+   Controller: static/js/pages/insights.js. The cards, tags and statistics are
+   ant.css; the tab shell and page padding are forecast.css. Every chart colour
+   is a custom property, so a theme flip restyles the SVG without a redraw.
+   ============================================================================ */
+
+.ins-page {
+    --ins-up: var(--ant-color-error-text);
+    --ins-down: var(--ant-color-success-text);
+    --ins-flat: var(--ant-color-text-tertiary);
+    --ins-pos: var(--ant-color-primary);
+    --ins-neg: var(--ant-color-text-quaternary);
+    --ins-index: var(--ant-color-info);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Direction is never colour alone: every coloured figure also carries an arrow
+   (▲ ▼ ■) and a signed number. */
+.ins-up   { color: var(--ins-up); }
+.ins-down { color: var(--ins-down); }
+.ins-flat { color: var(--ins-flat); }
+.ins-muted { color: var(--ant-color-text-tertiary); fill: var(--ant-color-text-tertiary); }
+
+/* ─── Headline statistics ──────────────────────────────────────────────────── */
+.ins-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px 48px;
+    margin-bottom: 24px;
+}
+.ins-stats:empty { display: none; }
+.ins-stat { min-width: 0; }
+.ins-stat .ant-statistic-content small {
+    margin-left: 2px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size);
+}
+.ins-stat-foot {
+    max-width: 30ch;
+    margin-top: 4px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+}
+
+.ins-verdict { flex: 1 1 360px; min-width: 0; }
+.ins-sentence {
+    margin: 0 0 8px;
+    color: var(--ant-color-text);
+    font-size: var(--ant-font-size-lg);
+    line-height: 1.5;
+}
+.ins-confidence {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0;
+    color: var(--ant-color-text-secondary);
+}
+
+/* ─── List + detail, side by side ──────────────────────────────────────────── */
+.ins-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+.ins-split-even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 1100px) {
+    .ins-split, .ins-split-even { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ─── Inflation: laid out to the viewport ─────────────────────────────────────
+   The Cash Flow pattern (forecast.css): while this tab is showing, the reports
+   column takes a DEFINITE height, and a chain of flex:1 / min-height:0 boxes
+   hands what is left after the stats card and the chart card to the merchant
+   table, whose body scrolls on its own. The page itself does not scroll, so the
+   chart stays in view. The table keeps a floor; below it (a very short window)
+   the page scrolls after all rather than squeezing the table to nothing. */
+.rep-reports:has(#rep-panel-inflation:not([hidden])) {
+    box-sizing: border-box;
+    height: 100%;
+}
+#rep-panel-inflation:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+.ins-infl-page,
+.ins-infl-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    gap: 16px;
+}
+.ins-infl-main[hidden] { display: none; }
+.ins-infl-stats,
+.ins-infl-main .ins-detail { flex: none; }
+.ins-infl-stats .ins-stats { margin: 0; }
+
+.ins-infl-main .ins-detail > .ant-card-body { padding: 12px 24px; }
+
+/* The four headline figures share the row evenly. */
+.ins-stats-even {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px 24px;
+}
+@media (max-width: 900px) {
+    .ins-stats-even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.ins-stats-even .ins-stat-foot { max-width: 34ch; }
+
+.ins-detail-extra { display: flex; align-items: center; gap: 8px; }
+.ins-detail-extra .ant-btn { display: inline-flex; align-items: center; gap: 4px; }
+.ins-detail .ant-card-head-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.ins-detail-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px 32px;
+    /* Holds one line even when empty (the overall index shows no figures),
+       so opening a merchant does not move the chart or the list below. */
+    min-height: 22px;
+    margin-bottom: 8px;
+}
+.ins-mini { display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.ins-mini-label, .ins-mini-foot { color: var(--ant-color-text-tertiary); font-size: var(--ant-font-size-sm); }
+.ins-mini strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* The flex gap already spaces the ⓘ off the title; drop the tip's own margin
+   so it sits as close as the ⓘ on every other title. */
+.ins-detail .ant-card-head-title > .ant-info-tip { margin-inline-start: -2px; }
+.ins-head-figure {
+    margin-inline-start: 8px;
+    font-size: var(--ant-font-size-lg);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.ins-head-since {
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size);
+    font-weight: normal;
+}
+.ins-detail-stats .ant-statistic-content { font-size: var(--ant-font-size-heading-4); }
+
+/* ─── Merchant table ──────────────────────────────────────────────────────────
+   An ant-table like the Transactions ledger (middle size, column splits in the
+   header, row hover, the sorted column tinted, the selected-row tint), drawn as
+   Ant's scroll.y table: the header is its own table over the same <colgroup>,
+   and only the body scrolls, so the scrollbar runs under the header rather
+   than up beside it. Both halves reserve the same scrollbar gutter, which is
+   what keeps the header's columns over the body's. */
+.ins-table-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 200px;
+    overflow: clip;
+}
+/* The Merchants ⇄ Categories switch sits in a small card head over the table. */
+.ins-table-card > .ant-card-head { flex: none; }
+.ins-table-head {
+    flex: none;
+    overflow: hidden;
+    scrollbar-gutter: stable;
+    /* The same thin bar as the body, so the two gutters are the same width. */
+    scrollbar-width: thin;
+    /* The header tint runs on over the gutter, as Ant's scrollbar cell does. */
+    background: var(--ant-table-header-bg);
+    border-bottom: var(--ant-line-width) solid var(--ant-color-border-secondary);
+}
+.ins-table-head .ant-table { background: transparent; }
+.ins-table-head th { border-bottom: 0; }
+.ins-table-head th:first-child,
+.ins-table-head th:last-child { border-radius: 0; }
+.ins-table-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+}
+.ins-table-body tbody tr:last-child > td { border-bottom: 0; }
+.ins-table-merchants .ins-col-count { width: 150px; }
+.ins-table-merchants .ins-col-change { width: 38%; }
+.ins-table-merchants td { vertical-align: middle; }
+
+.ins-tr { cursor: pointer; }
+.ins-tr:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+}
+.ins-tr.is-varied .ins-num,
+.ins-tr.is-varied .ins-change { opacity: 0.75; }
+.ins-num { font-variant-numeric: tabular-nums; }
+
+.ins-merchant {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.ins-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ins-varied { flex: none; font-size: 11px; line-height: 18px; color: var(--ant-color-text-tertiary); }
+.ins-change-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px;
+    align-items: center;
+    gap: 12px;
+}
+.ins-change {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Diverging bar: zero in the middle, rises right, falls left. */
+.ins-dbar {
+    position: relative;
+    display: block;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--ant-color-fill-secondary);
+}
+.ins-dbar::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    left: 50%;
+    width: 1px;
+    background: var(--ant-color-text-quaternary);
+}
+.ins-dbar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 4px;
+}
+/* The end that meets the zero line is square, so the bar reads as growing out
+   of it; only the far end is rounded. */
+.ins-dbar-right { border-start-start-radius: 0; border-end-start-radius: 0; }
+.ins-dbar-left  { border-start-end-radius: 0; border-end-end-radius: 0; }
+.ins-fill-up   { background: var(--ins-up); }
+.ins-fill-down { background: var(--ins-down); }
+.ins-fill-flat { background: var(--ins-flat); }
+.ins-fill-pos  { background: var(--ins-pos); }
+.ins-fill-neg  { background: var(--ins-neg); }
+
+/* ─── Category betas ───────────────────────────────────────────────────────── */
+.ins-crow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(80px, 1.2fr) 72px;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-split);
+}
+.ins-crow:last-of-type { border-bottom: 0; }
+.ins-cname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ins-cval { text-align: end; font-variant-numeric: tabular-nums; }
+.ins-note {
+    margin: 0 0 12px;
+    color: var(--ant-color-text-tertiary);
+    font-size: var(--ant-font-size-sm);
+}
+.ins-crow + .ins-note { margin: 12px 0 0; }
+
+/* ─── Year table ───────────────────────────────────────────────────────────── */
+.ins-years { margin-top: 24px; overflow-x: auto; }
+.ins-years:empty { display: none; }
+.ins-table {
+    width: 100%;
+    max-width: 640px;
+    margin-bottom: 8px;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+.ins-table th,
+.ins-table td {
+    padding: 8px 12px;
+    border-bottom: var(--ant-line-width) solid var(--ant-color-split);
+    text-align: end;
+}
+.ins-table th:first-child,
+.ins-table td:first-child { text-align: start; }
+.ins-table th {
+    color: var(--ant-color-text-tertiary);
+    font-weight: normal;
+    font-size: var(--ant-font-size-sm);
+}
+
+/* ─── Plots ────────────────────────────────────────────────────────────────── */
+.ins-plot { position: relative; width: 100%; }
+.ins-svg { display: block; overflow: visible; }
+.ins-grid line { stroke: var(--ant-color-border-secondary); stroke-width: 1; }
+.ins-axis, .ins-axis-title {
+    fill: var(--ant-color-text-secondary);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+.ins-axis-title { font-size: 12px; }
+
+.ins-dots circle {
+    fill: var(--ant-color-text-secondary);
+    fill-opacity: 0.7;
+    stroke: var(--ant-color-bg-container);
+    stroke-width: 1.5;
+}
+.ins-bdots circle {
+    fill: var(--ins-pos);
+    stroke: var(--ant-color-bg-container);
+    stroke-width: 2;
+}
+.ins-dot-hi {
+    fill: none;
+    stroke: var(--ant-color-text);
+    stroke-width: 2;
+    pointer-events: none;
+}
+.ins-split-line {
+    stroke: var(--ant-color-text-quaternary);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+}
+.ins-avg { stroke-width: 2.5; stroke-linecap: round; }
+.ins-avg-early { stroke: var(--ant-color-text); }
+.ins-stroke-up   { stroke: var(--ins-up); }
+.ins-stroke-down { stroke: var(--ins-down); }
+.ins-stroke-flat { stroke: var(--ins-flat); }
+.ins-avg-label {
+    fill: var(--ant-color-text);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    paint-order: stroke;
+    stroke: var(--ant-color-bg-container);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+.ins-avg-label.ins-muted { fill: var(--ant-color-text-tertiary); font-weight: normal; }
+/* The Personal Price Index line: the theme's blue in both directions. */
+.ins-trend { fill: none; stroke: var(--ins-index); stroke-width: 2.5; stroke-linecap: round; }
+.ins-trend-end { fill: var(--ins-index); stroke: var(--ant-color-bg-container); stroke-width: 2; }
+.ins-guide { stroke: var(--ant-color-border); stroke-width: 1; pointer-events: none; }
+.ins-diag {
+    stroke: var(--ant-color-text-tertiary);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 5;
+}
+.ins-fit {
+    stroke: var(--ins-pos);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.ins-tip {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 10px;
+    border-radius: var(--ant-radius, 6px);
+    background: var(--ant-color-bg-elevated, var(--ant-color-bg-container));
+    box-shadow: var(--ant-box-shadow-secondary, 0 6px 16px rgba(0, 0, 0, 0.12));
+    color: var(--ant-color-text-secondary);
+    font-size: var(--ant-font-size-sm);
+    white-space: nowrap;
+    pointer-events: none;
+}
+.ins-tip[hidden] { display: none; }
+.ins-tip strong { color: var(--ant-color-text); font-variant-numeric: tabular-nums; }

@@ -15,6 +15,7 @@ const routes = [
   ...require('./handlers/forecast').routes,
   ...require('./handlers/trends').routes,
   ...require('./handlers/topMerchants').routes,
+  ...require('./handlers/insights').routes,
   ...require('./handlers/transfers').routes,
   ...require('./handlers/recurring').routes,
   ...require('./handlers/budgets').routes,

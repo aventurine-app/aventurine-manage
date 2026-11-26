@@ -14,6 +14,11 @@
 // pushed, because every move replaces the document, so the next reader is
 // always a fresh page asking again.
 //
+// One exception to "every move replaces the document": Reports keeps its open
+// tab in the URL hash (static/js/pages/reports.js), so a move between two of
+// its tabs stays on the same document. That move ends at the 'popstate' below,
+// which re-opens the latch and re-reads the button state.
+//
 // Page state is NOT carried across a move. A history navigation is a full
 // document load, so the arriving page runs its own init and starts at its
 // defaults. Restoring filters, tabs and scroll is a separate piece of work.
@@ -83,6 +88,14 @@
             .catch(() => { /* no answer — both stay disabled, as they start */ });
     }
     syncButtons();
+
+    // A move that stayed on this document (a hash entry — see the header) has
+    // landed: nothing will replace the page, so release the latch now, and the
+    // position in the trail has changed, so ask again which directions exist.
+    // Also covers a new hash entry being pushed (a Reports tab click), which
+    // leaves nothing to go forward to.
+    window.addEventListener('popstate', () => { moving = false; syncButtons(); });
+    window.addEventListener('hashchange', syncButtons);
 
     // ── Keyboard ─────────────────────────────────────────────────────────────
     // Alt+Left / Alt+Right off macOS, Cmd+[ / Cmd+] on it. The split is not
