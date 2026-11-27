@@ -1,50 +1,58 @@
 'use strict';
 
 // ─── theme-init.js ──────────────────────────────────────────────────────────
-// Applies the saved color theme before first paint. Loaded as a classic
-// (blocking) script in <head> so it runs synchronously during parsing —
+// Applies the saved colour mode and theme before first paint. Loaded as a
+// classic (blocking) script in <head> so it runs synchronously during parsing —
 // CSP-compatible (script-src 'self' forbids inline scripts).
 //
-// Sets the data-theme attribute on <html> from localStorage so the saved
-// theme is the FIRST paint, with no flash of the default theme on nav.
+// Two choices, stored apart:
+//   'color-mode'  'light' (the default), 'dark' or 'system' (follow the OS; the
+//                 live picker, settings.js, repaints when the OS flips).
+//   'app-theme'   '' for the Default theme (static/css/theme.css), else the id
+//                 of a theme file in the user's themes folder (electron/
+//                 themes.js): the file name less ".css".
 //
-// Stored 'color-theme' values: '' (Light, the default), 'dark', 'gruvbox',
-// 'oblivion', 'flexoki-light', 'flexoki-dark', or 'system' (follow the OS; the live picker, settings.js, repaints it when the
-// OS preference changes while the app is open). Gruvbox is a dark theme: it
-// paints data-theme="dark", so every dark-only rule applies, plus
-// data-palette="gruvbox", which re-points the colours (theme.css §5).
-// Oblivion and Flexoki Dark are painted the same way (§6, §8). Flexoki Light
-// is the one palette theme on the light base: no data-theme, only
-// data-palette="flexoki-light" (§7). The surfaces Manage used to offer are read as the nearest one:
-// Warm Dark as Dark, and Mixed ('colorful'), Warm Light and the hue tints
-// ('tint-<hue>') as Light. A stale value is rewritten, so the picker lights the
-// choice that is actually painted.
+// On <html>: data-mode="light|dark" always, the hook every theme file's two
+// halves hang on (:root[data-mode="light"] / [data-mode="dark"]), and
+// data-theme="dark" in dark mode, which every dark-only rule in the app reads.
+// A theme file loads as <link id="app-theme-file"> from
+// app://aventurine/themes/<id>.css, render-blocking so the first paint is
+// already in its colours. A file that has gone missing simply 404s, and the
+// Default theme shows until the picker (which can see the folder) resets it.
 //
-// The chart colours are part of the theme (theme.css); there is no separate
-// graph palette any more.
+// The single 'color-theme' choice Manage used to store (Light, Dark, System,
+// Gruvbox, Oblivion, Flexoki Light/Dark, and the older surfaces read as their
+// nearest) is split into the two keys once, then dropped.
 //
-// The theme lands on <html> as data-theme before first paint, to avoid a flash
-// of the wrong theme on nav. window.appTheme exposes the same reads and the painter to
-// the live picker, so which values exist is decided in this one file. 'ui-density' =
-// 'compact' tightens table row heights (else comfortable) and is applied the
-// same way.
+// The chart colours are part of the theme; there is no separate graph palette.
+// window.appTheme exposes the reads and the painter to the live picker, so
+// which values exist is decided in this one file. 'ui-density' = 'compact'
+// tightens table row heights (else comfortable) and is applied the same way.
 
 (function () {
-    // Retired surfaces, and the theme each is now read as.
-    const RETIRED_SURFACES = { 'warm-dark': 'dark' };
-    // Themes painted as a base (Light '' or 'dark') plus a palette of their
-    // own (theme.css), keyed by palette, valued by base.
-    const PALETTES = {
-        gruvbox: 'dark',
-        oblivion: 'dark',
-        'flexoki-light': '',
-        'flexoki-dark': 'dark',
+    const MODES = ['light', 'dark', 'system'];
+
+    // The old single choice → [mode, theme].
+    const LEGACY = {
+        '':              ['light', ''],
+        dark:            ['dark', ''],
+        'warm-dark':     ['dark', ''],
+        system:          ['system', ''],
+        gruvbox:         ['dark', 'gruvbox'],
+        oblivion:        ['dark', 'oblivion'],
+        'flexoki-light': ['light', 'flexoki'],
+        'flexoki-dark':  ['dark', 'flexoki'],
     };
-    const SURFACES = ['', 'dark', 'system', ...Object.keys(PALETTES)];
     {
-        const stored = localStorage.getItem('color-theme');
-        if (stored !== null && !SURFACES.includes(stored)) {
-            localStorage.setItem('color-theme', RETIRED_SURFACES[stored] ?? '');
+        const legacy = localStorage.getItem('color-theme');
+        if (legacy !== null) {
+            if (localStorage.getItem('color-mode') === null) {
+                // Mixed, Warm Light and the hue tints all read as Light.
+                const [mode, theme] = LEGACY[legacy] ?? ['light', ''];
+                localStorage.setItem('color-mode', mode);
+                localStorage.setItem('app-theme', theme);
+            }
+            localStorage.removeItem('color-theme');
         }
     }
 
@@ -52,27 +60,71 @@
     // it). Charts now take the theme's own palette, so the stale key is dropped.
     localStorage.removeItem('graph-theme');
 
-    /** The stored surface choice: one of SURFACES. Light when none. */
-    function surface() {
-        return localStorage.getItem('color-theme') ?? '';
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+    /** The stored mode choice: one of MODES. Light when none. */
+    function mode() {
+        const m = localStorage.getItem('color-mode');
+        return MODES.includes(m) ? m : 'light';
     }
 
-    /** Paint the theme onto <html>. Called here pre-paint and by the live
-     *  picker after a choice. */
-    function apply() {
+    /** The mode painted now: 'light' or 'dark' ('system' resolved). */
+    function effectiveMode() {
+        const m = mode();
+        if (m !== 'system') return m;
+        return prefersDark.matches ? 'dark' : 'light';
+    }
+
+    /** The stored theme: '' (Default) or a theme file's id. */
+    function theme() {
+        return localStorage.getItem('app-theme') ?? '';
+    }
+
+    const LINK_ID = 'app-theme-file';
+    let reloads = 0;
+
+    /** Paint the mode and load the theme file onto <html>. Called here
+     *  pre-paint and by the live picker after a choice. Resolves once the
+     *  theme's colours are in place (the new file loaded, or failed), so a
+     *  chart repainting after it reads the new tokens. `reload` re-fetches the
+     *  current file after an edit. */
+    function apply({ reload = false } = {}) {
         const root = document.documentElement;
-        const s = surface();
-        const effective = s === 'system'
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : '')
-            : s;
-        const base = Object.hasOwn(PALETTES, effective) ? PALETTES[effective] : effective;
-        if (base) root.dataset.theme = base;
+        const m = effectiveMode();
+        root.dataset.mode = m;
+        if (m === 'dark') root.dataset.theme = 'dark';
         else delete root.dataset.theme;
-        if (base !== effective) root.dataset.palette = effective;
-        else delete root.dataset.palette;
+
+        const id = theme();
+        const old = document.getElementById(LINK_ID);
+        if (!id) {
+            if (old) old.remove();
+            return Promise.resolve();
+        }
+        const base = '/themes/' + encodeURIComponent(id + '.css');
+        if (old && old.dataset.themeId === id && !reload) return Promise.resolve();
+
+        // The new sheet goes in beside the old one, which stays until the new
+        // one has loaded, so a swap never flashes the Default theme between.
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.setAttribute('blocking', 'render');
+        link.dataset.themeId = id;
+        link.href = reload ? base + '?v=' + (++reloads) : base;
+        if (old) old.removeAttribute('id');
+        link.id = LINK_ID;
+        return new Promise((resolve) => {
+            const done = () => {
+                if (old) old.remove();
+                resolve();
+            };
+            link.addEventListener('load', done, { once: true });
+            link.addEventListener('error', done, { once: true });
+            document.head.appendChild(link);
+        });
     }
 
-    window.appTheme = { surface, apply };
+    window.appTheme = { MODES, mode, effectiveMode, theme, apply };
 
     apply();
 

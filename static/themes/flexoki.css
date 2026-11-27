@@ -1,0 +1,503 @@
+/* @name Flexoki
+ * ============================================================================
+ * An Aventurine Manage theme. The official Flexoki palette (Steph Ango,
+ * kepano/flexoki) in its light and dark modes.
+ *
+ * This file lives in the app's themes folder (Preferences → Appearance →
+ * Open Themes Folder) and is yours to edit: save it and the app repaints. A
+ * copy under a new file name is a new theme. The @name line above is the name
+ * the picker shows (the file name stands in without one).
+ *
+ * A theme has two halves, and the Light / Dark / System switch picks one:
+ *
+ *   :root[data-mode="light"] { … }     the light half
+ *   :root[data-mode="dark"]  { … }     the dark half
+ *
+ * Each half sets the app's colour tokens; any token a half leaves out keeps
+ * the Default theme's value for that mode, so a theme can be as small as a
+ * few lines. Prefix any other rule with the same selector to restyle one
+ * element in one mode, e.g.  :root[data-mode="dark"] .ant-switch::after { … }
+ *
+ * The tokens are Ant Design's (static/css/theme.css in the app source lists
+ * them all): the ten-step palettes (--blue-1 … --magenta-10), the semantic
+ * tokens (--color-text, --color-bg-layout, --color-bg-container,
+ * --color-primary, --color-success…) and the chart colours (--ant-chart-*).
+ * Write chart colours as hex: the chart engine reads them as plain values.
+ * ============================================================================ */
+
+/*   paper #fffcf0  black #100f0f  base 50 #f2f0e5 · 100 #e6e4d9 · 150 #dad8ce
+ *   · 200 #cecdc3 · 300 #b7b5ac · 500 #878580 · 600 #6f6e69 · 700 #575653
+ *   · 800 #403e3c · 900 #282726 · 950 #1c1b1a
+ *   Accents: Flexoki's 50-950 scales for red, orange, yellow, green, cyan,
+ *   blue, purple, magenta. Light uses the 600s on paper, dark the 400s on
+ *   black. Ant's ten-step palettes are Flexoki's own steps; gold is yellow. */
+
+
+/* ─── Light ───────────────────────────────────────────────────────────────────── */
+:root[data-mode="light"] {
+    color-scheme: light;
+
+    /* Palettes, from Flexoki. */
+    --blue-1: #e1eceb;  --blue-2: #c6dde8;  --blue-3: #92bfdb;  --blue-4: #66a0c8;  --blue-5: #3171b2;
+    --blue-6: #205ea6;  --blue-7: #1a4f8c;  --blue-8: #163b66;  --blue-9: #12253b;  --blue-10: #101a24;
+
+    --cyan-1: #ddf1e4;  --cyan-2: #bfe8d9;  --cyan-3: #87d3c3;  --cyan-4: #5abdac;  --cyan-5: #2f968d;
+    --cyan-6: #24837b;  --cyan-7: #1c6c66;  --cyan-8: #164f4a;  --cyan-9: #122f2c;  --cyan-10: #101f1d;
+
+    --green-1: #edeecf;  --green-2: #dde2b2;  --green-3: #bec97e;  --green-4: #a0af54;  --green-5: #768d21;
+    --green-6: #66800b;  --green-7: #536907;  --green-8: #3d4c07;  --green-9: #252d09;  --green-10: #1a1e0c;
+
+    --gold-1: #faeec6;  --gold-2: #f6e2a0;  --gold-3: #eccb60;  --gold-4: #dfb431;  --gold-5: #be9207;
+    --gold-6: #ad8301;  --gold-7: #8e6b01;  --gold-8: #664d01;  --gold-9: #3a2d04;  --gold-10: #241e08;
+
+    --orange-1: #ffe7ce;  --orange-2: #fed3af;  --orange-3: #f9ae77;  --orange-4: #ec8b49;  --orange-5: #cb6120;
+    --orange-6: #bc5215;  --orange-7: #9d4310;  --orange-8: #71320d;  --orange-9: #40200d;  --orange-10: #27180e;
+
+    --red-1: #ffe1d5;  --red-2: #ffcabb;  --red-3: #f89a8a;  --red-4: #e8705f;  --red-5: #c03e35;
+    --red-6: #af3029;  --red-7: #942822;  --red-8: #6c201c;  --red-9: #3e1715;  --red-10: #261312;
+
+    --purple-1: #f0eaec;  --purple-2: #e2d9e9;  --purple-3: #c4b9e0;  --purple-4: #a699d0;  --purple-5: #735eb5;
+    --purple-6: #5e409d;  --purple-7: #4f3685;  --purple-8: #3c2a62;  --purple-9: #261c39;  --purple-10: #1a1623;
+
+    --magenta-1: #fee4e5;  --magenta-2: #fccfda;  --magenta-3: #f4a4c2;  --magenta-4: #e47da8;  --magenta-5: #b74583;
+    --magenta-6: #a02f6f;  --magenta-7: #87285e;  --magenta-8: #641f46;  --magenta-9: #39172b;  --magenta-10: #24131d;
+
+    /* Text and icons: black, then down the base scale to 300 (tx-3). */
+    --color-text:             #100f0f;
+    --color-text-secondary:   #575653;
+    --color-text-tertiary:    #6f6e69;
+    --color-text-quaternary:  #b7b5ac;
+    --color-text-disabled:    #b7b5ac;
+    --color-text-light-solid: #fffcf0;   /* text on a filled accent: paper */
+    --color-icon:             #6f6e69;
+    --color-icon-hover:       #100f0f;
+
+    /* Surfaces: base-50 page (bg-2), paper cards and pop-ups (bg), base-900
+       tooltips. */
+    --color-bg-layout:             #f2f0e5;
+    --color-bg-container:          #fffcf0;
+    --color-bg-elevated:           #fffcf0;
+    --color-bg-spotlight:          #282726;
+    --color-bg-mask:               rgba(16, 15, 15, 0.45);
+    --color-bg-container-disabled: rgba(16, 15, 15, 0.04);
+    --color-bg-text-hover:         rgba(16, 15, 15, 0.06);
+    --color-bg-text-active:        rgba(16, 15, 15, 0.15);
+
+    /* Lines (ui-2 base-150, ui base-100) and fills (black at Ant's alphas). */
+    --color-border:           #dad8ce;
+    --color-border-secondary: #e6e4d9;
+    --color-split:            #e6e4d9;
+    --color-fill:             rgba(16, 15, 15, 0.15);
+    --color-fill-secondary:   rgba(16, 15, 15, 0.06);
+    --color-fill-tertiary:    rgba(16, 15, 15, 0.04);
+    --color-fill-quaternary:  rgba(16, 15, 15, 0.02);
+    --color-fill-alter:       rgba(16, 15, 15, 0.02);
+
+    /* The accent: blue-600, 500 under the pointer, 700 pressed. */
+    --color-primary:              var(--blue-6);
+    --color-primary-hover:        var(--blue-5);
+    --color-primary-active:       var(--blue-7);
+    --color-primary-bg:           var(--blue-1);
+    --color-primary-bg-hover:     var(--blue-2);
+    --color-primary-border:       var(--blue-3);
+    --color-primary-border-hover: var(--blue-4);
+    --color-primary-text:         var(--blue-6);
+    --color-link:                 var(--blue-6);
+    --color-link-hover:           var(--blue-5);
+    --color-link-active:          var(--blue-7);
+
+    /* Statuses: the 600s, a step darker for text. */
+    --color-success:        var(--green-6);
+    --color-success-bg:     var(--green-1);
+    --color-success-border: var(--green-3);
+    --color-success-text:   var(--green-7);
+    --color-warning:        var(--gold-6);
+    --color-warning-bg:     var(--gold-1);
+    --color-warning-border: var(--gold-3);
+    --color-warning-text:   var(--gold-7);
+    --color-error:          var(--red-6);
+    --color-error-hover:    var(--red-5);
+    --color-error-active:   var(--red-7);
+    --color-error-bg:       var(--red-1);
+    --color-error-border:   var(--red-3);
+    --color-error-text:     var(--red-7);
+    --color-info:           var(--blue-6);
+    --color-info-bg:        var(--blue-1);
+    --color-info-border:    var(--blue-3);
+    --color-info-text:      var(--blue-7);
+
+    --control-item-bg-hover:        rgba(16, 15, 15, 0.04);
+    --control-item-bg-active:       var(--color-primary-bg);
+    --control-item-bg-active-hover: var(--color-primary-bg-hover);
+    --control-outline:              rgba(32, 94, 166, 0.12);
+    --color-error-outline:          rgba(175, 48, 41, 0.08);
+    --color-warning-outline:        rgba(173, 131, 1, 0.12);
+    --button-shadow:         0 2px 0 rgba(16, 15, 15, 0.02);
+    --button-primary-shadow: 0 2px 0 rgba(32, 94, 166, 0.1);
+    --button-danger-shadow:  0 2px 0 rgba(175, 48, 41, 0.06);
+
+    --canvas-dot: rgba(16, 15, 15, 0.14);
+
+    --table-header-bg:    #f2f0e5;
+    --table-row-hover-bg: #f2f0e5;
+    --table-sort-bg:      #f2f0e5;
+
+    /* Charts: the 600s first, then the 400s, then the 800s. Red is kept for
+       expense. */
+    --ant-chart-1: #205ea6;   /* blue */
+    --ant-chart-2: #24837b;   /* cyan */
+    --ant-chart-3: #5e409d;   /* purple */
+    --ant-chart-4: #bc5215;   /* orange */
+    --ant-chart-5: #66800b;   /* green */
+    --ant-chart-6: #a02f6f;   /* magenta */
+    --ant-chart-7: #ad8301;   /* yellow */
+    --ant-chart-8: #4385be;   /* blue, 400 */
+    --ant-chart-9: #ce5d97;   /* magenta, 400 */
+    --ant-chart-10: #3aa99f;  /* cyan, 400 */
+
+    --ant-chart-extra-1: #8b7ec8;
+    --ant-chart-extra-2: #da702c;
+    --ant-chart-extra-3: #879a39;
+    --ant-chart-extra-4: #d0a215;
+    --ant-chart-extra-5: #163b66;
+    --ant-chart-extra-6: #164f4a;
+    --ant-chart-extra-7: #3c2a62;
+    --ant-chart-extra-8: #641f46;
+
+    --ant-chart-primary:  var(--color-primary);
+    --ant-chart-income:   var(--color-success);
+    --ant-chart-expense:  var(--color-error);
+    --ant-chart-transfer: var(--color-info);
+    --ant-chart-income-2: #a0af54;
+    --ant-chart-neutral:  #b7b5ac;   /* base-300 */
+
+    --ant-chart-purple:  #5e409d;
+    --ant-chart-volcano: #cb6120;
+    --ant-chart-green:   #66800b;
+
+    /* Money arriving: the blues, deepest first. */
+    --ant-chart-inflow-1: #163b66;
+    --ant-chart-inflow-2: #1a4f8c;
+    --ant-chart-inflow-3: #205ea6;
+    --ant-chart-inflow-4: #4385be;
+    --ant-chart-inflow-5: #66a0c8;
+    --ant-chart-inflow-6: #92bfdb;
+
+    /* ── Manage's own colours (frost, hairlines, chips, avatars' ink…) ── */
+    /* Frost and hairlines in Flexoki black. */
+    --frost-2:        rgba(16, 15, 15, 0.05);
+    --frost-3:        rgba(16, 15, 15, 0.10);
+    --frost-focus:    rgba(16, 15, 15, 0.30);
+    --frost-dim:      rgba(16, 15, 15, 0.28);
+    --frost-caret:    rgba(16, 15, 15, 0.50);
+    --frost-text:     rgba(16, 15, 15, 0.70);
+    --stroke-divider: rgba(16, 15, 15, 0.08);
+    --stroke-soft:    rgba(16, 15, 15, 0.12);
+    --stroke-medium:  rgba(16, 15, 15, 0.16);
+    --stroke-strong:  rgba(16, 15, 15, 0.22);
+    --titlebar-frost: rgba(255, 252, 240, 0.60);
+
+    /* Ink on the filled colours: paper. */
+    --danger-text:  #fffcf0;
+    --chart-1-ink:  #fffcf0;
+    --avatar-icon-bg: #f2f0e5;
+
+    /* The Reports merchant spectrum: the 700s. */
+    --spectrum-mid-1: #1a4f8c;
+    --spectrum-mid-2: #8e6b01;
+    --spectrum-mid-3: #1c6c66;
+    --spectrum-mid-4: #536907;
+    --spectrum-mid-5: #87285e;
+    --spectrum-mid-6: #9d4310;
+    --spectrum-mid-7: #4f3685;
+    --spectrum-mid-8: #942822;
+
+    /* Plan: role greys, medals, goal stones. */
+    --role-group:    #575653;
+    --role-none:     #878580;
+    --medal-silver:  #878580;
+    --goal-lapis:      #1a4f8c;
+    --goal-tourmaline: #1c6c66;
+    --goal-tigers-eye: #8e6b01;
+    --goal-garnet:     #af3029;
+    --goal-tanzanite:  #5e409d;
+    --goal-amber:      #9d4310;
+    --goal-rhodolite:  #a02f6f;
+    --goal-emerald:    #536907;
+    --goal-ink:        #fffcf0;
+
+    /* Dashboard link colours: the 600s. */
+    --dash-link-red:    #af3029;
+    --dash-link-orange: #bc5215;
+    --dash-link-green:  #66800b;
+    --dash-link-blue:   #205ea6;
+    --dash-link-purple: #5e409d;
+    --dash-link-pink:   #a02f6f;
+
+    /* Recurring chips: the 700s, deep enough for paper text. */
+    --rec-chip-income:   #536907;
+    --rec-chip-expense:  #942822;
+    --rec-chip-transfer: #1a4f8c;
+}
+
+/* White literals become paper, and ink on light fills black. */
+:root[data-mode="light"] .rec-occ,
+:root[data-mode="light"] .ant-tooltip-inner,
+:root[data-mode="light"] .dash-size-badge { color: #fffcf0; }
+:root[data-mode="light"] .rec-occ:focus-visible { outline-color: #fffcf0; }
+:root[data-mode="light"] .ant-switch::after { background: #fffcf0; }
+:root[data-mode="light"] .dash-swatch[aria-checked="true"]::after,
+:root[data-mode="light"] .tr-sw::after { border-color: #fffcf0; }
+:root[data-mode="light"] .ant-tag-hue { color: color-mix(in srgb, var(--ant-tag-hue) 62%, #100f0f); }
+:root[data-mode="light"] .ant-tag-checkable[aria-pressed="true"] { color: var(--ant-tag-ink, #fffcf0); }
+:root[data-mode="light"] .ant-tag-checkable[aria-pressed="true"] .ant-tag-checkable-dot { background: var(--ant-tag-ink, #fffcf0); }
+:root[data-mode="light"] .node-flag--notice { color: #fffcf0; }
+:root[data-mode="light"] .node-check { background: #66800b; color: #fffcf0; }
+
+/* Merchant avatars: each hue's 100 under its 700 (800 for yellow and lime,
+   for contrast). */
+:root[data-mode="light"] .avatar-circle-0 { background: #c6dde8; color: #1a4f8c; }
+:root[data-mode="light"] .avatar-circle-1 { background: #bfe8d9; color: #1c6c66; }
+:root[data-mode="light"] .avatar-circle-2 { background: #dde2b2; color: #536907; }
+:root[data-mode="light"] .avatar-circle-3 { background: #f6e2a0; color: #664d01; }
+:root[data-mode="light"] .avatar-circle-4 { background: #ffcabb; color: #942822; }
+:root[data-mode="light"] .avatar-circle-5 { background: #fccfda; color: #87285e; }
+:root[data-mode="light"] .avatar-circle-6 { background: #e2d9e9; color: #4f3685; }
+:root[data-mode="light"] .avatar-circle-7 { background: #abcfe2; color: #163b66; }
+:root[data-mode="light"] .avatar-circle-8 { background: #cdd597; color: #3d4c07; }
+:root[data-mode="light"] .avatar-circle-9 { background: #fed3af; color: #9d4310; }
+
+
+/* ─── Dark ────────────────────────────────────────────────────────────────────── */
+:root[data-mode="dark"] {
+    color-scheme: dark;
+
+    /* Palettes, from Flexoki. */
+    --blue-1: #101a24;  --blue-2: #12253b;  --blue-3: #163b66;  --blue-4: #1a4f8c;  --blue-5: #205ea6;
+    --blue-6: #4385be;  --blue-7: #66a0c8;  --blue-8: #92bfdb;  --blue-9: #abcfe2;  --blue-10: #c6dde8;
+
+    --cyan-1: #101f1d;  --cyan-2: #122f2c;  --cyan-3: #164f4a;  --cyan-4: #1c6c66;  --cyan-5: #24837b;
+    --cyan-6: #3aa99f;  --cyan-7: #5abdac;  --cyan-8: #87d3c3;  --cyan-9: #a2dece;  --cyan-10: #bfe8d9;
+
+    --green-1: #1a1e0c;  --green-2: #252d09;  --green-3: #3d4c07;  --green-4: #536907;  --green-5: #66800b;
+    --green-6: #879a39;  --green-7: #a0af54;  --green-8: #bec97e;  --green-9: #cdd597;  --green-10: #dde2b2;
+
+    --gold-1: #241e08;  --gold-2: #3a2d04;  --gold-3: #664d01;  --gold-4: #8e6b01;  --gold-5: #ad8301;
+    --gold-6: #d0a215;  --gold-7: #dfb431;  --gold-8: #eccb60;  --gold-9: #f1d67e;  --gold-10: #f6e2a0;
+
+    --orange-1: #27180e;  --orange-2: #40200d;  --orange-3: #71320d;  --orange-4: #9d4310;  --orange-5: #bc5215;
+    --orange-6: #da702c;  --orange-7: #ec8b49;  --orange-8: #f9ae77;  --orange-9: #fcc192;  --orange-10: #fed3af;
+
+    --red-1: #261312;  --red-2: #3e1715;  --red-3: #6c201c;  --red-4: #942822;  --red-5: #af3029;
+    --red-6: #d14d41;  --red-7: #e8705f;  --red-8: #f89a8a;  --red-9: #fdb2a2;  --red-10: #ffcabb;
+
+    --purple-1: #1a1623;  --purple-2: #261c39;  --purple-3: #3c2a62;  --purple-4: #4f3685;  --purple-5: #5e409d;
+    --purple-6: #8b7ec8;  --purple-7: #a699d0;  --purple-8: #c4b9e0;  --purple-9: #d3cae6;  --purple-10: #e2d9e9;
+
+    --magenta-1: #24131d;  --magenta-2: #39172b;  --magenta-3: #641f46;  --magenta-4: #87285e;  --magenta-5: #a02f6f;
+    --magenta-6: #ce5d97;  --magenta-7: #e47da8;  --magenta-8: #f4a4c2;  --magenta-9: #f9b9cf;  --magenta-10: #fccfda;
+
+    /* Text and icons: base-200 (tx) down the base scale. */
+    --color-text:             #cecdc3;
+    --color-text-secondary:   #b7b5ac;
+    --color-text-tertiary:    #878580;
+    --color-text-quaternary:  #6f6e69;
+    --color-text-disabled:    #6f6e69;
+    --color-text-light-solid: #100f0f;   /* text on a filled accent: black on blue-400 */
+    --color-icon:             #878580;
+    --color-icon-hover:       #cecdc3;
+
+    /* Surfaces: black page (bg), base-950 cards (bg-2), base-900 pop-ups,
+       base-800 tooltips. */
+    --color-bg-layout:             #100f0f;
+    --color-bg-container:          #1c1b1a;
+    --color-bg-elevated:           #282726;
+    --color-bg-spotlight:          #403e3c;
+    --color-bg-mask:               rgba(16, 15, 15, 0.6);
+    --color-bg-container-disabled: rgba(206, 205, 195, 0.08);
+    --color-bg-text-hover:         rgba(206, 205, 195, 0.12);
+    --color-bg-text-active:        rgba(206, 205, 195, 0.18);
+
+    /* Lines (ui-3 base-800, ui base-900) and fills (base-200 at Ant's dark
+       alphas). */
+    --color-border:           #403e3c;
+    --color-border-secondary: #282726;
+    --color-split:            #282726;
+    --color-fill:             rgba(206, 205, 195, 0.18);
+    --color-fill-secondary:   rgba(206, 205, 195, 0.12);
+    --color-fill-tertiary:    rgba(206, 205, 195, 0.08);
+    --color-fill-quaternary:  rgba(206, 205, 195, 0.04);
+    --color-fill-alter:       rgba(206, 205, 195, 0.04);
+
+    /* The accent: blue-400, 300 under the pointer, 600 pressed. */
+    --color-primary:              var(--blue-6);
+    --color-primary-hover:        var(--blue-7);
+    --color-primary-active:       var(--blue-5);
+    --color-primary-bg:           var(--blue-1);
+    --color-primary-bg-hover:     var(--blue-2);
+    --color-primary-border:       var(--blue-3);
+    --color-primary-border-hover: var(--blue-4);
+    --color-primary-text:         var(--blue-6);
+    --color-link:                 var(--blue-6);
+    --color-link-hover:           var(--blue-7);
+    --color-link-active:          var(--blue-5);
+
+    /* Statuses: the 400s, a step lighter for text. */
+    --color-success:        var(--green-6);
+    --color-success-bg:     var(--green-1);
+    --color-success-border: var(--green-3);
+    --color-success-text:   var(--green-7);
+    --color-warning:        var(--gold-6);
+    --color-warning-bg:     var(--gold-1);
+    --color-warning-border: var(--gold-3);
+    --color-warning-text:   var(--gold-6);
+    --color-error:          var(--red-6);
+    --color-error-hover:    var(--red-7);
+    --color-error-active:   var(--red-5);
+    --color-error-bg:       var(--red-1);
+    --color-error-border:   var(--red-3);
+    --color-error-text:     var(--red-7);
+    --color-info:           var(--blue-6);
+    --color-info-bg:        var(--blue-1);
+    --color-info-border:    var(--blue-3);
+    --color-info-text:      var(--blue-7);
+
+    --control-item-bg-hover:        rgba(206, 205, 195, 0.08);
+    --control-item-bg-active:       var(--color-primary-bg);
+    --control-item-bg-active-hover: var(--color-primary-bg-hover);
+    --control-outline:              rgba(67, 133, 190, 0.24);
+    --color-error-outline:          rgba(209, 77, 65, 0.15);
+    --color-warning-outline:        rgba(208, 162, 21, 0.15);
+    --button-shadow:         0 2px 0 rgba(0, 0, 0, 0.02);
+    --button-primary-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+    --button-danger-shadow:  0 2px 0 rgba(209, 77, 65, 0.15);
+
+    --canvas-dot: rgba(206, 205, 195, 0.12);
+
+    --table-header-bg:    #282726;
+    --table-row-hover-bg: #343331;
+    --table-sort-bg:      #282726;
+
+    /* Charts: the 400s first, then the 300s, then the 600s. */
+    --ant-chart-1: #4385be;   /* blue */
+    --ant-chart-2: #3aa99f;   /* cyan */
+    --ant-chart-3: #8b7ec8;   /* purple */
+    --ant-chart-4: #da702c;   /* orange */
+    --ant-chart-5: #879a39;   /* green */
+    --ant-chart-6: #ce5d97;   /* magenta */
+    --ant-chart-7: #d0a215;   /* yellow */
+    --ant-chart-8: #66a0c8;   /* blue, 300 */
+    --ant-chart-9: #e47da8;   /* magenta, 300 */
+    --ant-chart-10: #5abdac;  /* cyan, 300 */
+
+    --ant-chart-extra-1: #a699d0;
+    --ant-chart-extra-2: #ec8b49;
+    --ant-chart-extra-3: #a0af54;
+    --ant-chart-extra-4: #dfb431;
+    --ant-chart-extra-5: #205ea6;
+    --ant-chart-extra-6: #24837b;
+    --ant-chart-extra-7: #5e409d;
+    --ant-chart-extra-8: #a02f6f;
+
+    --ant-chart-primary:  var(--color-primary);
+    --ant-chart-income:   var(--color-success);
+    --ant-chart-expense:  var(--color-error);
+    --ant-chart-transfer: var(--color-info);
+    --ant-chart-income-2: #66800b;
+    --ant-chart-neutral:  #6f6e69;   /* base-600 */
+
+    --ant-chart-purple:  #5e409d;
+    --ant-chart-volcano: #bc5215;
+    --ant-chart-green:   #66800b;
+
+    /* Money arriving: the blues, deepest first. */
+    --ant-chart-inflow-1: #1a4f8c;
+    --ant-chart-inflow-2: #205ea6;
+    --ant-chart-inflow-3: #3171b2;
+    --ant-chart-inflow-4: #4385be;
+    --ant-chart-inflow-5: #66a0c8;
+    --ant-chart-inflow-6: #92bfdb;
+
+    /* ── Manage's own colours (frost, hairlines, chips, avatars' ink…) ── */
+    /* Frost and hairlines in base-200 (tx). */
+    --frost-2:        rgba(206, 205, 195, 0.05);
+    --frost-3:        rgba(206, 205, 195, 0.10);
+    --frost-focus:    rgba(206, 205, 195, 0.40);
+    --frost-dim:      rgba(206, 205, 195, 0.15);
+    --frost-caret:    rgba(206, 205, 195, 0.80);
+    --frost-text:     rgba(206, 205, 195, 0.65);
+    --stroke-divider: rgba(206, 205, 195, 0.06);
+    --stroke-soft:    rgba(206, 205, 195, 0.12);
+    --stroke-medium:  rgba(206, 205, 195, 0.20);
+    --stroke-strong:  rgba(206, 205, 195, 0.25);
+    --titlebar-frost: rgba(206, 205, 195, 0.10);
+
+    /* Ink on the bright fills (danger buttons, the first chart colour): black. */
+    --danger-text:  #100f0f;
+    --chart-1-ink:  #100f0f;
+    --avatar-icon-bg: #cecdc3;
+
+    /* The Reports merchant spectrum: the 600s. */
+    --spectrum-mid-1: #205ea6;
+    --spectrum-mid-2: #ad8301;
+    --spectrum-mid-3: #24837b;
+    --spectrum-mid-4: #66800b;
+    --spectrum-mid-5: #a02f6f;
+    --spectrum-mid-6: #bc5215;
+    --spectrum-mid-7: #5e409d;
+    --spectrum-mid-8: #af3029;
+
+    /* Plan: role greys, medals, the selected-card ring, goal stones. */
+    --role-group:    #878580;
+    --role-none:     #575653;
+    --medal-silver:  #b7b5ac;
+    --node-active-ring: #e6e4d9;
+    --goal-lapis:      #1a4f8c;
+    --goal-tourmaline: #1c6c66;
+    --goal-tigers-eye: #8e6b01;
+    --goal-garnet:     #942822;
+    --goal-tanzanite:  #4f3685;
+    --goal-amber:      #9d4310;
+    --goal-rhodolite:  #87285e;
+    --goal-emerald:    #536907;
+    --goal-ink:        #e6e4d9;
+
+    /* Dashboard link colours: the 400s. */
+    --dash-link-red:    #d14d41;
+    --dash-link-orange: #da702c;
+    --dash-link-green:  #879a39;
+    --dash-link-blue:   #4385be;
+    --dash-link-purple: #8b7ec8;
+    --dash-link-pink:   #ce5d97;
+
+    /* Recurring chips: the 700s, deep enough for base-100 text. */
+    --rec-chip-income:   #536907;
+    --rec-chip-expense:  #942822;
+    --rec-chip-transfer: #1a4f8c;
+}
+
+/* White literals become base-100, and ink on bright fills black. */
+:root[data-mode="dark"] .rec-occ,
+:root[data-mode="dark"] .ant-tooltip-inner,
+:root[data-mode="dark"] .dash-size-badge { color: #e6e4d9; }
+:root[data-mode="dark"] .rec-occ:focus-visible { outline-color: #e6e4d9; }
+:root[data-mode="dark"] .ant-switch::after { background: #e6e4d9; }
+:root[data-mode="dark"] .dash-swatch[aria-checked="true"]::after,
+:root[data-mode="dark"] .tr-sw::after { border-color: #e6e4d9; }
+:root[data-mode="dark"] .ant-tag-hue { color: color-mix(in srgb, var(--ant-tag-hue) 65%, #e6e4d9); }
+:root[data-mode="dark"] .ant-tag-checkable[aria-pressed="true"] { color: var(--ant-tag-ink, #100f0f); }
+:root[data-mode="dark"] .ant-tag-checkable[aria-pressed="true"] .ant-tag-checkable-dot { background: var(--ant-tag-ink, #100f0f); }
+:root[data-mode="dark"] .node-flag--notice { color: #100f0f; }
+:root[data-mode="dark"] .node-check { background: #879a39; color: #100f0f; }
+
+/* Merchant avatars: each hue's 900 (850 for the last pair) under its 400 (300). */
+:root[data-mode="dark"] .avatar-circle-0 { background: #12253b; color: #4385be; }
+:root[data-mode="dark"] .avatar-circle-1 { background: #122f2c; color: #3aa99f; }
+:root[data-mode="dark"] .avatar-circle-2 { background: #252d09; color: #879a39; }
+:root[data-mode="dark"] .avatar-circle-3 { background: #3a2d04; color: #d0a215; }
+:root[data-mode="dark"] .avatar-circle-4 { background: #3e1715; color: #d14d41; }
+:root[data-mode="dark"] .avatar-circle-5 { background: #39172b; color: #ce5d97; }
+:root[data-mode="dark"] .avatar-circle-6 { background: #261c39; color: #8b7ec8; }
+:root[data-mode="dark"] .avatar-circle-7 { background: #133051; color: #66a0c8; }
+:root[data-mode="dark"] .avatar-circle-8 { background: #313d07; color: #a0af54; }
+:root[data-mode="dark"] .avatar-circle-9 { background: #40200d; color: #da702c; }

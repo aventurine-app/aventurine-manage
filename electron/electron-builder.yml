@@ -38,6 +38,8 @@ files:
   - updatePolicy.js
   - license.js
   - licensePolicy.js
+  - themes.js
+  - themePolicy.js
   - backend/**/*
   - node_modules/**/*
   - package.json

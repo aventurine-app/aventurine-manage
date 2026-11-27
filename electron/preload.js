@@ -55,6 +55,17 @@ contextBridge.exposeInMainWorld('electronFile', {
     savePlanPdf:          (suggestedName) => ipcRenderer.invoke('plan-save-pdf', suggestedName),
 });
 
+// Theme files (electron/themes.js; UI in static/js/shell/settings.js). The
+// page can list the themes folder and ask the OS to open it, nothing more: it
+// never names a path, and the chosen file loads through app://aventurine/themes/.
+contextBridge.exposeInMainWorld('electronThemes', {
+    list:       () => ipcRenderer.invoke('themes:list'),
+    openFolder: () => ipcRenderer.invoke('themes:open-folder'),
+    // A theme file was added, changed or removed. One listener per document,
+    // like onStatus below.
+    onChanged:  (fn) => ipcRenderer.on('themes:changed', () => fn()),
+});
+
 // The installed version string, shown in About (static/js/shell/titlebar.js).
 // Comes from the main process because a sandboxed preload has no access to the
 // app module.

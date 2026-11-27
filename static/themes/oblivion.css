@@ -1,0 +1,497 @@
+/* @name Oblivion
+ * ============================================================================
+ * An Aventurine Manage theme. GtkSourceView's Oblivion scheme (Paolo Borelli) on
+ * the Tango palette for dark, and its light companion on the same palette.
+ *
+ * This file lives in the app's themes folder (Preferences → Appearance →
+ * Open Themes Folder) and is yours to edit: save it and the app repaints. A
+ * copy under a new file name is a new theme. The @name line above is the name
+ * the picker shows (the file name stands in without one).
+ *
+ * A theme has two halves, and the Light / Dark / System switch picks one:
+ *
+ *   :root[data-mode="light"] { … }     the light half
+ *   :root[data-mode="dark"]  { … }     the dark half
+ *
+ * Each half sets the app's colour tokens; any token a half leaves out keeps
+ * the Default theme's value for that mode, so a theme can be as small as a
+ * few lines. Prefix any other rule with the same selector to restyle one
+ * element in one mode, e.g.  :root[data-mode="dark"] .ant-switch::after { … }
+ *
+ * The tokens are Ant Design's (static/css/theme.css in the app source lists
+ * them all): the ten-step palettes (--blue-1 … --magenta-10), the semantic
+ * tokens (--color-text, --color-bg-layout, --color-bg-container,
+ * --color-primary, --color-success…) and the chart colours (--ant-chart-*).
+ * Write chart colours as hex: the chart engine reads them as plain values.
+ * ============================================================================ */
+
+/*   aluminium1 #eeeeec  aluminium2 #d3d7cf  aluminium3 #babdb6
+ *   aluminium4 #888a85  aluminium5 #555753  aluminium6 #2e3436
+ *   light / mid / dark:
+ *     butter     #fce94f #edd400 #c4a000    chameleon  #8ae234 #73d216 #4e9a06
+ *     orange     #fcaf3e #f57900 #ce5c00    skyblue    #729fcf #3465a4 #204a87
+ *     plum       #ad7fa8 #75507b #5c3566    chocolate  #e9b96e #c17d11 #8f5902
+ *     scarletred #ef2929 #cc0000 #a40000 */
+
+
+/* ─── Light ───────────────────────────────────────────────────────────────────── */
+:root[data-mode="light"] {
+    color-scheme: light;
+
+    /* Palettes, from Tango: steps 1-3 the mid colour mixed into white
+       (12/24/42%), 4 light, 5 mid, 6 dark (mid for skyblue, plum and scarlet,
+       which are already deep), 7-10 that step mixed toward aluminium6. Tango
+       has no cyan or magenta: cyan is chocolate, magenta is plum. */
+    --blue-1: #e7edf4;  --blue-2: #cedae9;  --blue-3: #aabed9;  --blue-4: #729fcf;  --blue-5: #5382ba;
+    --blue-6: #3465a4;  --blue-7: #335989;  --blue-8: #314f73;  --blue-9: #30455d;  --blue-10: #2f3d4a;
+
+    --cyan-1: #f8efe2;  --cyan-2: #f0e0c6;  --cyan-3: #e5c89b;  --cyan-4: #e9b96e;  --cyan-5: #c17d11;
+    --cyan-6: #8f5902;  --cyan-7: #77500f;  --cyan-8: #634819;  --cyan-9: #504124;  --cyan-10: #3f3b2d;
+
+    --green-1: #eefae3;  --green-2: #ddf4c7;  --green-3: #c4ec9d;  --green-4: #8ae234;  --green-5: #73d216;
+    --green-6: #4e9a06;  --green-7: #468112;  --green-8: #406c1c;  --green-9: #395825;  --green-10: #34462d;
+
+    --gold-1: #fdfae0;  --gold-2: #fbf5c2;  --gold-3: #f7ed94;  --gold-4: #fce94f;  --gold-5: #edd400;
+    --gold-6: #c4a000;  --gold-7: #9f850e;  --gold-8: #816f18;  --gold-9: #635a23;  --gold-10: #49472c;
+
+    --orange-1: #feefe0;  --orange-2: #fddfc2;  --orange-3: #fbc794;  --orange-4: #fcaf3e;  --orange-5: #f57900;
+    --orange-6: #ce5c00;  --orange-7: #a6520e;  --orange-8: #864a18;  --orange-9: #664223;  --orange-10: #4b3b2c;
+
+    --red-1: #f9e0e0;  --red-2: #f3c2c2;  --red-3: #ea9494;  --red-4: #ef2929;  --red-5: #de1515;
+    --red-6: #cc0000;  --red-7: #a50d0e;  --red-8: #851718;  --red-9: #652223;  --red-10: #4a2b2c;
+
+    --purple-1: #eeeaef;  --purple-2: #ded5df;  --purple-3: #c5b6c8;  --purple-4: #ad7fa8;  --purple-5: #916892;
+    --purple-6: #75507b;  --purple-7: #63496a;  --purple-8: #55435c;  --purple-9: #473e4e;  --purple-10: #3b3942;
+
+    --magenta-1: #eeeaef;  --magenta-2: #ded5df;  --magenta-3: #c5b6c8;  --magenta-4: #ad7fa8;  --magenta-5: #916892;
+    --magenta-6: #75507b;  --magenta-7: #63496a;  --magenta-8: #55435c;  --magenta-9: #473e4e;  --magenta-10: #3b3942;
+
+    /* Text and icons: aluminium6 down to aluminium3. */
+    --color-text:             #2e3436;
+    --color-text-secondary:   #555753;
+    --color-text-tertiary:    #888a85;
+    --color-text-quaternary:  #babdb6;
+    --color-text-disabled:    #babdb6;
+    --color-text-light-solid: #ffffff;
+    --color-icon:             #888a85;
+    --color-icon-hover:       #2e3436;
+
+    /* Surfaces: aluminium1 page, white cards and pop-ups (the Tango scheme's
+       paper), aluminium6 tooltips. */
+    --color-bg-layout:             #eeeeec;
+    --color-bg-container:          #ffffff;
+    --color-bg-elevated:           #ffffff;
+    --color-bg-spotlight:          #2e3436;
+    --color-bg-mask:               rgba(46, 52, 54, 0.45);
+    --color-bg-container-disabled: rgba(46, 52, 54, 0.04);
+    --color-bg-text-hover:         rgba(46, 52, 54, 0.06);
+    --color-bg-text-active:        rgba(46, 52, 54, 0.15);
+
+    /* Lines (aluminium2, and halfway to aluminium1) and fills (aluminium6 at
+       Ant's light alphas). */
+    --color-border:           #d3d7cf;
+    --color-border-secondary: #e1e3de;
+    --color-split:            #e1e3de;
+    --color-fill:             rgba(46, 52, 54, 0.15);
+    --color-fill-secondary:   rgba(46, 52, 54, 0.06);
+    --color-fill-tertiary:    rgba(46, 52, 54, 0.04);
+    --color-fill-quaternary:  rgba(46, 52, 54, 0.02);
+    --color-fill-alter:       rgba(46, 52, 54, 0.02);
+
+    /* The accent: skyblue2, skyblue3 pressed. */
+    --color-primary:              var(--blue-6);
+    --color-primary-hover:        var(--blue-5);
+    --color-primary-active:       var(--blue-7);
+    --color-primary-bg:           var(--blue-1);
+    --color-primary-bg-hover:     var(--blue-2);
+    --color-primary-border:       var(--blue-3);
+    --color-primary-border-hover: var(--blue-4);
+    --color-primary-text:         var(--blue-6);
+    --color-link:                 var(--blue-6);
+    --color-link-hover:           var(--blue-5);
+    --color-link-active:          var(--blue-7);
+
+    /* Statuses: the dark colours; text a step deeper where the dark step is
+       still too light to read on white (chameleon, butter). */
+    --color-success:        var(--green-6);
+    --color-success-bg:     var(--green-1);
+    --color-success-border: var(--green-3);
+    --color-success-text:   var(--green-7);
+    --color-warning:        var(--gold-5);
+    --color-warning-bg:     var(--gold-1);
+    --color-warning-border: var(--gold-3);
+    --color-warning-text:   var(--gold-8);
+    --color-error:          var(--red-6);
+    --color-error-hover:    var(--red-5);
+    --color-error-active:   var(--red-7);
+    --color-error-bg:       var(--red-1);
+    --color-error-border:   var(--red-3);
+    --color-error-text:     var(--red-7);
+    --color-info:           var(--blue-6);
+    --color-info-bg:        var(--blue-1);
+    --color-info-border:    var(--blue-3);
+    --color-info-text:      var(--blue-7);
+
+    --control-item-bg-hover:        rgba(46, 52, 54, 0.04);
+    --control-item-bg-active:       var(--color-primary-bg);
+    --control-item-bg-active-hover: var(--color-primary-bg-hover);
+    --control-outline:              rgba(52, 101, 164, 0.12);
+    --color-error-outline:          rgba(204, 0, 0, 0.08);
+    --color-warning-outline:        rgba(196, 160, 0, 0.12);
+    --button-shadow:         0 2px 0 rgba(46, 52, 54, 0.02);
+    --button-primary-shadow: 0 2px 0 rgba(52, 101, 164, 0.1);
+    --button-danger-shadow:  0 2px 0 rgba(204, 0, 0, 0.06);
+
+    --canvas-dot: rgba(46, 52, 54, 0.14);
+
+    --table-header-bg:    #f7f7f6;
+    --table-row-hover-bg: #f7f7f6;
+    --table-sort-bg:      #f7f7f6;
+
+    /* Charts: the mid colours first, then the darks, then the lights. Red is
+       kept for expense, chameleon for the extras. */
+    --ant-chart-1: #3465a4;   /* skyblue */
+    --ant-chart-2: #c17d11;   /* chocolate */
+    --ant-chart-3: #75507b;   /* plum */
+    --ant-chart-4: #f57900;   /* orange */
+    --ant-chart-5: #c4a000;   /* butter, dark */
+    --ant-chart-6: #204a87;   /* skyblue, dark */
+    --ant-chart-7: #8f5902;   /* chocolate, dark */
+    --ant-chart-8: #5c3566;   /* plum, dark */
+    --ant-chart-9: #ce5c00;   /* orange, dark */
+    --ant-chart-10: #729fcf;  /* skyblue, light */
+
+    --ant-chart-extra-1: #4e9a06;
+    --ant-chart-extra-2: #73d216;
+    --ant-chart-extra-3: #e9b96e;
+    --ant-chart-extra-4: #ad7fa8;
+    --ant-chart-extra-5: #fcaf3e;
+    --ant-chart-extra-6: #edd400;
+    --ant-chart-extra-7: #8ae234;
+    --ant-chart-extra-8: #888a85;
+
+    --ant-chart-primary:  var(--color-primary);
+    --ant-chart-income:   var(--color-success);
+    --ant-chart-expense:  var(--color-error);
+    --ant-chart-transfer: var(--color-info);
+    --ant-chart-income-2: #73d216;
+    --ant-chart-neutral:  #babdb6;
+
+    --ant-chart-purple:  #5c3566;
+    --ant-chart-volcano: #ce5c00;
+    --ant-chart-green:   #4e9a06;
+
+    /* Money arriving: the skyblues, deepest first. */
+    --ant-chart-inflow-1: #204a87;
+    --ant-chart-inflow-2: #3465a4;
+    --ant-chart-inflow-3: #5382ba;
+    --ant-chart-inflow-4: #729fcf;
+    --ant-chart-inflow-5: #91b3d6;
+    --ant-chart-inflow-6: #aac3dc;
+
+    /* ── Manage's own colours (frost, hairlines, chips, avatars' ink…) ── */
+    /* Frost and hairlines in aluminium6. */
+    --frost-2:        rgba(46, 52, 54, 0.05);
+    --frost-3:        rgba(46, 52, 54, 0.1);
+    --frost-focus:    rgba(46, 52, 54, 0.3);
+    --frost-dim:      rgba(46, 52, 54, 0.28);
+    --frost-caret:    rgba(46, 52, 54, 0.5);
+    --frost-text:     rgba(46, 52, 54, 0.7);
+    --stroke-divider: rgba(46, 52, 54, 0.08);
+    --stroke-soft:    rgba(46, 52, 54, 0.12);
+    --stroke-medium:  rgba(46, 52, 54, 0.16);
+    --stroke-strong:  rgba(46, 52, 54, 0.22);
+
+    --avatar-icon-bg: #eeeeec;
+
+    /* The Reports merchant spectrum: the dark colours. */
+    --spectrum-mid-1: #204a87;
+    --spectrum-mid-2: #c4a000;
+    --spectrum-mid-3: #8f5902;
+    --spectrum-mid-4: #4e9a06;
+    --spectrum-mid-5: #75507b;
+    --spectrum-mid-6: #ce5c00;
+    --spectrum-mid-7: #5c3566;
+    --spectrum-mid-8: #a40000;
+
+    /* Plan: role greys, medals, goal stones. */
+    --role-group:    #555753;
+    --role-none:     #888a85;
+    --medal-silver:  #888a85;
+    --goal-lapis:      #204a87;
+    --goal-tourmaline: #8f5902;
+    --goal-tigers-eye: #c4a000;
+    --goal-garnet:     #a40000;
+    --goal-tanzanite:  #5c3566;
+    --goal-amber:      #ce5c00;
+    --goal-rhodolite:  #75507b;
+    --goal-emerald:    #4e9a06;
+
+    /* Dashboard link colours: the mid colours. */
+    --dash-link-red:    #cc0000;
+    --dash-link-orange: #f57900;
+    --dash-link-green:  #4e9a06;
+    --dash-link-blue:   #3465a4;
+    --dash-link-purple: #75507b;
+    --dash-link-pink:   #ad7fa8;
+
+    /* Recurring chips: the dark colours, deep enough for white text. */
+    --rec-chip-income:   #4e9a06;
+    --rec-chip-expense:  #a40000;
+    --rec-chip-transfer: #204a87;
+}
+
+/* Ink on light fills aluminium6. */
+:root[data-mode="light"] .ant-tag-hue { color: color-mix(in srgb, var(--ant-tag-hue) 62%, #2e3436); }
+:root[data-mode="light"] .node-check { background: #4e9a06; color: #ffffff; }
+
+/* Merchant avatars: a tint of each hue under its deep step. */
+:root[data-mode="light"] .avatar-circle-0 { background: #cedae9; color: #314f73; }
+:root[data-mode="light"] .avatar-circle-1 { background: #f0e0c6; color: #634819; }
+:root[data-mode="light"] .avatar-circle-2 { background: #ddf4c7; color: #406c1c; }
+:root[data-mode="light"] .avatar-circle-3 { background: #fbf5c2; color: #816f18; }
+:root[data-mode="light"] .avatar-circle-4 { background: #f3c2c2; color: #851718; }
+:root[data-mode="light"] .avatar-circle-5 { background: #ded5df; color: #55435c; }
+:root[data-mode="light"] .avatar-circle-6 { background: #fddfc2; color: #864a18; }
+:root[data-mode="light"] .avatar-circle-7 { background: #aabed9; color: #30455d; }
+:root[data-mode="light"] .avatar-circle-8 { background: #c4ec9d; color: #395825; }
+:root[data-mode="light"] .avatar-circle-9 { background: #fbc794; color: #664223; }
+
+
+/* ─── Dark ────────────────────────────────────────────────────────────────────── */
+:root[data-mode="dark"] {
+    color-scheme: dark;
+
+    /* Palettes: steps 1-3 the mid colour mixed into the card (15/25/40%),
+       4 dark, 5 mid, 6 light, 7-10 light mixed toward aluminium1. */
+    --blue-1: #34404a;  --blue-2: #344454;  --blue-3: #344b64;  --blue-4: #204a87;  --blue-5: #3465a4;
+    --blue-6: #729fcf;  --blue-7: #91b3d6;  --blue-8: #aac3dc;  --blue-9: #c3d2e2;  --blue-10: #d8e0e7;
+
+    --cyan-1: #494334;  --cyan-2: #574a30;  --cyan-3: #6c542a;  --cyan-4: #8f5902;  --cyan-5: #c17d11;
+    --cyan-6: #e9b96e;  --cyan-7: #eac68e;  --cyan-8: #ebd1a7;  --cyan-9: #ecdbc0;  --cyan-10: #ede4d5;
+
+    --green-1: #3d5035;  --green-2: #445f31;  --green-3: #4d762c;  --green-4: #4e9a06;  --green-5: #73d216;
+    --green-6: #8ae234;  --green-7: #a3e562;  --green-8: #b7e787;  --green-9: #cbeaac;  --green-10: #dceccb;
+
+    --gold-1: #505031;  --gold-2: #62602c;  --gold-3: #7e7723;  --gold-4: #c4a000;  --gold-5: #edd400;
+    --gold-6: #fce94f;  --gold-7: #f8ea76;  --gold-8: #f6eb96;  --gold-9: #f3ecb5;  --gold-10: #f1edd0;
+
+    --orange-1: #514331;  --orange-2: #64492c;  --orange-3: #815323;  --orange-4: #ce5c00;  --orange-5: #f57900;
+    --orange-6: #fcaf3e;  --orange-7: #f8bf6a;  --orange-8: #f6cb8c;  --orange-9: #f3d8af;  --orange-10: #f1e3cd;
+
+    --red-1: #4b3031;  --red-2: #5a2b2c;  --red-3: #712223;  --red-4: #a40000;  --red-5: #cc0000;
+    --red-6: #ef2929;  --red-7: #ef5a5a;  --red-8: #ef8281;  --red-9: #eea9a8;  --red-10: #eecbc9;
+
+    --purple-1: #3e3c44;  --purple-2: #443f4a;  --purple-3: #4e4254;  --purple-4: #5c3566;  --purple-5: #75507b;
+    --purple-6: #ad7fa8;  --purple-7: #bd9bb9;  --purple-8: #cab1c7;  --purple-9: #d7c7d4;  --purple-10: #e2dae0;
+
+    --magenta-1: #3e3c44;  --magenta-2: #443f4a;  --magenta-3: #4e4254;  --magenta-4: #5c3566;  --magenta-5: #75507b;
+    --magenta-6: #ad7fa8;  --magenta-7: #bd9bb9;  --magenta-8: #cab1c7;  --magenta-9: #d7c7d4;  --magenta-10: #e2dae0;
+
+    /* Text and icons: aluminium2 down to aluminium4. */
+    --color-text:             #d3d7cf;
+    --color-text-secondary:   #babdb6;
+    --color-text-tertiary:    #a1a49e;
+    --color-text-quaternary:  #888a85;
+    --color-text-disabled:    #888a85;
+    --color-text-light-solid: #2e3436;   /* text on a filled accent: aluminium6 on skyblue */
+    --color-icon:             #a1a49e;
+    --color-icon-hover:       #eeeeec;
+
+    /* Surfaces: aluminium6 page, the 6-5 blend for cards, a step up for
+       pop-ups, aluminium5 tooltips (the scheme's current line). */
+    --color-bg-layout:             #2e3436;
+    --color-bg-container:          #34393a;
+    --color-bg-elevated:           #424644;
+    --color-bg-spotlight:          #555753;
+    --color-bg-mask:               rgba(0, 0, 0, 0.6);
+    --color-bg-container-disabled: rgba(211, 215, 207, 0.08);
+    --color-bg-text-hover:         rgba(211, 215, 207, 0.12);
+    --color-bg-text-active:        rgba(211, 215, 207, 0.18);
+
+    /* Lines (aluminium5, and halfway to the card) and fills (aluminium2 at
+       Ant's dark alphas). */
+    --color-border:           #555753;
+    --color-border-secondary: #424644;
+    --color-split:            #424644;
+    --color-fill:             rgba(211, 215, 207, 0.18);
+    --color-fill-secondary:   rgba(211, 215, 207, 0.12);
+    --color-fill-tertiary:    rgba(211, 215, 207, 0.08);
+    --color-fill-quaternary:  rgba(211, 215, 207, 0.04);
+    --color-fill-alter:       rgba(211, 215, 207, 0.04);
+
+    /* The accent: skyblue1 (the scheme's identifiers), skyblue2 pressed. */
+    --color-primary:              var(--blue-6);
+    --color-primary-hover:        var(--blue-7);
+    --color-primary-active:       var(--blue-5);
+    --color-primary-bg:           var(--blue-1);
+    --color-primary-bg-hover:     var(--blue-2);
+    --color-primary-border:       var(--blue-3);
+    --color-primary-border-hover: var(--blue-4);
+    --color-primary-text:         var(--blue-6);
+    --color-link:                 var(--blue-6);
+    --color-link-hover:           var(--blue-7);
+    --color-link-active:          var(--blue-5);
+
+    /* Statuses: the light colours, their next step for text. */
+    --color-success:        var(--green-6);
+    --color-success-bg:     var(--green-1);
+    --color-success-border: var(--green-3);
+    --color-success-text:   var(--green-7);
+    --color-warning:        var(--gold-6);
+    --color-warning-bg:     var(--gold-1);
+    --color-warning-border: var(--gold-3);
+    --color-warning-text:   var(--gold-6);
+    --color-error:          var(--red-6);
+    --color-error-hover:    var(--red-7);
+    --color-error-active:   var(--red-5);
+    --color-error-bg:       var(--red-1);
+    --color-error-border:   var(--red-3);
+    --color-error-text:     var(--red-7);
+    --color-info:           var(--blue-6);
+    --color-info-bg:        var(--blue-1);
+    --color-info-border:    var(--blue-3);
+    --color-info-text:      var(--blue-7);
+
+    --control-item-bg-hover:        rgba(211, 215, 207, 0.08);
+    --control-item-bg-active:       var(--color-primary-bg);
+    --control-item-bg-active-hover: var(--color-primary-bg-hover);
+    --control-outline:              rgba(114, 159, 207, 0.24);
+    --color-error-outline:          rgba(239, 41, 41, 0.15);
+    --color-warning-outline:        rgba(252, 233, 79, 0.15);
+    --button-shadow:         0 2px 0 rgba(0, 0, 0, 0.02);
+    --button-primary-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+    --button-danger-shadow:  0 2px 0 rgba(239, 41, 41, 0.15);
+
+    --canvas-dot: rgba(211, 215, 207, 0.12);
+
+    --table-header-bg:    #2e3436;
+    --table-row-hover-bg: #424644;
+    --table-sort-bg:      #2e3436;
+
+    /* Charts: the light colours first, then the mids, then the darks. Red is
+       kept for expense, and chameleon (the success green, which the Sankey's
+       Net bars wear) waits until the extras so no category matches them. */
+    --ant-chart-1: #729fcf;   /* skyblue */
+    --ant-chart-2: #e9b96e;   /* chocolate */
+    --ant-chart-3: #ad7fa8;   /* plum */
+    --ant-chart-4: #fcaf3e;   /* orange */
+    --ant-chart-5: #fce94f;   /* butter */
+    --ant-chart-6: #3465a4;   /* skyblue, mid */
+    --ant-chart-7: #c17d11;   /* chocolate, mid */
+    --ant-chart-8: #75507b;   /* plum, mid */
+    --ant-chart-9: #f57900;   /* orange, mid */
+    --ant-chart-10: #edd400;  /* butter, mid */
+
+    --ant-chart-extra-1: #8ae234;
+    --ant-chart-extra-2: #73d216;
+    --ant-chart-extra-3: #204a87;
+    --ant-chart-extra-4: #8f5902;
+    --ant-chart-extra-5: #ce5c00;
+    --ant-chart-extra-6: #5c3566;
+    --ant-chart-extra-7: #4e9a06;
+    --ant-chart-extra-8: #c4a000;
+
+    --ant-chart-primary:  var(--color-primary);
+    --ant-chart-income:   var(--color-success);
+    --ant-chart-expense:  var(--color-error);
+    --ant-chart-transfer: var(--color-info);
+    --ant-chart-income-2: #73d216;
+    --ant-chart-neutral:  #888a85;   /* aluminium4 */
+
+    --ant-chart-purple:  #5c3566;
+    --ant-chart-volcano: #ce5c00;
+    --ant-chart-green:   #73d216;
+
+    /* Money arriving: the skyblues, deepest first. */
+    --ant-chart-inflow-1: #204a87;
+    --ant-chart-inflow-2: #3465a4;
+    --ant-chart-inflow-3: #5382ba;
+    --ant-chart-inflow-4: #729fcf;
+    --ant-chart-inflow-5: #91b3d6;
+    --ant-chart-inflow-6: #aac3dc;
+
+    /* ── Manage's own colours (frost, hairlines, chips, avatars' ink…) ── */
+    /* Frost and hairlines in aluminium1. */
+    --frost-2:        rgba(238, 238, 236, 0.05);
+    --frost-3:        rgba(238, 238, 236, 0.10);
+    --frost-focus:    rgba(238, 238, 236, 0.40);
+    --frost-dim:      rgba(238, 238, 236, 0.15);
+    --frost-caret:    rgba(238, 238, 236, 0.80);
+    --frost-text:     rgba(238, 238, 236, 0.65);
+    --stroke-divider: rgba(238, 238, 236, 0.06);
+    --stroke-soft:    rgba(238, 238, 236, 0.12);
+    --stroke-medium:  rgba(238, 238, 236, 0.20);
+    --stroke-strong:  rgba(238, 238, 236, 0.25);
+    --titlebar-frost: rgba(238, 238, 236, 0.10);
+
+    /* Ink on the light fills (danger buttons, the first chart colour): aluminium6. */
+    --danger-text:  #2e3436;
+    --chart-1-ink:  #2e3436;
+    --avatar-icon-bg: #d3d7cf;
+
+    /* The Reports merchant spectrum: the mid colours. */
+    --spectrum-mid-1: #3465a4;
+    --spectrum-mid-2: #edd400;
+    --spectrum-mid-3: #c17d11;
+    --spectrum-mid-4: #73d216;
+    --spectrum-mid-5: #75507b;
+    --spectrum-mid-6: #4e9a06;
+    --spectrum-mid-7: #5c3566;
+    --spectrum-mid-8: #cc0000;
+
+    /* Plan: role greys, medals, the selected-card ring, goal stones. */
+    --role-group:    #888a85;
+    --role-none:     #555753;
+    --medal-silver:  #babdb6;
+    --node-active-ring: #eeeeec;
+    --goal-lapis:      #204a87;
+    --goal-tourmaline: #8f5902;
+    --goal-tigers-eye: #c4a000;
+    --goal-garnet:     #a40000;
+    --goal-tanzanite:  #5c3566;
+    --goal-amber:      #ce5c00;
+    --goal-rhodolite:  #75507b;
+    --goal-emerald:    #4e9a06;
+    --goal-ink:        #eeeeec;
+
+    /* Dashboard link colours: the light colours. */
+    --dash-link-red:    #ef2929;
+    --dash-link-orange: #fcaf3e;
+    --dash-link-green:  #8ae234;
+    --dash-link-blue:   #729fcf;
+    --dash-link-purple: #ad7fa8;
+    --dash-link-pink:   #75507b;
+
+    /* Recurring chips: the dark colours, deep enough for aluminium1 text. */
+    --rec-chip-income:   #4e9a06;
+    --rec-chip-expense:  #a40000;
+    --rec-chip-transfer: #204a87;
+}
+
+/* White literals become aluminium1, and ink on light fills aluminium6. */
+:root[data-mode="dark"] .rec-occ,
+:root[data-mode="dark"] .ant-tooltip-inner,
+:root[data-mode="dark"] .dash-size-badge { color: #eeeeec; }
+:root[data-mode="dark"] .rec-occ:focus-visible { outline-color: #eeeeec; }
+:root[data-mode="dark"] .ant-switch::after { background: #eeeeec; }
+:root[data-mode="dark"] .dash-swatch[aria-checked="true"]::after,
+:root[data-mode="dark"] .tr-sw::after { border-color: #eeeeec; }
+:root[data-mode="dark"] .ant-tag-hue { color: color-mix(in srgb, var(--ant-tag-hue) 65%, #eeeeec); }
+:root[data-mode="dark"] .ant-tag-checkable[aria-pressed="true"] { color: var(--ant-tag-ink, #2e3436); }
+:root[data-mode="dark"] .ant-tag-checkable[aria-pressed="true"] .ant-tag-checkable-dot { background: var(--ant-tag-ink, #2e3436); }
+:root[data-mode="dark"] .node-flag--notice { color: #2e3436; }
+:root[data-mode="dark"] .node-check { background: #8ae234; color: #2e3436; }
+
+/* Merchant avatars: each hue's mid colour (dark for the last three) mixed 30%
+   into aluminium6, under its light colour. */
+:root[data-mode="dark"] .avatar-circle-0 { background: #304357; color: #729fcf; }
+:root[data-mode="dark"] .avatar-circle-1 { background: #5a4a2b; color: #e9b96e; }
+:root[data-mode="dark"] .avatar-circle-2 { background: #43632c; color: #8ae234; }
+:root[data-mode="dark"] .avatar-circle-3 { background: #676426; color: #fce94f; }
+:root[data-mode="dark"] .avatar-circle-4 { background: #5d2426; color: #ef2929; }
+:root[data-mode="dark"] .avatar-circle-5 { background: #433c4b; color: #ad7fa8; }
+:root[data-mode="dark"] .avatar-circle-6 { background: #6a4926; color: #fcaf3e; }
+:root[data-mode="dark"] .avatar-circle-7 { background: #2a3b4e; color: #729fcf; }
+:root[data-mode="dark"] .avatar-circle-8 { background: #385328; color: #8ae234; }
+:root[data-mode="dark"] .avatar-circle-9 { background: #5e4026; color: #fcaf3e; }

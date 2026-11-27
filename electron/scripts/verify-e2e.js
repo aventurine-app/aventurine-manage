@@ -298,17 +298,34 @@ app.whenReady().then(async () => {
       '/^\\d+\\.\\d+\\.\\d+/.test(document.querySelector("[data-about-version]").textContent.trim())'
     ));
 
-    // Picking a theme paints in place and fires 'themechange' for the charts —
-    // it must NOT reload the page, which used to shut the modal the user was
-    // standing in. Assert the swap landed AND the modal survived it.
-    check('theme swap paints without closing Preferences', await evalJs(`(() => {
-      document.querySelector(".settings-theme-btn[data-theme='dark']").click();
+    // Picking a mode or theme paints in place and fires 'themechange' for the
+    // charts — it must NOT reload the page, which used to shut the modal the
+    // user was standing in. Assert each swap landed AND the modal survived it.
+    check('dark mode paints without closing Preferences', await evalJs(`(() => {
+      document.querySelector(".settings-pref-radio[name='color-mode'][value='dark']").click();
       return document.documentElement.dataset.theme === 'dark'
-        && !document.querySelector("[data-modal='preferences']").hidden
-        && document.querySelector(".settings-theme-btn[data-theme='dark']").classList.contains('active');
+        && document.documentElement.dataset.mode === 'dark'
+        && !document.querySelector("[data-modal='preferences']").hidden;
     })()`));
-    // Reset to the default so later checks run against the default theme.
-    await evalJs('document.querySelector(".settings-theme-btn[data-theme=\'\']").click()');
+    // The built-in theme files are seeded into the themes folder and listed;
+    // picking one loads its file and repaints the page in its colours.
+    check('a theme file loads and repaints', await evalJs(`new Promise((resolve) => {
+      const tile = () => document.querySelector(".settings-theme-btn[data-theme-id='gruvbox']");
+      const start = Date.now();
+      (function wait() {
+        if (!tile()) return Date.now() - start > 3000 ? resolve(false) : setTimeout(wait, 50);
+        window.addEventListener('themechange', () => resolve(
+          getComputedStyle(document.documentElement).getPropertyValue('--color-bg-layout').trim() === '#1d2021'
+          && tile().classList.contains('active')
+          && !document.querySelector("[data-modal='preferences']").hidden), { once: true });
+        tile().click();
+      })();
+    })`));
+    // Reset to the defaults so later checks run against the default theme.
+    await evalJs(`(() => {
+      document.querySelector(".settings-theme-btn[data-theme-id='']").click();
+      document.querySelector(".settings-pref-radio[name='color-mode'][value='light']").click();
+    })()`);
 
     // Both column editors live behind ONE toolbar button: "Manage Columns"
     // opens an Ant modal on the tab matching the statement tab. From Cash Flow

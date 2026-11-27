@@ -36,39 +36,33 @@
     <div class="settings-card">
         <div class="settings-row">
             <div class="settings-row-label">
-                <div class="settings-row-name">Surface</div>
+                <div class="settings-row-name">Mode</div>
+                <div class="settings-row-desc">Every theme has a light and a dark version. System follows your computer's setting.</div>
             </div>
-            <div class="settings-theme-options">
-                <!-- The themes (static/css/theme.css), and the OS's choice. -->
-                <button class="settings-theme-btn" data-theme="">
-                    <div class="settings-theme-swatch" data-theme="light"></div>
-                    <span class="settings-theme-label">Light</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="dark">
-                    <div class="settings-theme-swatch" data-theme="dark"></div>
-                    <span class="settings-theme-label">Dark</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="gruvbox">
-                    <div class="settings-theme-swatch" data-theme="gruvbox"></div>
-                    <span class="settings-theme-label">Gruvbox</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="oblivion">
-                    <div class="settings-theme-swatch" data-theme="oblivion"></div>
-                    <span class="settings-theme-label">Oblivion</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="flexoki-light">
-                    <div class="settings-theme-swatch" data-theme="flexoki-light"></div>
-                    <span class="settings-theme-label">Flexoki Light</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="flexoki-dark">
-                    <div class="settings-theme-swatch" data-theme="flexoki-dark"></div>
-                    <span class="settings-theme-label">Flexoki Dark</span>
-                </button>
-                <button class="settings-theme-btn" data-theme="system">
-                    <div class="settings-theme-swatch settings-theme-swatch-system"></div>
-                    <span class="settings-theme-label">System</span>
-                </button>
+            <div class="settings-match-toggle seg-switch">
+                <label class="settings-match-option">
+                    <input class="settings-pref-radio" type="radio" name="color-mode" value="light">
+                    <span class="settings-match-label seg-switch-btn">Light</span>
+                </label>
+                <label class="settings-match-option">
+                    <input class="settings-pref-radio" type="radio" name="color-mode" value="dark">
+                    <span class="settings-match-label seg-switch-btn">Dark</span>
+                </label>
+                <label class="settings-match-option">
+                    <input class="settings-pref-radio" type="radio" name="color-mode" value="system">
+                    <span class="settings-match-label seg-switch-btn">System</span>
+                </label>
             </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-row-label">
+                <div class="settings-row-name">Theme</div>
+                <div class="settings-row-desc">Themes other than Default are CSS files in your themes folder. Edit one, or add your own .css file, and it appears here.</div>
+            </div>
+            <!-- Default, then one tile per theme file (settings.js fills these
+                 from the themes folder; electron/themes.js). -->
+            <div class="settings-theme-options" role="radiogroup" aria-label="Theme"></div>
+            <button class="button-secondary settings-theme-folder" type="button">Open Themes Folder</button>
         </div>
         <div class="settings-row">
             <div class="settings-row-label">

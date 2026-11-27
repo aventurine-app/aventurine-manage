@@ -20,6 +20,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const { initUpdater } = require('./updater');
 const { initLicense } = require('./license');
+const { initThemes, readThemeFile } = require('./themes');
 
 const APP_HOST = 'aventurine';
 const APP_ORIGIN = `app://${APP_HOST}`;
@@ -543,6 +544,17 @@ function registerAppProtocol() {
             const file = safeJoin(STATIC_DIR, p.slice('/static/'.length));
             if (file) return serveFile(file);
         }
+        // The chosen theme file, from the user's themes folder (themes.js).
+        // no-store: the file is edited in place, and an edit must show on the
+        // next load rather than a cached copy.
+        if (p.startsWith('/themes/')) {
+            return readThemeFile(p.slice('/themes/'.length)).then((css) => (css === null
+                ? new Response('not found', { status: 404 })
+                : new Response(css, {
+                    status:  200,
+                    headers: { 'Content-Type': TEXT_TYPES['.css'], 'Cache-Control': 'no-store' },
+                })));
+        }
         return new Response('not found', { status: 404 });
     });
 }
@@ -647,6 +659,8 @@ app.whenReady().then(async () => {
     if (!gotSingleInstanceLock) return;
 
     registerAppProtocol();
+    // Before the window: the page asks for its theme file as it loads.
+    initThemes({ builtinDir: path.join(STATIC_DIR, 'themes') });
     try {
         startBackend();
     } catch (err) {

@@ -43,56 +43,157 @@
     document.querySelectorAll('.settings-currency-input').forEach(wireCurrencyInput);
 
 
-    // ── Color theme ───────────────────────────────────────────────────────────
+    // ── Mode and theme ────────────────────────────────────────────────────────
+    // Two choices (shell/theme-init.js, window.appTheme, owns the keys and the
+    // painter): the mode, Light / Dark / System, and the theme, Default or one
+    // of the theme files in the user's themes folder (electron/themes.js). Every
+    // theme has a light and a dark half, so the mode applies whatever the theme.
+    //
+    // A change swaps tokens on <html> (and the theme's <link>), so everything
+    // painted by CSS updates at once. Only the charts go stale, since they write
+    // token values into their options at draw time; the 'themechange' event
+    // (the same shape as 'currencychange') makes them repaint from the state
+    // they hold. It fires after the new theme file has loaded, so they read the
+    // new colours. This used to reload the page instead, which closed the open
+    // Settings modal.
 
     const _prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    const themesApi = window.electronThemes;
 
-    // Which surfaces exist and what the defaults are both live in
-    // shell/theme-init.js (window.appTheme), which also paints pre-load. This
-    // file only handles the picker: '' is Light, 'dark' is Dark, 'gruvbox' is
-    // Gruvbox (dark, on the Gruvbox palette), 'oblivion' is Oblivion (dark, on
-    // the Tango palette), 'flexoki-light' and 'flexoki-dark' are Flexoki's two
-    // modes, 'system' follows the OS.
+    /** The Default theme's swatch colours (theme.css: layout, container,
+     *  primary), and the stand-ins for any a theme file does not declare. */
+    const DEFAULT_PREVIEW = {
+        light: { bg: '#f5f5f5', surface: '#ffffff', accent: '#1677ff' },
+        dark:  { bg: '#000000', surface: '#141414', accent: '#1668dc' },
+    };
+    const DEFAULT_THEME = { id: '', name: 'Default', preview: DEFAULT_PREVIEW };
 
-    // Switching the theme swaps tokens on <html>, so everything painted by CSS
-    // updates immediately. Only the charts go stale, since they write
-    // --chart-*/--accent-primary into SVG attributes at draw time; the
-    // 'themechange' event (the same shape as 'currencychange') makes them repaint
-    // from the state they hold. This used to reload the page instead, which
-    // closed the open Settings modal.
-    function applyTheme(theme) {
-        localStorage.setItem('color-theme', theme);
-        appTheme.apply();
-        const root = document.documentElement;
-        const effective = root.dataset.palette ?? root.dataset.theme ?? '';
-        window.dispatchEvent(new CustomEvent('themechange', { detail: { theme, effective } }));
+    /** The theme files last listed; null until the first list arrives. */
+    let fileThemes = null;
+
+    async function repaint(opts) {
+        await appTheme.apply(opts);
+        window.dispatchEvent(new CustomEvent('themechange', {
+            detail: { mode: appTheme.mode(), effectiveMode: appTheme.effectiveMode(), theme: appTheme.theme() },
+        }));
     }
 
-    // Reflect the stored choice on every picker instance (page + title-bar modal).
-    function syncThemeButtons() {
-        const current = appTheme.surface();
+    function setMode(mode) {
+        localStorage.setItem('color-mode', mode);
+        return repaint();
+    }
+
+    function setTheme(id) {
+        localStorage.setItem('app-theme', id);
+        return repaint();
+    }
+
+    /** One picker tile: the theme's page, card and accent in the mode now
+     *  painted, and its name. */
+    function themeTile(theme) {
+        const mode = appTheme.effectiveMode();
+        const own = theme.preview[mode] || {};
+        const fallback = DEFAULT_PREVIEW[mode];
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'settings-theme-btn';
+        btn.setAttribute('role', 'radio');
+        btn.dataset.themeId = theme.id;
+        btn.title = theme.id ? `${theme.name} (${theme.id}.css)` : theme.name;
+
+        const swatch = document.createElement('div');
+        swatch.className = 'settings-theme-swatch';
+        swatch.style.setProperty('--sw-bg', own.bg || fallback.bg);
+        swatch.style.setProperty('--sw-surface', own.surface || fallback.surface);
+        swatch.style.setProperty('--sw-accent', own.accent || fallback.accent);
+
+        const label = document.createElement('span');
+        label.className = 'settings-theme-label';
+        label.textContent = theme.name;
+
+        btn.append(swatch, label);
+        btn.addEventListener('click', () => setTheme(theme.id));
+        return btn;
+    }
+
+    function renderThemeTiles() {
+        const themes = [DEFAULT_THEME, ...(fileThemes || [])];
+        document.querySelectorAll('.settings-theme-options').forEach(box => {
+            box.replaceChildren(...themes.map(themeTile));
+        });
+        syncThemeControls();
+    }
+
+    /** Reflect the stored choices on every picker instance. */
+    function syncThemeControls() {
+        const current = appTheme.theme();
         document.querySelectorAll('.settings-theme-btn').forEach(btn => {
-            btn.classList.toggle('active', (btn.dataset.theme ?? '') === current);
+            const on = btn.dataset.themeId === current;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-checked', String(on));
+        });
+        const mode = appTheme.mode();
+        document.querySelectorAll('.settings-pref-radio[name="color-mode"]').forEach(radio => {
+            radio.checked = radio.value === mode;
         });
     }
 
-    function wireThemeButtons() {
-        syncThemeButtons();
-        document.querySelectorAll('.settings-theme-btn').forEach(btn => {
-            btn.addEventListener('click', () => applyTheme(btn.dataset.theme ?? ''));
+    /** Re-read the themes folder. A chosen theme whose file has gone falls
+     *  back to Default, so the picker never shows nothing chosen. */
+    async function loadThemes() {
+        if (!themesApi) return;
+        try {
+            fileThemes = await themesApi.list();
+        } catch (err) {
+            console.error('[themes] listing the themes folder failed:', err);
+            return;
+        }
+        const current = appTheme.theme();
+        if (current && !fileThemes.some(t => t.id === current)) await setTheme('');
+        renderThemeTiles();
+    }
+
+    function wireThemeControls() {
+        renderThemeTiles();
+        loadThemes();
+
+        document.querySelectorAll('.settings-pref-radio[name="color-mode"]').forEach(radio => {
+            radio.addEventListener('change', () => { if (radio.checked) setMode(radio.value); });
         });
-        // Re-resolve live when the OS flips while 'system' is selected.
+        // Re-resolve live when the OS flips while System is selected.
         _prefersDark.addEventListener('change', () => {
-            if (appTheme.surface() === 'system') applyTheme('system');
+            if (appTheme.mode() === 'system') repaint();
         });
+
+        document.querySelectorAll('.settings-theme-folder').forEach(btn => {
+            if (!themesApi) { btn.hidden = true; return; }
+            btn.addEventListener('click', async () => {
+                const res = await themesApi.openFolder().catch(() => ({ ok: false }));
+                if (res.ok) return;
+                // Ant (widgets/ant.js) is on every page but the sign-in page.
+                if (window.Ant) Ant.message.error('The themes folder could not be opened.');
+                else console.error('[themes] the themes folder could not be opened:', res.error);
+            });
+        });
+
+        // A theme file was saved, added or removed: re-list, and reload the
+        // chosen one so an edit shows without leaving the page.
+        if (themesApi) {
+            themesApi.onChanged(async () => {
+                await loadThemes();
+                if (appTheme.theme()) await repaint({ reload: true });
+            });
+        }
     }
 
-    wireThemeButtons();
+    wireThemeControls();
 
 
-    // Every change funnels through 'themechange' (a pick or the OS flipping), so
-    // the buttons are re-synced here once rather than at each call site.
-    window.addEventListener('themechange', syncThemeButtons);
+    // Every change funnels through 'themechange' (a pick, the OS flipping, a
+    // file edit). The tiles are redrawn here once rather than at each call
+    // site, since their swatches show the mode now painted.
+    window.addEventListener('themechange', renderThemeTiles);
 
 
     // ── Display preferences (localStorage-backed pill toggles + selects) ───────
@@ -204,7 +305,7 @@
     // reset (though it only touches settings, never financial data).
 
     const PREF_KEYS = [
-        'color-theme', 'ui-density', 'merchant_icons', 'currency_symbol', 'number_format',
+        'color-mode', 'app-theme', 'ui-density', 'merchant_icons', 'currency_symbol', 'number_format',
         'symbol_position', 'hide_cents', 'negative_style', 'date_format', 'week_start',
         'zoom_level', 'flow-motion',
     ];

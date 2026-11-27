@@ -408,13 +408,13 @@ app.whenReady().then(async () => {
       await sleep(settle);
     };
 
-    /** Switch the app's colour theme for a capture. theme-init.js reads
-     *  'color-theme' from localStorage BEFORE first paint, so the value must be
-     *  written before the navigation that should show it; changing it on a live
-     *  page does not reproduce what the app does on launch. '' is the default
-     *  light theme; 'dark' is used for the site's dashboard shot. */
+    /** Switch the app's colour mode for a capture (the Default theme). theme-init.js
+     *  reads 'color-mode' from localStorage BEFORE first paint, so the value must
+     *  be written before the navigation that should show it; changing it on a
+     *  live page does not reproduce what the app does on launch. '' is the
+     *  default light mode; 'dark' is used for the site's dashboard shot. */
     const setTheme = (value) =>
-      js(`localStorage.setItem('color-theme', ${JSON.stringify(value)})`);
+      js(`localStorage.setItem('color-mode', ${JSON.stringify(value || 'light')}); localStorage.setItem('app-theme', '')`);
 
     const esc = () => js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
 

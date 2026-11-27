@@ -63,14 +63,11 @@
  * file), which the Plan section paints with too. Nothing here is a colour of
  * its own: each of Manage's token names below points at a theme token, and
  * the theme's light and dark blocks decide what it resolves to. To change a
- * colour, change theme.css.
+ * colour, change theme.css (or a theme file, static/themes/).
  *
- * The selector also names the theme picker's swatches, so a swatch's own
- * data-theme puts these names in that theme's context (theme.css declares
- * its tokens on the swatches too). Only the few names whose ROLE differs
- * between light and dark are restated in themes.css. */
-:root,
-.settings-theme-swatch {
+ * Only the few names whose ROLE differs between light and dark are restated
+ * in themes.css. */
+:root {
 
     /* Native <input type=date> picker glyph, replaced with a bundled SVG so it
        matches --text-primary in either theme. The glyph is swapped via
