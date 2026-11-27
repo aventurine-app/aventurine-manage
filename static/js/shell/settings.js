@@ -49,8 +49,10 @@
 
     // Which surfaces exist and what the defaults are both live in
     // shell/theme-init.js (window.appTheme), which also paints pre-load. This
-    // file only handles the picker: '' is Light, 'dark' is Dark, 'system'
-    // follows the OS (the Aventurine theme's two faces, static/css/theme.css).
+    // file only handles the picker: '' is Light, 'dark' is Dark, 'gruvbox' is
+    // Gruvbox (dark, on the Gruvbox palette), 'oblivion' is Oblivion (dark, on
+    // the Tango palette), 'flexoki-light' and 'flexoki-dark' are Flexoki's two
+    // modes, 'system' follows the OS.
 
     // Switching the theme swaps tokens on <html>, so everything painted by CSS
     // updates immediately. Only the charts go stale, since they write
@@ -61,7 +63,8 @@
     function applyTheme(theme) {
         localStorage.setItem('color-theme', theme);
         appTheme.apply();
-        const effective = document.documentElement.dataset.theme ?? '';
+        const root = document.documentElement;
+        const effective = root.dataset.palette ?? root.dataset.theme ?? '';
         window.dispatchEvent(new CustomEvent('themechange', { detail: { theme, effective } }));
     }
 
@@ -86,41 +89,6 @@
 
     wireThemeButtons();
 
-
-    // ── Graph palette ─────────────────────────────────────────────────────────
-    // The second appearance axis: the theme above sets the page colours, this
-    // sets the chart colours, and the two combine (see themes.css). '' is the
-    // default, Ant Design's chart palette, and the reason it stores an empty
-    // string rather than the word 'default': an absent attribute uses the
-    // --ant-chart-* definitions in ant.css, with no override block to keep in
-    // sync. 'opal' is the one alternative, a desaturated copy of it.
-    //
-    // Switching it is the same token swap the theme does, so it reuses the same
-    // 'themechange' event to make the drawn charts repaint from the state they
-    // hold. The charts re-read their colours off <html> for either axis, so a
-    // second event name would duplicate this one and every listener would have
-    // to bind both.
-    function applyGraphTheme(palette) {
-        localStorage.setItem('graph-theme', palette);
-        appTheme.apply();
-        window.dispatchEvent(new CustomEvent('themechange', { detail: { graphTheme: palette } }));
-    }
-
-    function syncGraphButtons() {
-        const current = appTheme.graph();
-        document.querySelectorAll('.settings-graph-btn').forEach(btn => {
-            btn.classList.toggle('active', (btn.dataset.graphTheme ?? '') === current);
-        });
-    }
-
-    function wireGraphButtons() {
-        syncGraphButtons();
-        document.querySelectorAll('.settings-graph-btn').forEach(btn => {
-            btn.addEventListener('click', () => applyGraphTheme(btn.dataset.graphTheme ?? ''));
-        });
-    }
-
-    wireGraphButtons();
 
     // Every change funnels through 'themechange' (a pick or the OS flipping), so
     // the buttons are re-synced here once rather than at each call site.
@@ -239,7 +207,7 @@
     // reset (though it only touches settings, never financial data).
 
     const PREF_KEYS = [
-        'color-theme', 'graph-theme', 'ui-density', 'merchant_icons', 'currency_symbol', 'number_format',
+        'color-theme', 'ui-density', 'merchant_icons', 'currency_symbol', 'number_format',
         'symbol_position', 'hide_cents', 'negative_style', 'date_format', 'week_start',
         'zoom_level', 'flow-motion',
     ];

@@ -293,11 +293,10 @@
 
   function readAccent() {
     // The forecast line is a neutral projection, so it uses the chart palette and
-    // changes with a palette swap, rather than the green/red reserved for
-    // gain/loss. --chart-1 rather than --accent-primary: it resolves to the accent
-    // under the default graph palette (style.css) and to the first colourful stop
-    // under the other one (themes.css), so this line changes with the rest of the
-    // app's charts.
+    // changes with the theme, rather than the green/red reserved for
+    // gain/loss. --chart-1 rather than --accent-primary: it resolves to the
+    // theme's first chart colour (theme.css), so this line changes with the
+    // rest of the app's charts.
     const v = getComputedStyle(document.documentElement).getPropertyValue('--chart-1').trim();
     return v || '#8fb088';
   }

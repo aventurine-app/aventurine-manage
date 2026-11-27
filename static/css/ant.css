@@ -124,8 +124,7 @@
     --ant-color-primary-bg: var(--color-primary-bg);
     --ant-color-primary-bg-hover: var(--color-primary-bg-hover);
     --ant-color-primary-border: var(--color-primary-border);
-    /* Text in the accent: the same charcoal on light, a light step on dark,
-       where the solid accent is too dark to read as text. */
+    /* Text in the accent: the accent's text step. */
     --ant-color-primary-text: var(--color-primary-text);
     --ant-control-outline: var(--control-outline);
 
@@ -165,68 +164,8 @@
 }
 
 /* ─── 1b. Chart palette ─────────────────────────────────────────────────────
- * The one place a chart colour is written down. Everything that draws a chart
- * reads these tokens (ant.js categoryHue, the Dashboard and Portfolio cards,
- * the Reports engines through the --chart-* mapping below), so the Graphs
- * choice in Preferences is a swap of this block and nothing else. Default is
- * Ant's own palette; themes.css re-points the same names for Opal.
- *
- * The selector list also names the Default swatch in Preferences, so that
- * swatch keeps showing these values while Opal is the live palette. */
-:root,
-.settings-graph-swatch[data-graph-theme=""] {
-    /* AntV's categorical palette, for series that are identities rather than
-       meanings, such as a portfolio's holdings and accounts. Ant draws it
-       unchanged on light and dark. */
-    --ant-chart-1: #1783ff;
-    --ant-chart-2: #00c9c9;
-    --ant-chart-3: #7863ff;
-    --ant-chart-4: #f0884d;
-    --ant-chart-5: #60c42d;
-    --ant-chart-6: #d580ff;
-    --ant-chart-7: #2491b3;
-    --ant-chart-8: #bd8f24;
-    --ant-chart-9: #ff80ca;
-    --ant-chart-10: #17c76f;
-
-    /* The hues a category takes once the ten above are spoken for (ant.js
-       categoryHue picks one by a hash of its key). */
-    --ant-chart-extra-1: #aaba01;
-    --ant-chart-extra-2: #bc7cfc;
-    --ant-chart-extra-3: #237cbc;
-    --ant-chart-extra-4: #2de379;
-    --ant-chart-extra-5: #ce8032;
-    --ant-chart-extra-6: #ff7af4;
-    --ant-chart-extra-7: #545fd3;
-    --ant-chart-extra-8: #afe410;
-
-    /* Meanings: money arriving, money leaving, money that only moved, and the
-       primary a single measure over time is drawn in. */
-    --ant-chart-primary: var(--ant-color-primary);
-    --ant-chart-income: var(--ant-color-success);
-    --ant-chart-expense: var(--ant-color-error);
-    --ant-chart-transfer: var(--ant-color-info);
-
-    /* The category colours that are not AntV's: a second income (Ant's green-4)
-       and Uncategorized, a quiet grey. Both a step darker on dark, below. */
-    --ant-chart-income-2: #95de64;
-    --ant-chart-neutral: #c9c2b3;   /* the theme's charcoal-3, a quiet warm grey */
-
-    /* Ant's purple-6 and volcano-6 and green-6: Investing, and the two outflow
-       bands and the hub that the Sankey cannot take from the ten above. */
-    --ant-chart-purple: #722ed1;
-    --ant-chart-volcano: #fa541c;
-    --ant-chart-green: #52c41a;
-
-    /* Money arriving, the Sankey's left side: Ant's blue, deepest first
-       (blue-7 down to blue-2). */
-    --ant-chart-inflow-1: #0958d9;
-    --ant-chart-inflow-2: #1677ff;
-    --ant-chart-inflow-3: #4096ff;
-    --ant-chart-inflow-4: #69b1ff;
-    --ant-chart-inflow-5: #91caff;
-    --ant-chart-inflow-6: #bae0ff;
-}
+ * The --ant-chart-* palette is part of the theme (theme.css, light and dark);
+ * this file only maps it onto the names the chart engines read. */
 
 /* The same names under the legacy --chart-* / --cat-* tokens the chart engines
  * read (chart.js, forecast.js, cashflow-sankey.js, chartramp.js, trends.css).
@@ -293,12 +232,10 @@
 
 /* Dark: the theme carries Ant's dark algorithm, so only what is not colour
    theme is restated: stronger pop-up shadows (the light ones barely show on a
-   dark page), and the chart steps that darken to sit on the dark card. */
+   dark page). */
 html[data-theme="dark"] {
     --ant-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.32), 0 3px 6px -4px rgba(0, 0, 0, 0.48),
         0 9px 28px 8px rgba(0, 0, 0, 0.2);
-    --ant-chart-income-2: #7bc96f;
-    --ant-chart-neutral: #6f695f;
 }
 
 

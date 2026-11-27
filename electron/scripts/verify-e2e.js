@@ -310,25 +310,6 @@ app.whenReady().then(async () => {
     // Reset to the default so later checks run against the default theme.
     await evalJs('document.querySelector(".settings-theme-btn[data-theme=\'\']").click()');
 
-    // The graph palette is the second appearance axis and swaps the same way:
-    // an attribute on <html> that re-points --ant-chart-*, no reload. Assert the
-    // attribute landed AND that the tokens the charts read actually moved (both
-    // the Ant name and the --chart-* the Reports engines read through it) — the
-    // picker being wired is not the same as the palette being applied.
-    check('opal graph palette re-points the chart tokens', await evalJs(`(() => {
-      const read = (name) => getComputedStyle(document.documentElement)
-        .getPropertyValue(name).trim();
-      const before = [read('--ant-chart-1'), read('--chart-1')];
-      document.querySelector(".settings-graph-btn[data-graph-theme='opal']").click();
-      return document.documentElement.dataset.graphTheme === 'opal'
-        && read('--ant-chart-1') !== before[0]
-        && read('--chart-1') !== before[1]
-        && !document.querySelector("[data-modal='preferences']").hidden
-        && document.querySelector(".settings-graph-btn[data-graph-theme='opal']").classList.contains('active');
-    })()`));
-    // Back to the default palette, same as the theme above.
-    await evalJs('document.querySelector(".settings-graph-btn[data-graph-theme=\'\']").click()');
-
     // Both column editors live behind ONE toolbar button: "Manage Columns"
     // opens an Ant modal on the tab matching the statement tab. From Cash Flow
     // that is Categories: one card per type (Income / Expenses / Transfers),

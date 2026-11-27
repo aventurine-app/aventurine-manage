@@ -3,12 +3,10 @@
    ============================================================================
    The surface theme is the Aventurine theme (theme.css, shared with Aventurine
    Planner): Light, Dark, or System (follow the OS). Its tokens carry every
-   colour; style.css maps Manage's names onto them. This file holds only:
-
-     - the dark theme's few restated ROLES, where Manage draws something from a
-       different theme token in dark than in light;
-     - the graph palettes, a second axis that picks what the charts are painted
-       with (data-graph-theme). */
+   colour, the charts' included; style.css maps Manage's names onto them. This
+   file holds the dark theme's few restated ROLES, where Manage draws
+   something from a different theme token in dark than in light, and the palette
+   themes' (Gruvbox, Oblivion, Flexoki) versions of the colours Manage writes as literals rather than tokens. */
 
 
 /* ─── Dark ─────────────────────────────────────────────────────────────────────
@@ -26,18 +24,18 @@ html[data-theme="dark"],
        page is far darker than the card, and a well that deep reads as a hole. */
     --surface2: var(--color-bg-container);
 
-    /* Frost and hairlines in the theme's dark ink, the paper #fcf8f0. */
-    --frost-2:        rgba(252, 248, 240, 0.05);
-    --frost-3:        rgba(252, 248, 240, 0.10);
-    --frost-focus:    rgba(252, 248, 240, 0.40);
-    --frost-dim:      rgba(252, 248, 240, 0.15);
-    --frost-caret:    rgba(252, 248, 240, 0.80);
-    --frost-text:     rgba(252, 248, 240, 0.65);
+    /* Frost and hairlines in the dark theme's white ink. */
+    --frost-2:        rgba(255, 255, 255, 0.05);
+    --frost-3:        rgba(255, 255, 255, 0.10);
+    --frost-focus:    rgba(255, 255, 255, 0.40);
+    --frost-dim:      rgba(255, 255, 255, 0.15);
+    --frost-caret:    rgba(255, 255, 255, 0.80);
+    --frost-text:     rgba(255, 255, 255, 0.65);
 
-    --stroke-divider: rgba(252, 248, 240, 0.06);
-    --stroke-soft:    rgba(252, 248, 240, 0.12);
-    --stroke-medium:  rgba(252, 248, 240, 0.20);
-    --stroke-strong:  rgba(252, 248, 240, 0.25);
+    --stroke-divider: rgba(255, 255, 255, 0.06);
+    --stroke-soft:    rgba(255, 255, 255, 0.12);
+    --stroke-medium:  rgba(255, 255, 255, 0.20);
+    --stroke-strong:  rgba(255, 255, 255, 0.25);
 
     /* Selected table row: a wash gets its contrast from the gap between the
        mix and the surface, and there is less room to darken toward black than
@@ -48,80 +46,356 @@ html[data-theme="dark"],
 }
 
 
+/* ─── Gruvbox ──────────────────────────────────────────────────────────────────
+   Gruvbox (theme.css §5) sits on top of Dark, so the dark roles above already
+   apply; this re-points the colours Manage hard-codes, onto the official
+   Gruvbox palette. Two attributes deep, so it outweighs every
+   html[data-theme="dark"] rule whatever order the sheets load in. */
+html[data-theme][data-palette="gruvbox"] {
+    /* Frost and hairlines in fg0. */
+    --frost-2:        rgba(251, 241, 199, 0.05);
+    --frost-3:        rgba(251, 241, 199, 0.10);
+    --frost-focus:    rgba(251, 241, 199, 0.40);
+    --frost-dim:      rgba(251, 241, 199, 0.15);
+    --frost-caret:    rgba(251, 241, 199, 0.80);
+    --frost-text:     rgba(251, 241, 199, 0.65);
+    --stroke-divider: rgba(251, 241, 199, 0.06);
+    --stroke-soft:    rgba(251, 241, 199, 0.12);
+    --stroke-medium:  rgba(251, 241, 199, 0.20);
+    --stroke-strong:  rgba(251, 241, 199, 0.25);
+    --titlebar-frost: rgba(251, 241, 199, 0.10);
 
-/* ─── Graph palettes ─────────────────────────────────────────────────────────
-   A SECOND, independent axis from the surface theme above: the surface theme
-   picks the page (light / dark), the graph palette picks what the
-   charts are painted with. They compose — every palette works on every surface —
-   which is why this lives in its own attribute (data-graph-theme on <html>, from
-   settings.js / theme-init.js).
+    /* Ink on the bright fills (danger buttons, the first chart colour): bg0. */
+    --danger-text:  #282828;
+    --chart-1-ink:  #282828;
+    --avatar-icon-bg: #ebdbb2;
 
-   'default' is Ant Design's chart palette and needs no block at all: ant.css
-   defines the --ant-chart-* tokens, and leaving the attribute off IS the default.
-   Everything that draws a chart reads those tokens (ant.js categoryHue, the
-   Dashboard and Portfolio cards, the Reports engines through the --chart-* map
-   in ant.css), so a palette is only a re-pointing of the same names. */
+    /* The Reports merchant spectrum: the neutral colours. */
+    --spectrum-mid-1: #458588;
+    --spectrum-mid-2: #d79921;
+    --spectrum-mid-3: #689d6a;
+    --spectrum-mid-4: #98971a;
+    --spectrum-mid-5: #b16286;
+    --spectrum-mid-6: #427b58;
+    --spectrum-mid-7: #8f3f71;
+    --spectrum-mid-8: #cc241d;
 
+    /* Plan: role greys, medals, the selected-card ring, goal stones. */
+    --role-group:    #a89984;
+    --role-none:     #7c6f64;
+    --medal-silver:  #bdae93;
+    --node-active-ring: #fbf1c7;
+    --goal-lapis:      #076678;
+    --goal-tourmaline: #427b58;
+    --goal-tigers-eye: #b57614;
+    --goal-garnet:     #9d0006;
+    --goal-tanzanite:  #8f3f71;
+    --goal-amber:      #af3a03;
+    --goal-rhodolite:  #b16286;
+    --goal-emerald:    #79740e;
+    --goal-ink:        #fbf1c7;
 
-/* ─── Opal graphs ─────────────────────────────────────────────────────────────
-   The default palette with its colour turned down: every hue is kept (the same
-   blue, cyan, violet, orange, green, lilac, teal, gold, pink and mint, in the
-   same slots) but at 55% of Ant's chroma, with lightness eased a little toward
-   the middle so the very bright hues (the limes, the pink) and the deep ones
-   (the Sankey's blues, the purple) sit together. Mean chroma drops from 0.169 to
-   0.093 in OKLCH; neighbouring slots stay 13-22 apart in OKLab (ΔE x100), where
-   the default is 23-40, so the palette is quieter and every pair is still
-   readable. Generated, not hand-picked: re-run the same chroma scale rather than
-   nudging single values, or the family stops being one set.
+    /* Dashboard link colours: the bright colours. */
+    --dash-link-red:    #fb4934;
+    --dash-link-orange: #fe8019;
+    --dash-link-green:  #b8bb26;
+    --dash-link-blue:   #83a598;
+    --dash-link-purple: #d3869b;
+    --dash-link-pink:   #b16286;
 
-   Fixed hex for everything but the primary, which is the UI accent and so is
-   desaturated by mixing it toward a grey instead. Like Ant's own palette this
-   is one set for light and dark; only the second income green steps darker on
-   dark, the way the default's does (ant.css). The swatch selector puts the
-   Preferences preview in this palette's context whether or not it is live. */
-html[data-graph-theme="opal"],
-.settings-graph-swatch[data-graph-theme="opal"] {
-    --ant-chart-1: #5c8dcf;
-    --ant-chart-2: #77bebd;
-    --ant-chart-3: #7e7cce;
-    --ant-chart-4: #d2997b;
-    --ant-chart-5: #86b972;
-    --ant-chart-6: #c396da;
-    --ant-chart-7: #6191a3;
-    --ant-chart-8: #af9667;
-    --ant-chart-9: #df99bf;
-    --ant-chart-10: #74ba8b;
-
-    --ant-chart-extra-1: #abb56f;
-    --ant-chart-extra-2: #b091d5;
-    --ant-chart-extra-3: #5881a4;
-    --ant-chart-extra-4: #85d299;
-    --ant-chart-extra-5: #b98e69;
-    --ant-chart-extra-6: #df98d7;
-    --ant-chart-extra-7: #6571af;
-    --ant-chart-extra-8: #b8d782;
-
-    --ant-chart-primary: color-mix(in srgb, var(--ant-color-primary) 55%, #a39c8e);
-    --ant-chart-income: #659f6e;
-    --ant-chart-expense: #ac6664;
-    --ant-chart-transfer: #6486ce;
-
-    --ant-chart-income-2: #a9d192;
-
-    --ant-chart-purple: #7158aa;
-    --ant-chart-volcano: #d47c63;
-    --ant-chart-green: #80b96e;
-
-    --ant-chart-inflow-1: #456baf;
-    --ant-chart-inflow-2: #5785cd;
-    --ant-chart-inflow-3: #6f9bd4;
-    --ant-chart-inflow-4: #8ab0db;
-    --ant-chart-inflow-5: #a6c5e2;
-    --ant-chart-inflow-6: #c3d8e9;
+    /* Recurring chips: the faded colours, deep enough for fg0 text. */
+    --rec-chip-income:   #79740e;
+    --rec-chip-expense:  #9d0006;
+    --rec-chip-transfer: #076678;
 }
 
-/* Two attributes deep, so it outweighs ant.css's dark block (one attribute and
-   an element) whichever order they land in. */
-html[data-graph-theme="opal"][data-theme="dark"] {
-    --ant-chart-income-2: #96bf8f;
+/* White literals become fg0, and ink on bright fills bg0. */
+html[data-theme][data-palette="gruvbox"] .rec-occ,
+html[data-theme][data-palette="gruvbox"] .ant-tooltip-inner,
+html[data-theme][data-palette="gruvbox"] .dash-size-badge { color: #fbf1c7; }
+html[data-theme][data-palette="gruvbox"] .rec-occ:focus-visible { outline-color: #fbf1c7; }
+html[data-theme][data-palette="gruvbox"] .ant-switch::after { background: #fbf1c7; }
+html[data-theme][data-palette="gruvbox"] .dash-swatch[aria-checked="true"]::after,
+html[data-theme][data-palette="gruvbox"] .tr-sw::after { border-color: #fbf1c7; }
+html[data-theme][data-palette="gruvbox"] .ant-tag-hue { color: color-mix(in srgb, var(--ant-tag-hue) 65%, #fbf1c7); }
+html[data-theme][data-palette="gruvbox"] .ant-tag-checkable[aria-pressed="true"] { color: var(--ant-tag-ink, #282828); }
+html[data-theme][data-palette="gruvbox"] .ant-tag-checkable[aria-pressed="true"] .ant-tag-checkable-dot { background: var(--ant-tag-ink, #282828); }
+html[data-theme][data-palette="gruvbox"] .node-flag--notice { color: #282828; }
+html[data-theme][data-palette="gruvbox"] .node-check { background: #b8bb26; color: #282828; }
+
+/* Merchant avatars: each hue's neutral (faded for the last three) in bg0, under
+   its bright colour. */
+html[data-theme][data-palette="gruvbox"] .avatar-circle-0 { background: #314445; color: #83a598; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-1 { background: #3b4b3c; color: #8ec07c; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-2 { background: #4a4924; color: #b8bb26; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-3 { background: #5c4a26; color: #fabd2f; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-4 { background: #592725; color: #fb4934; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-5 { background: #513944; color: #d3869b; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-6 { background: #5c3820; color: #fe8019; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-7 { background: #19444c; color: #83a598; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-8 { background: #4c4a1c; color: #b8bb26; }
+html[data-theme][data-palette="gruvbox"] .avatar-circle-9 { background: #653017; color: #fe8019; }
+
+
+/* ─── Oblivion ─────────────────────────────────────────────────────────────────
+   Oblivion (theme.css §6) sits on top of Dark like Gruvbox; this re-points the
+   colours Manage hard-codes onto the Tango palette the scheme is built on. */
+html[data-theme][data-palette="oblivion"] {
+    /* Frost and hairlines in aluminium1. */
+    --frost-2:        rgba(238, 238, 236, 0.05);
+    --frost-3:        rgba(238, 238, 236, 0.10);
+    --frost-focus:    rgba(238, 238, 236, 0.40);
+    --frost-dim:      rgba(238, 238, 236, 0.15);
+    --frost-caret:    rgba(238, 238, 236, 0.80);
+    --frost-text:     rgba(238, 238, 236, 0.65);
+    --stroke-divider: rgba(238, 238, 236, 0.06);
+    --stroke-soft:    rgba(238, 238, 236, 0.12);
+    --stroke-medium:  rgba(238, 238, 236, 0.20);
+    --stroke-strong:  rgba(238, 238, 236, 0.25);
+    --titlebar-frost: rgba(238, 238, 236, 0.10);
+
+    /* Ink on the light fills (danger buttons, the first chart colour): aluminium6. */
+    --danger-text:  #2e3436;
+    --chart-1-ink:  #2e3436;
+    --avatar-icon-bg: #d3d7cf;
+
+    /* The Reports merchant spectrum: the mid colours. */
+    --spectrum-mid-1: #3465a4;
+    --spectrum-mid-2: #edd400;
+    --spectrum-mid-3: #c17d11;
+    --spectrum-mid-4: #73d216;
+    --spectrum-mid-5: #75507b;
+    --spectrum-mid-6: #4e9a06;
+    --spectrum-mid-7: #5c3566;
+    --spectrum-mid-8: #cc0000;
+
+    /* Plan: role greys, medals, the selected-card ring, goal stones. */
+    --role-group:    #888a85;
+    --role-none:     #555753;
+    --medal-silver:  #babdb6;
+    --node-active-ring: #eeeeec;
+    --goal-lapis:      #204a87;
+    --goal-tourmaline: #8f5902;
+    --goal-tigers-eye: #c4a000;
+    --goal-garnet:     #a40000;
+    --goal-tanzanite:  #5c3566;
+    --goal-amber:      #ce5c00;
+    --goal-rhodolite:  #75507b;
+    --goal-emerald:    #4e9a06;
+    --goal-ink:        #eeeeec;
+
+    /* Dashboard link colours: the light colours. */
+    --dash-link-red:    #ef2929;
+    --dash-link-orange: #fcaf3e;
+    --dash-link-green:  #8ae234;
+    --dash-link-blue:   #729fcf;
+    --dash-link-purple: #ad7fa8;
+    --dash-link-pink:   #75507b;
+
+    /* Recurring chips: the dark colours, deep enough for aluminium1 text. */
+    --rec-chip-income:   #4e9a06;
+    --rec-chip-expense:  #a40000;
+    --rec-chip-transfer: #204a87;
 }
+
+/* White literals become aluminium1, and ink on light fills aluminium6. */
+html[data-theme][data-palette="oblivion"] .rec-occ,
+html[data-theme][data-palette="oblivion"] .ant-tooltip-inner,
+html[data-theme][data-palette="oblivion"] .dash-size-badge { color: #eeeeec; }
+html[data-theme][data-palette="oblivion"] .rec-occ:focus-visible { outline-color: #eeeeec; }
+html[data-theme][data-palette="oblivion"] .ant-switch::after { background: #eeeeec; }
+html[data-theme][data-palette="oblivion"] .dash-swatch[aria-checked="true"]::after,
+html[data-theme][data-palette="oblivion"] .tr-sw::after { border-color: #eeeeec; }
+html[data-theme][data-palette="oblivion"] .ant-tag-hue { color: color-mix(in srgb, var(--ant-tag-hue) 65%, #eeeeec); }
+html[data-theme][data-palette="oblivion"] .ant-tag-checkable[aria-pressed="true"] { color: var(--ant-tag-ink, #2e3436); }
+html[data-theme][data-palette="oblivion"] .ant-tag-checkable[aria-pressed="true"] .ant-tag-checkable-dot { background: var(--ant-tag-ink, #2e3436); }
+html[data-theme][data-palette="oblivion"] .node-flag--notice { color: #2e3436; }
+html[data-theme][data-palette="oblivion"] .node-check { background: #8ae234; color: #2e3436; }
+
+/* Merchant avatars: each hue's mid colour (dark for the last three) mixed 30%
+   into aluminium6, under its light colour. */
+html[data-theme][data-palette="oblivion"] .avatar-circle-0 { background: #304357; color: #729fcf; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-1 { background: #5a4a2b; color: #e9b96e; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-2 { background: #43632c; color: #8ae234; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-3 { background: #676426; color: #fce94f; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-4 { background: #5d2426; color: #ef2929; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-5 { background: #433c4b; color: #ad7fa8; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-6 { background: #6a4926; color: #fcaf3e; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-7 { background: #2a3b4e; color: #729fcf; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-8 { background: #385328; color: #8ae234; }
+html[data-theme][data-palette="oblivion"] .avatar-circle-9 { background: #5e4026; color: #fcaf3e; }
+
+/* ─── Flexoki Light ────────────────────────────────────────────────────────────
+   Flexoki Light (theme.css §7) is on the LIGHT base, so this re-points the
+   light theme's hard-coded colours onto Flexoki: black ink instead of #000,
+   paper instead of white. */
+html[data-palette="flexoki-light"] {
+    /* Frost and hairlines in Flexoki black. */
+    --frost-2:        rgba(16, 15, 15, 0.05);
+    --frost-3:        rgba(16, 15, 15, 0.10);
+    --frost-focus:    rgba(16, 15, 15, 0.30);
+    --frost-dim:      rgba(16, 15, 15, 0.28);
+    --frost-caret:    rgba(16, 15, 15, 0.50);
+    --frost-text:     rgba(16, 15, 15, 0.70);
+    --stroke-divider: rgba(16, 15, 15, 0.08);
+    --stroke-soft:    rgba(16, 15, 15, 0.12);
+    --stroke-medium:  rgba(16, 15, 15, 0.16);
+    --stroke-strong:  rgba(16, 15, 15, 0.22);
+    --titlebar-frost: rgba(255, 252, 240, 0.60);
+
+    /* Ink on the filled colours: paper. */
+    --danger-text:  #fffcf0;
+    --chart-1-ink:  #fffcf0;
+    --avatar-icon-bg: #f2f0e5;
+
+    /* The Reports merchant spectrum: the 700s. */
+    --spectrum-mid-1: #1a4f8c;
+    --spectrum-mid-2: #8e6b01;
+    --spectrum-mid-3: #1c6c66;
+    --spectrum-mid-4: #536907;
+    --spectrum-mid-5: #87285e;
+    --spectrum-mid-6: #9d4310;
+    --spectrum-mid-7: #4f3685;
+    --spectrum-mid-8: #942822;
+
+    /* Plan: role greys, medals, goal stones. */
+    --role-group:    #575653;
+    --role-none:     #878580;
+    --medal-silver:  #878580;
+    --goal-lapis:      #1a4f8c;
+    --goal-tourmaline: #1c6c66;
+    --goal-tigers-eye: #8e6b01;
+    --goal-garnet:     #af3029;
+    --goal-tanzanite:  #5e409d;
+    --goal-amber:      #9d4310;
+    --goal-rhodolite:  #a02f6f;
+    --goal-emerald:    #536907;
+    --goal-ink:        #fffcf0;
+
+    /* Dashboard link colours: the 600s. */
+    --dash-link-red:    #af3029;
+    --dash-link-orange: #bc5215;
+    --dash-link-green:  #66800b;
+    --dash-link-blue:   #205ea6;
+    --dash-link-purple: #5e409d;
+    --dash-link-pink:   #a02f6f;
+
+    /* Recurring chips: the 700s, deep enough for paper text. */
+    --rec-chip-income:   #536907;
+    --rec-chip-expense:  #942822;
+    --rec-chip-transfer: #1a4f8c;
+}
+
+/* White literals become paper, and ink on light fills black. */
+html[data-palette="flexoki-light"] .rec-occ,
+html[data-palette="flexoki-light"] .ant-tooltip-inner,
+html[data-palette="flexoki-light"] .dash-size-badge { color: #fffcf0; }
+html[data-palette="flexoki-light"] .rec-occ:focus-visible { outline-color: #fffcf0; }
+html[data-palette="flexoki-light"] .ant-switch::after { background: #fffcf0; }
+html[data-palette="flexoki-light"] .dash-swatch[aria-checked="true"]::after,
+html[data-palette="flexoki-light"] .tr-sw::after { border-color: #fffcf0; }
+html[data-palette="flexoki-light"] .ant-tag-hue { color: color-mix(in srgb, var(--ant-tag-hue) 62%, #100f0f); }
+html[data-palette="flexoki-light"] .ant-tag-checkable[aria-pressed="true"] { color: var(--ant-tag-ink, #fffcf0); }
+html[data-palette="flexoki-light"] .ant-tag-checkable[aria-pressed="true"] .ant-tag-checkable-dot { background: var(--ant-tag-ink, #fffcf0); }
+html[data-palette="flexoki-light"] .node-flag--notice { color: #fffcf0; }
+html[data-palette="flexoki-light"] .node-check { background: #66800b; color: #fffcf0; }
+
+/* Merchant avatars: each hue's 100 under its 700 (800 for yellow and lime,
+   for contrast). */
+html[data-palette="flexoki-light"] .avatar-circle-0 { background: #c6dde8; color: #1a4f8c; }
+html[data-palette="flexoki-light"] .avatar-circle-1 { background: #bfe8d9; color: #1c6c66; }
+html[data-palette="flexoki-light"] .avatar-circle-2 { background: #dde2b2; color: #536907; }
+html[data-palette="flexoki-light"] .avatar-circle-3 { background: #f6e2a0; color: #664d01; }
+html[data-palette="flexoki-light"] .avatar-circle-4 { background: #ffcabb; color: #942822; }
+html[data-palette="flexoki-light"] .avatar-circle-5 { background: #fccfda; color: #87285e; }
+html[data-palette="flexoki-light"] .avatar-circle-6 { background: #e2d9e9; color: #4f3685; }
+html[data-palette="flexoki-light"] .avatar-circle-7 { background: #abcfe2; color: #163b66; }
+html[data-palette="flexoki-light"] .avatar-circle-8 { background: #cdd597; color: #3d4c07; }
+html[data-palette="flexoki-light"] .avatar-circle-9 { background: #fed3af; color: #9d4310; }
+
+
+/* ─── Flexoki Dark ─────────────────────────────────────────────────────────────
+   Flexoki Dark (theme.css §8) sits on top of Dark like Gruvbox. */
+html[data-theme][data-palette="flexoki-dark"] {
+    /* Frost and hairlines in base-200 (tx). */
+    --frost-2:        rgba(206, 205, 195, 0.05);
+    --frost-3:        rgba(206, 205, 195, 0.10);
+    --frost-focus:    rgba(206, 205, 195, 0.40);
+    --frost-dim:      rgba(206, 205, 195, 0.15);
+    --frost-caret:    rgba(206, 205, 195, 0.80);
+    --frost-text:     rgba(206, 205, 195, 0.65);
+    --stroke-divider: rgba(206, 205, 195, 0.06);
+    --stroke-soft:    rgba(206, 205, 195, 0.12);
+    --stroke-medium:  rgba(206, 205, 195, 0.20);
+    --stroke-strong:  rgba(206, 205, 195, 0.25);
+    --titlebar-frost: rgba(206, 205, 195, 0.10);
+
+    /* Ink on the bright fills (danger buttons, the first chart colour): black. */
+    --danger-text:  #100f0f;
+    --chart-1-ink:  #100f0f;
+    --avatar-icon-bg: #cecdc3;
+
+    /* The Reports merchant spectrum: the 600s. */
+    --spectrum-mid-1: #205ea6;
+    --spectrum-mid-2: #ad8301;
+    --spectrum-mid-3: #24837b;
+    --spectrum-mid-4: #66800b;
+    --spectrum-mid-5: #a02f6f;
+    --spectrum-mid-6: #bc5215;
+    --spectrum-mid-7: #5e409d;
+    --spectrum-mid-8: #af3029;
+
+    /* Plan: role greys, medals, the selected-card ring, goal stones. */
+    --role-group:    #878580;
+    --role-none:     #575653;
+    --medal-silver:  #b7b5ac;
+    --node-active-ring: #e6e4d9;
+    --goal-lapis:      #1a4f8c;
+    --goal-tourmaline: #1c6c66;
+    --goal-tigers-eye: #8e6b01;
+    --goal-garnet:     #942822;
+    --goal-tanzanite:  #4f3685;
+    --goal-amber:      #9d4310;
+    --goal-rhodolite:  #87285e;
+    --goal-emerald:    #536907;
+    --goal-ink:        #e6e4d9;
+
+    /* Dashboard link colours: the 400s. */
+    --dash-link-red:    #d14d41;
+    --dash-link-orange: #da702c;
+    --dash-link-green:  #879a39;
+    --dash-link-blue:   #4385be;
+    --dash-link-purple: #8b7ec8;
+    --dash-link-pink:   #ce5d97;
+
+    /* Recurring chips: the 700s, deep enough for base-100 text. */
+    --rec-chip-income:   #536907;
+    --rec-chip-expense:  #942822;
+    --rec-chip-transfer: #1a4f8c;
+}
+
+/* White literals become base-100, and ink on bright fills black. */
+html[data-theme][data-palette="flexoki-dark"] .rec-occ,
+html[data-theme][data-palette="flexoki-dark"] .ant-tooltip-inner,
+html[data-theme][data-palette="flexoki-dark"] .dash-size-badge { color: #e6e4d9; }
+html[data-theme][data-palette="flexoki-dark"] .rec-occ:focus-visible { outline-color: #e6e4d9; }
+html[data-theme][data-palette="flexoki-dark"] .ant-switch::after { background: #e6e4d9; }
+html[data-theme][data-palette="flexoki-dark"] .dash-swatch[aria-checked="true"]::after,
+html[data-theme][data-palette="flexoki-dark"] .tr-sw::after { border-color: #e6e4d9; }
+html[data-theme][data-palette="flexoki-dark"] .ant-tag-hue { color: color-mix(in srgb, var(--ant-tag-hue) 65%, #e6e4d9); }
+html[data-theme][data-palette="flexoki-dark"] .ant-tag-checkable[aria-pressed="true"] { color: var(--ant-tag-ink, #100f0f); }
+html[data-theme][data-palette="flexoki-dark"] .ant-tag-checkable[aria-pressed="true"] .ant-tag-checkable-dot { background: var(--ant-tag-ink, #100f0f); }
+html[data-theme][data-palette="flexoki-dark"] .node-flag--notice { color: #100f0f; }
+html[data-theme][data-palette="flexoki-dark"] .node-check { background: #879a39; color: #100f0f; }
+
+/* Merchant avatars: each hue's 900 (850 for the last pair) under its 400 (300). */
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-0 { background: #12253b; color: #4385be; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-1 { background: #122f2c; color: #3aa99f; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-2 { background: #252d09; color: #879a39; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-3 { background: #3a2d04; color: #d0a215; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-4 { background: #3e1715; color: #d14d41; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-5 { background: #39172b; color: #ce5d97; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-6 { background: #261c39; color: #8b7ec8; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-7 { background: #133051; color: #66a0c8; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-8 { background: #313d07; color: #a0af54; }
+html[data-theme][data-palette="flexoki-dark"] .avatar-circle-9 { background: #40200d; color: #da702c; }

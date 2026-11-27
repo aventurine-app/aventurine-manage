@@ -119,8 +119,7 @@
    overlap the border, and a clip edge on the border's inner edge leaves a light
    seam where two anti-aliased edges meet. The previews round their own top
    corners instead, to the border's inner radius (8px outer less the 3px border). */
-.settings-theme-swatch,
-.settings-graph-swatch {
+.settings-theme-swatch {
     border-radius: 5px 5px 0 0;
     overflow: hidden;
 }
@@ -156,37 +155,14 @@
     background-color: var(--sw-accent);
 }
 
-/* ── Graph palette swatches ─────────────────────────────────────────────
-   Same card as the theme swatches above (same size, same active border, same
-   label), so the two appearance rows read as one control stacked twice. The
-   preview is a four-bar mini chart rather than the theme swatch's three bands,
-   because what changes here is what the CHARTS are painted with, not the page.
-
-   Each variant only sets --sw-1..4; the bars themselves are one rule. */
-.settings-graph-btn {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    padding: 0;
-    border: 3px solid var(--border);
-    border-radius: 8px;
-    cursor: pointer;
-    background: var(--surface2);
-    transition: border-color 0.15s ease;
-}
-
-.settings-graph-btn:hover  { border-color: var(--text-tertiary); }
-/* The chosen option: a thick border in the theme's accent (charcoal) with a
+/* The chosen option: a thick border in the theme's accent with a
    square of it set into its top-left corner, flush with the border so the two
    read as one shape, and a light check inside the square. The square sits over the tile, not beside it,
    so nothing shifts when an option is chosen. The check is two borders turned
    45 degrees, because the CSP blocks data: URIs and so an inline icon. */
-.settings-theme-btn.active,
-.settings-graph-btn.active { border-color: var(--accent-primary); }
+.settings-theme-btn.active { border-color: var(--accent-primary); }
 
-.settings-theme-btn.active::after,
-.settings-graph-btn.active::after {
+.settings-theme-btn.active::after {
     content: '';
     position: absolute;
     /* Starts inside the border ring, not at its inner edge, so it paints over
@@ -200,8 +176,7 @@
     border-bottom-right-radius: 5px;
 }
 
-.settings-theme-btn.active::before,
-.settings-graph-btn.active::before {
+.settings-theme-btn.active::before {
     content: '';
     position: absolute;
     z-index: 1;
@@ -212,36 +187,6 @@
     border: solid var(--button-text);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
-}
-
-.settings-graph-swatch {
-    width: 76px;
-    height: 46px;
-    flex-shrink: 0;
-    background-color: var(--surface1);
-    background-repeat: no-repeat;
-    /* Four bars off a shared bottom baseline, at uneven heights so the preview
-       reads as a chart and not as a colour strip. */
-    background-image:
-        linear-gradient(var(--sw-1), var(--sw-1)),
-        linear-gradient(var(--sw-2), var(--sw-2)),
-        linear-gradient(var(--sw-3), var(--sw-3)),
-        linear-gradient(var(--sw-4), var(--sw-4));
-    background-size: 12px 42%, 12px 68%, 12px 88%, 12px 56%;
-    background-position: 10px bottom, 26px bottom, 42px bottom, 58px bottom;
-}
-
-/* Both previews read the live --ant-chart-* names. Each swatch carries its own
-   data-graph-theme, which puts it in that palette's token context (ant.css for
-   Default, themes.css for Opal), so each shows its true colours whichever
-   palette is live. Four slots: blue, cyan, violet and orange, the first four
-   categories. */
-.settings-graph-swatch[data-graph-theme=""],
-.settings-graph-swatch[data-graph-theme="opal"] {
-    --sw-1: var(--ant-chart-1);
-    --sw-2: var(--ant-chart-2);
-    --sw-3: var(--ant-chart-3);
-    --sw-4: var(--ant-chart-4);
 }
 
 .settings-theme-label {
@@ -270,8 +215,8 @@
     --sw-split: linear-gradient(105deg, var(--sw-light) 0 50%, var(--sw-dark) 50% 100%);
     background: var(--sw-split);
     background-size: 76px 46px;
-    --sw-light: #fcfaf4;
-    --sw-dark:  #161411;
+    --sw-light: #ffffff;
+    --sw-dark:  #141414;
 }
 
 .settings-theme-swatch-system::before,
@@ -281,12 +226,12 @@
 }
 
 .settings-theme-swatch-system::before {
-    background-image: linear-gradient(105deg, #f5f2ea 0 50%, #080706 50% 100%);
+    background-image: linear-gradient(105deg, #f5f5f5 0 50%, #000000 50% 100%);
     background-position: top left;
 }
 
 .settings-theme-swatch-system::after {
-    background-image: linear-gradient(105deg, #3a3630 0 50%, #6a645a 50% 100%);
+    background-image: linear-gradient(105deg, #1677ff 0 50%, #1668dc 50% 100%);
     background-position: bottom left;
 }
 

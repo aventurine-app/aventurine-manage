@@ -416,14 +416,6 @@ app.whenReady().then(async () => {
     const setTheme = (value) =>
       js(`localStorage.setItem('color-theme', ${JSON.stringify(value)})`);
 
-    /** Switch the chart palette for a capture. A SECOND axis from the surface
-     *  theme above, read pre-paint by the same theme-init.js, so it has the same
-     *  rule: write it before the navigation that should show it. '' is the
-     *  default (Ant Design's chart palette, which the website's shots are taken
-     *  in); 'opal' is the desaturated one. */
-    const setGraphTheme = (value) =>
-      js(`localStorage.setItem('graph-theme', ${JSON.stringify(value)})`);
-
     const esc = () => js(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
 
     /** Answer the import wizard's account question. With several accounts adopted
@@ -970,13 +962,12 @@ app.whenReady().then(async () => {
       console.log('\n— site —');
 
       // Every site crop is shot in one surface theme (LIGHT unless
-      // SHOT_SURFACE=dark, which also suffixes the filenames) and the DEFAULT
-      // chart palette, so the Features section reads as one set. Set once here
-      // rather than per shot: both live in localStorage on a fixed origin, so
-      // they survive every nav below. The docs phases run under the defaults,
-      // which is why the pair is put back at the end of the block.
+      // SHOT_SURFACE=dark, which also suffixes the filenames), whose chart
+      // palette comes with it, so the Features section reads as one set. Set
+      // once here rather than per shot: it lives in localStorage on a fixed
+      // origin, so it survives every nav below. The docs phases run under the
+      // default, which is why it is put back at the end of the block.
       await setTheme(FRAME_SURFACE === 'dark' ? 'dark' : '');
-      await setGraphTheme('');
 
       // EVERY SITE CROP COMES OUT AT ONE SHAPE, SITE_RATIO (the Planner
       // canvas shot's 1379×809), so the website's feature rows line up. A crop
@@ -1036,9 +1027,6 @@ app.whenReady().then(async () => {
       // today, so the current month is a part-month and the month cards would
       // open on a half paycheque against a half month of spending.
       await nav('/', 3200);
-      if (await js(`document.documentElement.dataset.graphTheme !== undefined`)) {
-        throw new Error('dashboard did not load in the default graph palette');
-      }
       await dashboardPreviousMonth();
       // The stepper click leaves its button focused, and the focus ring would
       // land in the picture.
@@ -1107,14 +1095,13 @@ app.whenReady().then(async () => {
 
       // Back to the defaults for any docs phase sharing the pass.
       await setTheme('');
-      await setGraphTheme('');
     }
 
     // ═══ Opt-in: full-frame app shots ════════════════════════════════
     // Whole-window captures — title bar, sidebar and page in one picture — for
     // the website, where the site crops above deliberately drop all of that.
     // Shot in the COLORFUL surface theme (the site crops use the light one) on
-    // the default graph palette. Opt in by naming it, like `site`:
+    // the theme's chart palette. Opt in by naming it, like `site`:
     //
     //   SHOT_ONLY=frames SHOT_W=1728 SHOT_H=972 SHOT_SCALE=2 SHOT_OUT=… \
     //     electron --no-sandbox --force-device-scale-factor=2 scripts/shoot-docs.js
@@ -1147,21 +1134,17 @@ app.whenReady().then(async () => {
       // does most of its work, so a light frame would show the chrome the crops
       // deliberately drop and then paint it in the one theme that makes it
       // plainest. SHOT_SURFACE=dark re-shoots the same set for the website's
-      // click-to-flip pair. The default palette is fixed either way: Ant draws
-      // it unchanged on both surfaces. Set once here; both axes
-      // live in localStorage on a fixed origin, so they survive every nav below.
+      // click-to-flip pair. The chart palette comes with the theme. Set once
+      // here; it lives in localStorage on a fixed origin, so it survives every
+      // nav below.
       console.log(`  surface: ${FRAME_SURFACE}`);
       await setTheme(FRAME_SURFACES[FRAME_SURFACE]);
-      await setGraphTheme('');
 
       // Stepped back one month for the reason the site dashboard is: the seeded
       // ledger stops at today, so the current month is a part-month and the
       // month cards would open on a half paycheque against a half month of
       // spending.
       await nav('/', 3200);
-      if (await js(`document.documentElement.dataset.graphTheme !== undefined`)) {
-        throw new Error('dashboard did not load in the default graph palette');
-      }
       await dashboardPreviousMonth();
       await sleep(900);
       await unhover();
@@ -1227,7 +1210,6 @@ app.whenReady().then(async () => {
 
       // Back to the defaults for any docs phase sharing the pass.
       await setTheme('');
-      await setGraphTheme('');
     }
 
     // ═══ Phase 9: recurring ══════════════════════════════════════════════════

@@ -216,8 +216,8 @@
    The cards keep their own design, from before the Ant Design conversion: a
    fill and edge tinted with the module's role colour, its category in that
    colour above its name, and a black (white on dark) edge when selected. */
-:root { --node-tint: 17%; --node-edge: 38%; --node-active-ring: #1c1a16; }
-html[data-theme="dark"] { --node-tint: 14%; --node-edge: 30%; --node-active-ring: #fcf8f0; }
+:root { --node-tint: 17%; --node-edge: 38%; --node-active-ring: #000000; }
+html[data-theme="dark"] { --node-tint: 14%; --node-edge: 30%; --node-active-ring: #ffffff; }
 
 .node {
     position: absolute;

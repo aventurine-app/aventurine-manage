@@ -271,8 +271,7 @@
             const parts = rgb[1].split(/[\s,/]+/).filter(Boolean).slice(0, 3).map(Number);
             if (parts.length === 3 && parts.every(Number.isFinite)) return parts;
         }
-        // A colour-mix() result comes back as color(srgb r g b) with channels in 0-1,
-        // which is what the Opal palette's primary is (themes.css).
+        // A colour-mix() result comes back as color(srgb r g b) with channels in 0-1.
         const srgb = /^color\(srgb\s+([^)]+)\)$/i.exec(text);
         if (srgb) {
             const parts = srgb[1].split(/[\s/]+/).filter(Boolean).slice(0, 3).map((n) => Math.round(Number(n) * 255));

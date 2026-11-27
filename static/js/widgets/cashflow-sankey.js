@@ -77,7 +77,7 @@
   // take one end's colour, which left a seam at the other end.
   const NET_FALLBACK = '#4e5153';
   const INCOME_FALLBACK = ['#0a5b47', '#10744c', '#1a8b52', '#2ba25b', '#48b76b', '#72c983'];
-  const TAG_FALLBACK = '#c9c2b3';
+  const TAG_FALLBACK = '#bfbfbf';
 
   function readSankeyPalettes() {
     const cs = getComputedStyle(document.documentElement);

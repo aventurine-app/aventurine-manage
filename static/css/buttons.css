@@ -146,7 +146,7 @@ button,
    font-weight: var(--weight-superbold);
    border: var(--border-width) solid var(--accent-neutral-border);
 }
-/* On hover the outlined secondary fills in with neutral charcoal + contrast
+/* On hover the outlined secondary fills in with the accent + contrast
    text, so it reads as a quiet neutral sibling of the accent-filled primary.
    That is what --accent-neutral-fill is FOR, and both themes have defined it
    all along (light base-800 / dark base-700) while this rule hard-coded a ramp

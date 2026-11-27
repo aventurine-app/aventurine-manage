@@ -98,19 +98,19 @@
    --border:           var(--color-border);
 
    /* Text and icons on a filled accent (or neutral-hover) button: the theme's
-      light ink, which reads on the charcoal accent in both themes. */
+      light ink, which reads on the blue accent in both themes. */
    --button-text:         var(--color-text-light-solid);
    --accent-neutral-text: var(--color-text-light-solid);
    /* Text on a filled --accent-negative (danger) button. */
    --danger-text:      #fff;
 
-    /* Accent — the theme's charcoal: buttons, focus rings, selection, toggles,
+    /* Accent — the theme's blue: buttons, focus rings, selection, toggles,
        active tabs, links. Hover is the theme's own hover step (a rung lighter
        in both themes). */
     --accent-primary:       var(--color-primary);
     --accent-primary-hover: var(--color-primary-hover);
-    /* Text or an icon in the accent (a link, a chosen tab): the same charcoal
-       on light, a light step on dark, where the solid accent cannot be read. */
+    /* Text or an icon in the accent (a link, a chosen tab): the accent's
+       text step. */
     --accent-primary-text:  var(--color-primary-text);
     --accent-secondary:     var(--cyan-7);
     --accent-quatenary:     var(--purple-6);
@@ -132,8 +132,8 @@
    --accent-info:       var(--color-info-text);
    --accent-info-light: var(--color-info);
 
-   /* Chart colours are not set here: the Graphs palette (ant.css, with Opal in
-      themes.css) is the one definition, and --chart-* / --cat-* map onto it. */
+   /* Chart colours are not set here: the theme's chart palette (theme.css) is
+      the one definition, and --chart-* / --cat-* map onto it (ant.css). */
 
    /* ── Merchant spectrum ──────────────────────────────────────────────────
     * Eight desaturated hues, evenly spaced 45° apart, for the Reports charts:
@@ -155,7 +155,7 @@
       surface tokens. */
    --avatar-icon-bg: #f0f0f2;
 
-   /* Neutral secondary (outlined) buttons: body-text ink, and the charcoal
+   /* Neutral secondary (outlined) buttons: body-text ink, and the
       accent as their line and hover fill, so they read as the quiet sibling of
       the filled primary. */
    --accent-neutral:        var(--color-text);
@@ -166,20 +166,20 @@
    --icon-button-fill: var(--surface1);
    --icon-button-ink:  var(--text-primary);
 
-   /* Frost layer — translucent washes in the theme's ink: warm charcoal on
-      light, the paper on dark (themes.css), at the theme's own alphas. */
-   --frost-2:          rgba(28, 26, 22, 0.05);
-   --frost-3:          rgba(28, 26, 22, 0.10);
-   --frost-focus:      rgba(28, 26, 22, 0.30);
-   --frost-dim:        rgba(28, 26, 22, 0.28);
-   --frost-caret:      rgba(28, 26, 22, 0.50);
-   --frost-text:       rgba(28, 26, 22, 0.70);
+   /* Frost layer — translucent washes in the theme's ink: black on
+      light, white on dark (themes.css), at the theme's own alphas. */
+   --frost-2:          rgba(0, 0, 0, 0.05);
+   --frost-3:          rgba(0, 0, 0, 0.10);
+   --frost-focus:      rgba(0, 0, 0, 0.30);
+   --frost-dim:        rgba(0, 0, 0, 0.28);
+   --frost-caret:      rgba(0, 0, 0, 0.50);
+   --frost-text:       rgba(0, 0, 0, 0.70);
 
    /* Hairline strokes, in the same ink. */
-   --stroke-divider:   rgba(28, 26, 22, 0.08);
-   --stroke-soft:      rgba(28, 26, 22, 0.12);
-   --stroke-medium:    rgba(28, 26, 22, 0.16);
-   --stroke-strong:    rgba(28, 26, 22, 0.22);
+   --stroke-divider:   rgba(0, 0, 0, 0.08);
+   --stroke-soft:      rgba(0, 0, 0, 0.12);
+   --stroke-medium:    rgba(0, 0, 0, 0.16);
+   --stroke-strong:    rgba(0, 0, 0, 0.22);
 
    /* Segmented control (Statements/Dashboard/Reports tabs) — the card-coloured
       track, the theme's text-hover wash, and the accent fill of a primary

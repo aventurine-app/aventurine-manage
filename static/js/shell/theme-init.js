@@ -8,21 +8,23 @@
 // Sets the data-theme attribute on <html> from localStorage so the saved
 // theme is the FIRST paint, with no flash of the default theme on nav.
 //
-// Stored 'color-theme' values: '' (Light, the default), 'dark', or 'system'
-// (follow the OS; the live picker, settings.js, repaints it when the OS
-// preference changes while the app is open). They are the Aventurine theme's
-// (static/css/theme.css, shared with Aventurine Planner), which has these two
-// faces only. The surfaces Manage used to offer are read as the nearest one:
+// Stored 'color-theme' values: '' (Light, the default), 'dark', 'gruvbox',
+// 'oblivion', 'flexoki-light', 'flexoki-dark', or 'system' (follow the OS; the live picker, settings.js, repaints it when the
+// OS preference changes while the app is open). Gruvbox is a dark theme: it
+// paints data-theme="dark", so every dark-only rule applies, plus
+// data-palette="gruvbox", which re-points the colours (theme.css §5).
+// Oblivion and Flexoki Dark are painted the same way (§6, §8). Flexoki Light
+// is the one palette theme on the light base: no data-theme, only
+// data-palette="flexoki-light" (§7). The surfaces Manage used to offer are read as the nearest one:
 // Warm Dark as Dark, and Mixed ('colorful'), Warm Light and the hue tints
 // ('tint-<hue>') as Light. A stale value is rewritten, so the picker lights the
 // choice that is actually painted.
 //
-// Stored 'graph-theme' values: '' (Ant Design's chart palette, the default) or
-// 'opal' (the same palette, desaturated). The graph palette is a SECOND,
-// independent axis from the surface (see the block at the foot of themes.css).
+// The chart colours are part of the theme (theme.css); there is no separate
+// graph palette any more.
 //
-// Both axes land on <html> as data-* before first paint, to avoid a flash of the
-// wrong theme on nav. window.appTheme exposes the same reads and the painter to
+// The theme lands on <html> as data-theme before first paint, to avoid a flash
+// of the wrong theme on nav. window.appTheme exposes the same reads and the painter to
 // the live picker, so which values exist is decided in this one file. 'ui-density' =
 // 'compact' tightens table row heights (else comfortable) and is applied the
 // same way.
@@ -30,36 +32,32 @@
 (function () {
     // Retired surfaces, and the theme each is now read as.
     const RETIRED_SURFACES = { 'warm-dark': 'dark' };
+    // Themes painted as a base (Light '' or 'dark') plus a palette of their
+    // own (theme.css), keyed by palette, valued by base.
+    const PALETTES = {
+        gruvbox: 'dark',
+        oblivion: 'dark',
+        'flexoki-light': '',
+        'flexoki-dark': 'dark',
+    };
+    const SURFACES = ['', 'dark', 'system', ...Object.keys(PALETTES)];
     {
         const stored = localStorage.getItem('color-theme');
-        if (stored !== null && stored !== '' && stored !== 'dark' && stored !== 'system') {
+        if (stored !== null && !SURFACES.includes(stored)) {
             localStorage.setItem('color-theme', RETIRED_SURFACES[stored] ?? '');
         }
     }
 
-    // Palettes this app used to offer (the accent-derived Aventurine ramp,
-    // 'gemstone', 'lapis', 'labradorite', and 'colorful' before them) are gone.
-    // An unknown value is not an error anywhere, it just falls through to the
-    // default with no picker button lit, so a stale one is rewritten to the
-    // default rather than left to look as though no palette had been chosen.
-    {
-        const stored = localStorage.getItem('graph-theme');
-        if (stored !== null && stored !== '' && stored !== 'opal') {
-            localStorage.setItem('graph-theme', '');
-        }
-    }
+    // The retired graph palette choice ('graph-theme': Opal and the ones before
+    // it). Charts now take the theme's own palette, so the stale key is dropped.
+    localStorage.removeItem('graph-theme');
 
-    /** The stored surface choice: '', 'dark' or 'system'. Light when none. */
+    /** The stored surface choice: one of SURFACES. Light when none. */
     function surface() {
         return localStorage.getItem('color-theme') ?? '';
     }
 
-    /** The stored graph palette; '' (the default) when none is stored. */
-    function graph() {
-        return localStorage.getItem('graph-theme') ?? '';
-    }
-
-    /** Paint both axes onto <html>. Called here pre-paint and by the live
+    /** Paint the theme onto <html>. Called here pre-paint and by the live
      *  picker after a choice. */
     function apply() {
         const root = document.documentElement;
@@ -67,15 +65,14 @@
         const effective = s === 'system'
             ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : '')
             : s;
-        if (effective) root.dataset.theme = effective;
+        const base = Object.hasOwn(PALETTES, effective) ? PALETTES[effective] : effective;
+        if (base) root.dataset.theme = base;
         else delete root.dataset.theme;
-
-        const g = graph();
-        if (g) root.dataset.graphTheme = g;
-        else delete root.dataset.graphTheme;
+        if (base !== effective) root.dataset.palette = effective;
+        else delete root.dataset.palette;
     }
 
-    window.appTheme = { surface, graph, apply };
+    window.appTheme = { surface, apply };
 
     apply();
 
