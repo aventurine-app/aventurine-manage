@@ -125,10 +125,9 @@
 
     function applyCamera() {
         world.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.zoom})`;
-        const g = GRID * cam.zoom;
-        stage.style.setProperty('--grid', `${g}px`);
-        stage.style.setProperty('--grid-x', `${cam.x % g}px`);
-        stage.style.setProperty('--grid-y', `${cam.y % g}px`);
+        // The dot grid is fixed: it neither scales with zoom nor follows
+        // panning. Only the cards and links move.
+        stage.style.setProperty('--grid', `${GRID}px`);
         zoomLabel.textContent = `${Math.round(cam.zoom * 100)}%`;
     }
 
