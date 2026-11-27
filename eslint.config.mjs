@@ -80,6 +80,14 @@ const appGlobals = {
   aventurineZoom: 'readonly',
   // widgets/chart.js
   FinanceChart: 'readonly',
+  // widgets/spending-echart.js (Reports → Spending Trends)
+  SpendingChart: 'readonly',
+  // vendor/echarts (Apache ECharts: draws every chart in the app, loaded by the
+  // pages that have charts — Dashboard, Reports, Budgets, Plan)
+  echarts: 'readonly',
+  // widgets/echart-kit.js (the app's layer over ECharts: theme colours,
+  // sizing, lifecycle, the shared frame and tooltip)
+  EChartKit: 'readonly',
   // widgets/dashgrid.js / dashperiod.js (the Dashboard's grid engine and period
   // rules; pure, and also require()d by the backend test suite)
   DashGrid: 'readonly',
@@ -92,8 +100,6 @@ const appGlobals = {
   enableCellSelection: 'readonly',
   // shell/theme-init.js (the stored surface and graph palette; loaded in <head>)
   appTheme: 'readonly',
-  // widgets/bubblefield.js (the Budgets page's circles)
-  BubbleField: 'readonly',
   // widgets/ant.js (Ant Design's Modal, Tooltip, Popconfirm, month picker,
   // message and tabs; loaded by the pages drawn in Ant Design — Recurring,
   // Reports, Budgets, Statements)
@@ -166,6 +172,8 @@ export default [
       '**/node_modules/**',
       // Throwaway working files, not app code. See .scratch/README.md.
       '.scratch/**',
+      // Third-party builds, committed as shipped. See each one's README.
+      'static/js/vendor/**',
     ],
   },
 

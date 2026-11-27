@@ -2,14 +2,14 @@
 
 // ─── scrubber.js ────────────────────────────────────────────────────────────
 // The slim bar under the plan builder's canvas: the plan's net worth over its
-// whole run, drawn small. Moving along it (pointer, or arrow keys once
+// whole run, drawn small (Apache ECharts, through widgets/echart-kit.js). Moving along it (pointer, or arrow keys once
 // focused) scrubs the plan to that month (PlanStore.setScrub), and the module
 // cards follow; the canvas's time island names the month. Leaving it goes
 // back to the plan's end. The full charts are in Analyze.
 //
 // Pins mark where the plan's issues start and where its debts are paid off:
-// one per month, coloured as its worst issue (green when it holds only
-// payoffs). Pointing at one lists what happens then, while the scrub follows
+// one per month, a dot on the line coloured as its worst issue (green when it
+// holds only payoffs), under a button the pointer and keyboard reach. Pointing at one lists what happens then, while the scrub follows
 // the pointer; focusing one scrubs to its month; pressing it selects what the
 // first item is about. Issues that
 // belong to no month (a loop, money with no link) have no pin: the inspector
@@ -26,11 +26,7 @@
         <div class="scrub-lane">
             <div class="scrub-track" role="slider" tabindex="0" aria-label="Net worth over time" aria-valuemin="0">
                 <div class="scrub-plot" aria-hidden="true">
-                    <svg class="scrub-svg" preserveAspectRatio="none">
-                        <line class="scrub-zero"></line>
-                        <path class="scrub-area"></path>
-                        <path class="scrub-line"></path>
-                    </svg>
+                    <div class="scrub-canvas"></div>
                     <span class="scrub-cursor"></span>
                     <span class="scrub-dot"></span>
                 </div>
@@ -47,10 +43,7 @@
         </div>`;
 
     const track = root.querySelector('.scrub-track');
-    const svg = root.querySelector('.scrub-svg');
-    const area = root.querySelector('.scrub-area');
-    const line = root.querySelector('.scrub-line');
-    const zero = root.querySelector('.scrub-zero');
+    const canvas = root.querySelector('.scrub-canvas');
     const cursor = root.querySelector('.scrub-cursor');
     const dot = root.querySelector('.scrub-dot');
     const startEl = root.querySelector('.scrub-edge--start');
@@ -63,8 +56,10 @@
     let drawn = null;
     let dragging = false;
 
-    /** Draw the net worth line in a viewBox of months by value, stretched to
-     *  the track (the strokes keep their width: vector-effect in the CSS). */
+    /** Draw the net worth line with Apache ECharts (widgets/echart-kit.js),
+     *  edge to edge in the plot, with the pins as marks on it. The value range
+     *  is fixed here (not left to the chart), so the cursor's dot can be placed
+     *  over the line by percentage. */
     function draw() {
         const plan = PlanStore.state.plan;
         const res = PlanStore.state.results;
@@ -78,20 +73,6 @@
         const pad = (hi - lo) * 0.08;
         lo -= lo < 0 ? pad : 0;
         hi += pad;
-        // y runs down from `hi`, so the lowest value sits on the box's bottom edge.
-        const y = (v) => (hi - v).toFixed(2);
-        let d = '';
-        for (let k = 0; k <= n; k++) d += `${k ? 'L' : 'M'}${k},${y(worth[k])}`;
-        svg.setAttribute('viewBox', `0 0 ${n} ${hi - lo}`);
-        line.setAttribute('d', d);
-        // The area fills down to zero, or to the bottom when nothing is negative.
-        const base = y(Math.max(lo, 0));
-        area.setAttribute('d', `${d}L${n},${base}L0,${base}Z`);
-        zero.setAttribute('x1', 0);
-        zero.setAttribute('x2', n);
-        zero.setAttribute('y1', y(0));
-        zero.setAttribute('y2', y(0));
-        zero.style.display = lo < 0 ? '' : 'none';
         drawn = { worth, n, lo, hi };
         // The first and last months, as the cards name them at either end.
         startEl.textContent = window.Describe.monthLabel(plan, 0);
@@ -99,7 +80,60 @@
         track.setAttribute('aria-valuemax', String(n));
         lengthBtns.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.years) === PlanStore.state.years)));
         drawPins(plan, res);
+        drawLine();
         place();
+    }
+
+    /** A pin's colour: its worst issue's level. */
+    const PIN_TOKEN = { warn: '--color-warning', notice: '--color-info', info: '--color-text-tertiary', done: '--color-success' };
+
+    function drawLine() {
+        const { worth, n, lo, hi } = drawn;
+        const values = Array.from({ length: n + 1 }, (_, k) => worth[k]);
+        EChartKit.mount(canvas, (t) => {
+            const color = EChartKit.color('--color-primary', root) || t.primary;
+            return {
+                grid: { left: 0, right: 0, top: 0, bottom: 0 },
+                xAxis: { type: 'category', show: false, boundaryGap: false, data: values.map((_, k) => k) },
+                yAxis: { type: 'value', show: false, min: lo, max: hi },
+                series: [{
+                    type: 'line',
+                    silent: true,
+                    symbol: 'none',
+                    color,
+                    lineStyle: { width: 1.5 },
+                    // The area fills down to zero, or to the bottom when
+                    // nothing is negative.
+                    areaStyle: { color: EChartKit.alpha(color, 0.1), origin: lo < 0 ? 0 : 'start' },
+                    data: values,
+                    markLine: lo < 0 ? {
+                        silent: true,
+                        symbol: 'none',
+                        label: { show: false },
+                        lineStyle: { color: EChartKit.color('--color-border', root) || t.border, type: [3, 3], width: 1 },
+                        data: [{ yAxis: 0 }],
+                    } : undefined,
+                    // The pins: a dot on the line at each month an issue starts
+                    // or a debt is paid off. The buttons over them (.scrub-pin)
+                    // are what the pointer and the keyboard reach.
+                    markPoint: {
+                        silent: true,
+                        symbol: 'circle',
+                        symbolSize: 10,
+                        label: { show: false },
+                        animation: false,
+                        data: pins.map((p) => ({
+                            coord: [p.k, worth[p.k]],
+                            itemStyle: {
+                                color: EChartKit.color(PIN_TOKEN[p.level] || PIN_TOKEN.warn, root) || t.warning,
+                                borderColor: t.bgContainer,
+                                borderWidth: 2,
+                            },
+                        })),
+                    },
+                }],
+            };
+        }, { animate: false, label: 'Net worth over time' });
     }
 
     // ── Pins ───────────────────────────────────────────────────────────────

@@ -95,21 +95,6 @@
    ant.css, so Reports draws in whichever Graphs palette Preferences has
    picked, and the chrome below is the only part that is this page's own. */
 
-/* Axis chrome, as G2 draws it: 12px labels in the tertiary text colour over
-   dashed hairlines. Shared by the three chart engines on this page. */
-.rep-reports :is(.dashboard-chart, .forecast-chart) .chart-label {
-    fill: var(--ant-color-text-tertiary);
-    font-family: var(--ant-font-family);
-    font-size: var(--ant-font-size-sm);
-    font-weight: 400;
-    letter-spacing: 0;
-}
-.rep-reports :is(.dashboard-chart, .forecast-chart) .chart-grid {
-    stroke: var(--ant-color-split);
-    stroke-width: 1;
-    stroke-dasharray: 3 3;
-}
-
 
 /* ─── Pickers, drawn as Ant's Select ────────────────────────────────────────
    Every picker on the page is a .range-selector (ui.css): a button that opens
@@ -262,11 +247,12 @@
    below the card. So this one panel is stretched from .page down to .chart-area
    — each link grows, and the box the diagram measures is what the viewport had
    left rather than a fixed slab. min-height: 0 at each step because a flex item
-   defaults to refusing to shrink below its content. cashflow-sankey.js reads the
-   resulting height off .chart-area (via its ResizeObserver) and lays the diagram
-   out to fill it; with no definite height (a plain browser, no page chrome) it
-   falls back to the width ratio, so fixtures still render. */
-#cashflow-chart { width: 100%; }
+   defaults to refusing to shrink below its content. The ECharts Sankey
+   (cashflow-sankey.js) fills the resulting box; with no definite height (a
+   plain browser, no page chrome) the 360px floor holds it open. With no
+   diagram the box collapses, so the empty state is all that shows. */
+#cashflow-chart { width: 100%; height: 100%; min-height: 360px; }
+#cashflow-chart:empty { min-height: 0; }
 
 /* :not([hidden]) because an ID beats the `.rep-panel[hidden] { display: none }`
    rule in ui.css — without it this display:flex would un-hide the panel. */
@@ -299,86 +285,6 @@
     flex: 0 0 auto;
 }
 
-/* Each category's wave (the ribbon) + its labels is one link to that category's
-   transactions; the node bar is a bare cap, not part of the link. Brighten the
-   wave on hover/keyboard-focus so the click target reads, and outline
-   the wave's own contour on focus (a box around a ribbon would be huge). */
-.cashflow-sankey .sankey-cat { cursor: pointer; }
-.cashflow-sankey .sankey-cat .sankey-link,
-.cashflow-sankey .sankey-cat .sankey-label,
-.cashflow-sankey .sankey-cat .sankey-share,
-.cashflow-sankey .sankey-cat .sankey-amount {
-    transition: fill 0.15s ease, opacity 0.15s ease, stroke 0.15s ease;
-}
-.cashflow-sankey .sankey-cat:hover .sankey-link,
-.cashflow-sankey .sankey-cat:focus-visible .sankey-link { opacity: 0.7; }
-.cashflow-sankey .sankey-cat:focus { outline: none; }
-.cashflow-sankey .sankey-cat:focus-visible .sankey-link {
-    stroke: var(--ant-color-primary);
-    stroke-width: 1.5;
-}
-
-/* G2's Sankey links sit at about a third of their colour. */
-.cashflow-sankey .sankey-link {
-    opacity: 0.4;
-    transition: opacity 0.15s ease;
-}
-
-.cashflow-sankey .sankey-link:hover { opacity: 0.7; }
-
-/* The channel between the two hub bars is a stage of the diagram, not a
-   category, so it opens nothing. It holds its opacity under the pointer:
-   brightening would offer a click there is no destination for. Its tooltip
-   still appears. */
-.cashflow-sankey .sankey-link-net:hover { opacity: 0.4; }
-
-/* Thin connector from a node to its label when the label was nudged to avoid
-   overlapping a neighbour. */
-.cashflow-sankey .sankey-leader {
-    stroke: var(--ant-color-text-tertiary);
-    stroke-width: 1;
-    opacity: 0.45;
-}
-
-/* Name over amount, in the page's type. Both in the full text colour: they
-   float on the inner face of the bar, over the ribbon, and a muted tone read
-   poorly there. The layout measures them in the app's wider face
-   (cashflow-sankey.js), so these never come out wider than the room it left. */
-.cashflow-sankey .sankey-label {
-    fill: var(--ant-color-text-secondary);
-    font-family: var(--ant-font-family);
-    font-size: var(--ant-font-size-sm);
-    font-weight: 400;
-}
-
-.cashflow-sankey .sankey-amount {
-    fill: var(--ant-color-text);
-    font-family: var(--ant-font-family);
-    font-size: 13px;
-    font-weight: var(--ant-font-weight-strong);
-    font-variant-numeric: tabular-nums;
-}
-
-/* The share rides along in the amount's run, unbolded: it qualifies the figure
-   it follows rather than competing with it. */
-.cashflow-sankey .sankey-share {
-    fill: var(--ant-color-text-tertiary);
-    font-size: 11px;
-    font-weight: 400;
-}
-
-/* Entrance: fade the whole diagram in on first paint only (.sankey-enter is
-   added by cashflow-sankey.js for the first render, dropped on redraws). Fading
-   the SVG as a whole keeps each element's own opacity (e.g. the 0.4 links). */
-.cashflow-sankey.sankey-enter {
-    opacity: 0;
-    animation: fc-fade 0.5s ease forwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .cashflow-sankey.sankey-enter { animation: none; opacity: 1; }
-}
-
 
 /* ─── Forecast: header controls ──────────────────────────────────────────────
    Three knobs, because three are what the report is read through: whether your
@@ -398,7 +304,9 @@
 
 #forecast-kebab-btn[hidden] { display: none; }
 
-#forecast-chart { width: 100%; }
+/* A little taller than the other charts' .ec-box (echart.css): the forecast
+   carries a range band and pins over its line. */
+#forecast-chart { aspect-ratio: 10 / 3; min-height: 210px; }
 
 /* ─── The sentence ───────────────────────────────────────────────────────────
    This report answers one question, so it says the answer in words before it
@@ -457,118 +365,6 @@
 }
 .fc-note-warn a:hover { color: var(--ant-color-primary-hover); }
 
-/* ─── Forecast: the chart ────────────────────────────────────────────────────
-   Axis labels and grid come from the shared block near the top. The zero line
-   is the error colour, dashed: below it the account is overdrawn. */
-.forecast-chart .chart-zero {
-    stroke: var(--ant-color-error);
-    stroke-width: 1;
-    stroke-dasharray: 4 4;
-    opacity: 0.6;
-}
-
-/* ── Past vs future ──────────────────────────────────────────────────────────
-   Today sits dead centre: recorded balances to its left, the projection to its
-   right. The difference is drawn, not just labelled — but with ONE hue: what
-   separates the halves is the dash, the lighter fill, and the divider. Red and
-   green are spoken for by loss and gain. */
-
-/* Actual: solid, full weight, and the half that gets the draw animation — the
-   line the eye should follow first. */
-.forecast-chart .fc-line-actual {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: fc-draw 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-/* Projected: dashed and one step back. No draw animation — it carries a real
-   dash pattern, which the pathLength normalisation that animation depends on
-   would stretch into a single dash. */
-.forecast-chart .fc-line-projected {
-    stroke-dasharray: 6 5;
-    stroke-linecap: butt;
-    opacity: 0;
-    animation: fc-fade 0.45s ease 0.5s forwards;
-}
-
-.forecast-chart .fc-area {
-    opacity: 0;
-    animation: fc-fade 0.5s ease 0.4s forwards;
-}
-
-/* The range around the projection. Behind the lines and fainter than either
-   area, so it reads as the line's uncertainty and never competes with it. */
-.forecast-chart .fc-band {
-    fill-opacity: 0.13;
-    opacity: 0;
-    animation: fc-fade 0.5s ease 0.5s forwards;
-}
-
-/* The divider. Stronger than a grid line (it is a boundary, not a reading aid)
-   but still chrome — the lines either side are the content. */
-.forecast-chart .fc-today-rule {
-    stroke: var(--ant-color-border);
-    stroke-width: 1;
-}
-
-/* "Today" outranks the other tick labels: it is the one that explains the
-   chart's structure rather than just marking a date. */
-.rep-reports .forecast-chart .fc-today-label {
-    fill: var(--ant-color-text);
-    font-weight: var(--ant-font-weight-strong);
-}
-
-.forecast-chart .chart-dot {
-    opacity: 0;
-    animation: fc-fade 0.4s ease 0.5s forwards;
-    transition: r 0.15s ease;
-}
-
-.forecast-chart .chart-dot:hover { r: 5; fill-opacity: 1; }
-
-/* Projected points sit a step back from recorded ones, via fill-opacity rather
-   than opacity — the entrance animation owns `opacity`, and setting it here
-   would be overwritten the moment that finishes. */
-.forecast-chart .chart-dot-projected { fill-opacity: 0.5; }
-
-.forecast-chart .chart-dot-neg { fill: var(--ant-color-error) !important; fill-opacity: 1; }
-
-/* Today — where recorded history hands over to the projection, at the balance
-   before any projected flow is applied. Ringed so the handover reads as a real
-   point on both lines rather than the first weekly estimate. */
-.forecast-chart .chart-dot-anchor {
-    stroke: var(--ant-color-bg-container);
-    stroke-width: 2;
-    fill-opacity: 1;
-    r: 4.5;
-}
-
-@keyframes fc-draw { to { stroke-dashoffset: 0; } }
-@keyframes fc-fade { to { opacity: 1; } }
-
-/* Redraws (resize, data change) skip the entrance. The projected line keeps its
-   dash pattern here — only the ACTUAL line's dasharray is animation machinery. */
-.chart-no-anim .fc-line-actual {
-    animation: none;
-    stroke-dasharray: none;
-    stroke-dashoffset: 0;
-}
-.chart-no-anim .fc-line-projected,
-.chart-no-anim .fc-area,
-.chart-no-anim .fc-band,
-.chart-no-anim .chart-dot { animation: none; opacity: 1; }
-
-@media (prefers-reduced-motion: reduce) {
-    .forecast-chart .fc-line-actual {
-        animation: none;
-        stroke-dasharray: none;
-        stroke-dashoffset: 0;
-    }
-    .forecast-chart .fc-line-projected,
-    .forecast-chart .fc-area,
-    .forecast-chart .fc-band,
-    .forecast-chart .chart-dot { animation: none; opacity: 1; }
-}
 
 /* ─── Forecast: planned items, pins on the line ──────────────────────────────
    Each planned item is a pin ON the projected line at the date it falls, and
@@ -577,15 +373,15 @@
    thing you point at is the thing you edit, and a list beside the visual would
    be the same data drawn twice. */
 
-/* The plot box positions the overlay over the SVG. */
+/* The plot box positions the overlay over the chart. */
 .forecast-plot {
     position: relative;
     width: 100%;
 }
 
 /* The pin/guide layer. It is pointer-events:none as a whole so hovering the
-   plot still reaches the SVG's own <title> tooltips; the pins and the add
-   button switch it back on for themselves. */
+   plot still reaches the chart's own tooltips; the pins and the add button
+   switch it back on for themselves. */
 .fc-overlay {
     position: absolute;
     inset: 0;

@@ -557,7 +557,7 @@ html[data-theme="dark"] { --node-tint: 14%; --node-edge: 30%; --node-active-ring
 
 @media (prefers-reduced-motion: reduce) {
     .link-flow { animation: none; display: none; }
-    .node, .node-port, .link-path, .link-label, .scrub-pin::after { transition: none; }
+    .node, .node-port, .link-path, .link-label { transition: none; }
 }
 
 /* ── Net worth scrubber (scrubber.js) ────────────────────────────────────────
@@ -599,10 +599,7 @@ html[data-theme="dark"] { --node-tint: 14%; --node-edge: 30%; --node-active-ring
 .scrub-track:focus-visible { box-shadow: 0 0 0 2px var(--color-primary-border); }
 /* The plot leaves the bottom strip to the start and end dates. */
 .scrub-plot { position: absolute; inset: var(--space-8) 0 18px; }
-.scrub-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.scrub-area { fill: color-mix(in srgb, var(--color-primary) 10%, transparent); stroke: none; }
-.scrub-line { fill: none; stroke: var(--color-primary); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
-.scrub-zero { stroke: var(--color-border); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.scrub-canvas { position: absolute; inset: 0; }
 .scrub-cursor {
     position: absolute;
     top: -4px;
@@ -636,53 +633,25 @@ html[data-theme="dark"] { --node-tint: 14%; --node-edge: 30%; --node-active-ring
 .scrub-edge--start { left: 0; }
 .scrub-edge--end { right: 0; }
 
-/* An issue's pin: a stem the plot's height, headed by a dot in the colour of
-   its worst issue. The button is wider than the stem, to be easy to point at. */
+/* An issue's pin. Its dot is drawn on the line by the chart (scrubber.js); the
+   button is the plot's height over it and wider than the dot, to be easy to
+   point at, and carries the focus ring. */
 .scrub-pins { position: absolute; inset: var(--space-8) 0 18px; pointer-events: none; }
 .scrub-pin {
-    --pin: var(--color-warning);
     position: absolute;
     top: -4px;
     bottom: 0;
     width: 16px;
     padding: 0;
     border: 0;
+    border-radius: var(--border-radius-sm);
     background: transparent;
     transform: translateX(-50%);
     cursor: pointer;
     pointer-events: auto;
 }
-.scrub-pin[data-level="notice"] { --pin: var(--color-info); }
-.scrub-pin[data-level="info"] { --pin: var(--color-text-tertiary); }
-/* A month that holds only payoffs: green, as a paid-off card's check. */
-.scrub-pin[data-level="done"] { --pin: var(--color-success); }
-.scrub-pin::before {
-    content: '';
-    position: absolute;
-    top: 4px;
-    bottom: 0;
-    left: 50%;
-    width: 1px;
-    background: var(--pin);
-    opacity: 0.6;
-}
-.scrub-pin::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: 10px;
-    height: 10px;
-    border: 2px solid var(--color-bg-container);
-    border-radius: 50%;
-    background: var(--pin);
-    transform: translateX(-50%);
-    transition: transform var(--motion-duration-mid);
-}
-.scrub-pin:hover::after,
-.scrub-pin:focus-visible::after { transform: translateX(-50%) scale(1.3); }
-.scrub-pin:focus-visible { outline: none; }
-.scrub-pin:focus-visible::after { box-shadow: 0 0 0 2px var(--color-primary-border); }
+.scrub-pin:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
+.scrub-pin:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-primary-border); }
 
 /* A pin's issues, risen over the canvas above it: Ant's Popover. */
 .scrub-tip {

@@ -1,0 +1,81 @@
+/* ─── echart.css ──────────────────────────────────────────────────────────────
+   What every Apache ECharts chart shares outside its canvas (widgets/echart-kit.js):
+   the tooltip card's content, and the boxes charts are sized by. The card
+   itself (surface, padding, corners, shadow) is set by the kit from the
+   theme's tokens; these rules lay out what goes in it, as G2's tooltip does:
+   the title at tertiary ink, names at secondary, values at the strongest text. */
+
+.ec-tip {
+    z-index: var(--ant-z-tooltip, 1250) !important;
+    max-width: 360px;
+    line-height: 20px;
+}
+.ec-tip-title { color: var(--ant-color-text-tertiary); }
+/* color: inherit, against nav.css's bare `ul { color: white }`, which reaches
+   any list on the page — the tooltip is appended to <body>. */
+.ec-tip-list {
+    margin: 0;
+    padding: 0;
+    color: inherit;
+    list-style: none;
+}
+.ec-tip-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    line-height: 2em;
+    white-space: nowrap;
+}
+.ec-tip-row.is-total {
+    margin-top: 4px;
+    border-top: 1px solid var(--ant-color-split);
+}
+/* flex: none on the name and its label: ECharts sizes the card to its content,
+   and a shrinkable label would be squeezed to nothing in that measurement. */
+.ec-tip-name {
+    display: flex;
+    flex: none;
+    align-items: center;
+    max-width: 216px;
+}
+.ec-tip-marker {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+}
+.ec-tip-marker-none { background: transparent; }
+.ec-tip-label {
+    flex: none;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ec-tip-value {
+    color: var(--ant-color-text);
+    font-variant-numeric: tabular-nums;
+}
+.ec-tip-note {
+    max-width: 280px;
+    margin-top: 4px;
+    color: var(--ant-color-text-tertiary);
+    white-space: normal;
+}
+
+/* A chart box sized by its width, for charts that sit alone in a card: a
+   quarter as tall as it is wide, floored where the axis labels would collide.
+   ECharts fills whatever box it is given, so the box sets the height. */
+.ec-box {
+    width: 100%;
+    aspect-ratio: 4 / 1;
+    min-height: 170px;
+}
+/* An empty state in place of the chart: the box is only as tall as it is.
+   (Not :empty — a box must have its size BEFORE the first chart is drawn into
+   it, since the kit creates a chart on its container's first non-zero size.) */
+.ec-box:has(> .ant-empty) {
+    aspect-ratio: auto;
+    min-height: 0;
+}

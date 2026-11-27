@@ -92,10 +92,7 @@
 
     // Every change funnels through 'themechange' (a pick or the OS flipping), so
     // the buttons are re-synced here once rather than at each call site.
-    window.addEventListener('themechange', () => {
-        syncThemeButtons();
-        syncGraphButtons();
-    });
+    window.addEventListener('themechange', syncThemeButtons);
 
 
     // ── Display preferences (localStorage-backed pill toggles + selects) ───────

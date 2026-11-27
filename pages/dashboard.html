@@ -6,9 +6,7 @@
     <!-- @include head -->
     <!-- Drawn in Ant Design (ant.css, ant.js), like the other workspaces. -->
     <link rel="stylesheet" href="/static/css/ant.css">
-    <link rel="stylesheet" href="/static/css/donut.css">
-    <!-- The stacked-column rules (.chart-col, .chart-seg) the Spending card draws with. -->
-    <link rel="stylesheet" href="/static/css/transfers.css">
+    <link rel="stylesheet" href="/static/css/echart.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <!-- First-run setup (onboarding.css) hands its file to the ordinary
          import wizard: tximport.css for the wizard's own rows. -->
@@ -75,14 +73,17 @@
     </div>
 
     <!-- @include scripts -->
-    <!-- The shared chart geometry (core/chartmath.js). Per-page rather than in
-         the shared block: only this page and /reports draw charts, so the other
-         four would parse it for nothing. It has no dependencies and must load
-         before any script that draws. -->
+    <!-- The charts: the shared tick maths (core/chartmath.js), Apache ECharts
+         (vendor/echarts/README.md) and the app's chart kit over it
+         (widgets/echart-kit.js). Per-page rather than in the shared block:
+         only the pages that draw charts load them. -->
     <script src="/static/js/core/chartmath.js"></script>
-    <!-- The line renderer (widgets/chart.js) the line cards share with /reports. -->
+    <script src="/static/js/vendor/echarts/echarts.min.js"></script>
+    <script src="/static/js/widgets/echart-kit.js"></script>
+    <!-- The month charts (widgets/chart.js) the line and Spending cards share
+         with /reports, and the ring the Breakdown and Monthly Spending cards
+         draw. -->
     <script src="/static/js/widgets/chart.js"></script>
-    <!-- The ring the Breakdown card draws (shared with /portfolio). -->
     <script src="/static/js/widgets/donut.js"></script>
     <!-- The grid engine and the period rules: pure, and read by the cards and
          the page script below. -->

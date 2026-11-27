@@ -70,11 +70,6 @@
 //       serve the Balance Forecast's pin cards (#fc-pop) alone. The cards'
 //       buttons and icons are Ant Design's now (widgets/ant.js).
 //
-//   UI.observeChart(el, draw(w, h, animate), { height, target })  /  UI.unobserveChart(el)
-//       Draw a chart now and again on every real resize of its container.
-//       Shared by all four chart engines (Reports charts, Dashboard, Forecast,
-//       Cash Flow diagram), which each held their own copy and had drifted.
-//
 //   UI.dialog(bodyHtml, { className, zIndex, dismissOnBackdrop, onClose }) → { overlay, close }
 //   UI.confirm({ message, confirmLabel = 'Delete', danger = true, zIndex }) → Promise<boolean>
 //       The app's one modal shell (.confirm-overlay / .confirm-dialog in
@@ -371,103 +366,6 @@
             });
         }
 
-        // ── Responsive charts ──────────────────────────────────────────────────
-        // Charts are SVG strings built for an exact pixel size, so each one is
-        // redrawn when its container resizes. Watches `target` (default: el's
-        // parent, since el cannot shrink below the svg already inside it) and
-        // calls draw(w, h, animate) now and on every real size change. Width is
-        // always tracked; height only with `height: true`, for charts that fill
-        // their box. The 2px height tolerance stops a chart that makes its own
-        // container taller from redrawing itself forever.
-        //
-        // `animate` is true for the first paint only, and a chart is drawn once
-        // per real size change. Drawing it again restarts the entrance
-        // animation (or cuts it off) and builds the SVG twice, which is visible
-        // lag on a big chart.
-        //
-        // The chart is drawn synchronously, so it is on the page when the
-        // caller returns. Nothing is measured after that draw: reading the box
-        // back would force the browser to style and lay out the new SVG inside
-        // the caller's task, a long stall on a chart of a thousand-plus nodes.
-        //
-        // ResizeObserver always reports once right after observe(), after
-        // layout. Inserting the chart has usually moved the box by then (the
-        // page scrollbar coming back once a chart refills a container that was
-        // just emptied, as the Spending view switch does), and that is not a
-        // resize, so the report is taken as the baseline and not drawn. The one
-        // exception is a `height: true` chart whose box ended up TALLER than the
-        // chart drawn into it: a neighbouring card finished filling the row
-        // (Dashboard, Month to Month), so the chart redraws, with the animation,
-        // to fill it. The drawn height is read from the svg's own attribute,
-        // which costs no layout. A chart in a hidden panel (width 0) gets its
-        // first paint whenever the panel is shown.
-        //
-        // An animated paint is inserted with its entrance HELD (see
-        // .chart-anim-hold in ui.css) and released a frame after it first
-        // paints. The first frame of a large chart is long, and an animation
-        // running through it arrives part-way done or not at all; held, it
-        // starts from zero once that frame is behind it. The start is a frame
-        // later, and the animation is never interrupted.
-        //
-        // One observer per element: observing again replaces the previous one,
-        // and unobserveChart(el) stops it.
-        const _chartObservers = new WeakMap();
-
-        function holdEntrance(chart) {
-            if (!chart) return;
-            chart.classList.add('chart-anim-hold');
-            // The first callback runs before the frame that styles, lays out
-            // and paints the new chart; the second runs once that frame is done.
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                chart.classList.remove('chart-anim-hold');
-            }));
-        }
-
-        function unobserveChart(el) {
-            _chartObservers.get(el)?.disconnect();
-            _chartObservers.delete(el);
-        }
-
-        function observeChart(el, draw, { height = false, target = el.parentElement || el } = {}) {
-            unobserveChart(el);
-            let lastW = 0;
-            let lastH = 0;
-            let paints = 0;
-            let firstCallback = true;
-
-            const paint = (w, h, animate) => {
-                w = Math.round(w);
-                h = Math.round(h || 0);
-                const changed = w !== lastW || (height && Math.abs(h - lastH) > 2);
-                if (w <= 0 || !changed) return;
-                lastW = w;
-                lastH = h;
-                draw(w, h, animate);
-                paints++;
-                if (animate) holdEntrance(el.firstElementChild);
-            };
-
-            const obs = new ResizeObserver((entries) => {
-                const { width, height: h } = entries[0].contentRect;
-                if (firstCallback && paints > 0) {
-                    firstCallback = false;
-                    const drawnH = Number(el.firstElementChild?.getAttribute('height')) || 0;
-                    if (height && drawnH && h > drawnH + 2) {
-                        paint(width, h, true);
-                        return;
-                    }
-                    lastW = Math.round(width);
-                    lastH = Math.round(h);
-                    return;
-                }
-                firstCallback = false;
-                paint(width, h, paints === 0);
-            });
-            obs.observe(target);
-            _chartObservers.set(el, obs);
-            paint(target.clientWidth, target.clientHeight, true);
-        }
-
         // ── Modal dialogs ──────────────────────────────────────────────────────
         // The .confirm-overlay / .confirm-dialog shell every page's modal uses.
         // `bodyHtml` is trusted markup: escape anything user-controlled before
@@ -586,7 +484,7 @@
             emptyState, ICONS, skChart, skRows, skeletonGuard, openMenu, wirePicker,
             lockPickerWidth, PICKER_CARET, setPickerLabel, toast,
             floatingCard, positionFloatingCard, markActive,
-            dialog, confirm, observeChart, unobserveChart,
+            dialog, confirm,
         };
     })();
 

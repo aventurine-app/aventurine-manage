@@ -44,7 +44,7 @@
 //
 // SECURITY: layout names and every label a card draws are
 // user-controlled. All of it passes through escapeHtml before innerHTML, and the
-// chart reading is built with textContent.
+// chart tooltips escape theirs (EChartKit.tipHtml).
 
 (function () {
     const { TYPES, GROUPS, OVERVIEW, thumbHtml } = DashCards;
@@ -262,7 +262,6 @@
         if (ui.editing || !ui.loaded) return;
         if (saveTimer) saveNow();
         closePop();
-        hideChartTip();
         ui.editing = true;
         ui.base = clone(state);
         ui.undo = [];
@@ -617,7 +616,6 @@
         rt.size = `${w}x${h}`;
         rt.sig = JSON.stringify(card.settings);
         if (w < 24 || h < 24) return;
-        if (hover.body === rt.body) hideChartTip();
         if (rt.error) {
             rt.body.innerHTML = Ant.empty({ compact: true, title: 'Could not load this card' });
         } else {
@@ -661,7 +659,6 @@
         const rt = live.get(id);
         if (!rt) return;
         bodyObserver.unobserve(rt.body);
-        if (hover.body === rt.body) hideChartTip();
         rt.el.remove();
         live.delete(id);
     }
@@ -716,8 +713,8 @@
         dom.empty.hidden = list.length > 0 || ui.editing;
     }
 
-    /** Redraw every card from the data in hand: a theme or palette change,
-     *  whose colours the charts baked into their SVG. */
+    /** Redraw every card from the data in hand: a theme change, which moves
+     *  the colours the cards' chips, rings and charts read from the theme. */
     function repaintAll() {
         if (!ui.loaded) return;
         for (const card of cards()) paint(card.id, false);
@@ -1371,7 +1368,6 @@
             d.ghost.innerHTML = `<span class="dash-widget-thumb">${thumbHtml(d.type)}</span><span class="dash-widget-name">${escapeHtml(def.name)}</span>`;
             document.body.appendChild(d.ghost);
             drawer?.setAway(true);
-            hideChartTip();
             startAutoScroll();
         }
         updateLibraryDrag();
@@ -1497,7 +1493,6 @@
             g.badge.textContent = `${g.card.w} × ${g.card.h}`;
             g.el.appendChild(g.badge);
         }
-        hideChartTip();
         closePop();
         showPlaceholder(g.rect);
         startAutoScroll();
@@ -1645,102 +1640,6 @@
             removeCard(card.id);
             if (nextId) live.get(nextId)?.el.focus();
         }
-    }
-
-    // ─── Reading a line chart ────────────────────────────────────────────────
-    // Moving across a line chart names the month under the pointer and prints
-    // what every plotted series was worth in it, in G2's tooltip. The month
-    // columns, the guide and the dots come out of FinanceChart.buildLine; this
-    // half moves the guide, raises the hovered month's dots and fills the one
-    // floating reading every card shares. Everything it prints is read back off
-    // the dots (data-name, data-amount, fill), so there is no second copy of a
-    // series here to fall out of step with the chart. One delegated listener on
-    // the canvas covers every card, including cards added later.
-    const hover = { tip: null, hit: null, dots: [], body: null };
-
-    function chartTipEl() {
-        if (!hover.tip) {
-            hover.tip = document.createElement('div');
-            hover.tip.className = 'chart-tip dash-chart-tip ant-scope';
-            hover.tip.setAttribute('role', 'tooltip');
-            document.body.appendChild(hover.tip);
-        }
-        return hover.tip;
-    }
-
-    /** The month, then a row per series: its colour, its name, its amount.
-     *  Built with textContent: the names are user-controlled labels. */
-    function fillChartTip(tip, when, dots) {
-        const head = document.createElement('div');
-        head.className = 'chart-tip-when';
-        head.textContent = when;
-        const rows = document.createElement('ul');
-        rows.className = 'chart-tip-rows';
-        for (const dot of dots) {
-            const row = document.createElement('li');
-            row.className = 'chart-tip-row';
-            const swatch = document.createElement('span');
-            swatch.className = 'chart-tip-swatch';
-            swatch.style.background = dot.getAttribute('fill');
-            const name = document.createElement('span');
-            name.className = 'chart-tip-name';
-            name.textContent = dot.dataset.name;
-            const amount = document.createElement('span');
-            amount.className = 'chart-tip-amount';
-            amount.textContent = dot.dataset.amount;
-            row.append(swatch, name, amount);
-            rows.appendChild(row);
-        }
-        tip.replaceChildren(head, rows);
-    }
-
-    /** Over the hovered month, centred on the guide, sliding sideways only: its
-     *  height comes from the chart's frame, so it holds one line across a sweep. */
-    function positionChartTip() {
-        const tip = chartTipEl();
-        const frame = hover.hit.ownerSVGElement.getBoundingClientRect();
-        const anchor = (hover.dots[0] || hover.hit).getBoundingClientRect();
-        const w = tip.offsetWidth;
-        const h = tip.offsetHeight;
-        const x = anchor.left + anchor.width / 2 - w / 2;
-        const above = frame.top - h - 12;
-        tip.style.left = `${Math.round(clamp(x, 8, window.innerWidth - w - 8))}px`;
-        tip.style.top = `${Math.round(above < 8 ? frame.top + 12 : above)}px`;
-    }
-
-    function clearChartMarks(svg) {
-        if (!svg) return;
-        for (const dot of svg.querySelectorAll('.chart-dot-active')) dot.classList.remove('chart-dot-active');
-        svg.querySelector('.chart-guide')?.classList.remove('chart-guide-on');
-    }
-
-    function showChartTip(hit) {
-        const svg = hit.ownerSVGElement;
-        if (!svg) return;
-        if (hover.hit) clearChartMarks(hover.hit.ownerSVGElement);
-        hover.hit = hit;
-        hover.body = hit.closest('.dash-card-body');
-        hover.dots = [...svg.querySelectorAll(`.chart-dot[data-slot="${hit.dataset.slot}"]`)]
-            .sort((a, b) => Number(a.getAttribute('cy')) - Number(b.getAttribute('cy')));
-        for (const dot of hover.dots) dot.classList.add('chart-dot-active');
-        const guide = svg.querySelector('.chart-guide');
-        if (guide) {
-            guide.setAttribute('x1', hit.dataset.x);
-            guide.setAttribute('x2', hit.dataset.x);
-            guide.classList.add('chart-guide-on');
-        }
-        const tip = chartTipEl();
-        fillChartTip(tip, hit.dataset.when, hover.dots);
-        positionChartTip();
-        tip.classList.add('chart-tip-on');
-    }
-
-    function hideChartTip() {
-        if (hover.hit) clearChartMarks(hover.hit.ownerSVGElement);
-        hover.hit = null;
-        hover.dots = [];
-        hover.body = null;
-        hover.tip?.classList.remove('chart-tip-on');
     }
 
     // ─── First run ───────────────────────────────────────────────────────────
@@ -1909,13 +1808,6 @@
         dom.canvas.addEventListener('pointerdown', onCardPointerDown);
         dom.canvas.addEventListener('keydown', onCardKeydown);
         dom.canvas.addEventListener('click', onCanvasClick);
-        dom.canvas.addEventListener('pointerover', (e) => {
-            if (ui.editing || gesture || libDrag) return;
-            const hit = e.target.closest('.chart-hit');
-            if (!hit) { if (hover.hit) hideChartTip(); return; }
-            if (hit !== hover.hit) showChartTip(hit);
-        });
-        dom.canvas.addEventListener('pointerleave', hideChartTip);
         dom.empty.addEventListener('click', (e) => {
             if (e.target.closest('[data-empty-action="add-widgets"]')) openDrawer();
         });
@@ -1927,11 +1819,9 @@
         // .page scrolls, not the window; capture, because that scroll does not bubble.
         document.addEventListener('scroll', () => {
             if (pop) pop.handle.reposition?.();
-            if (hover.hit) positionChartTip();
         }, { capture: true, passive: true });
         window.addEventListener('resize', () => {
             closePop();
-            hideChartTip();
         });
         window.addEventListener('themechange', repaintAll);
         window.addEventListener('pagehide', () => { if (saveTimer) saveNow(); });

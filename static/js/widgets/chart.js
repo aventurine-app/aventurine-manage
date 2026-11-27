@@ -1,161 +1,78 @@
 'use strict';
 
 // ─── chart.js ────────────────────────────────────────────────────────────────
-// Shared hand-rolled multi-series SVG chart, exposed as window.FinanceChart.
-// Every line chart in the app is drawn here: the Reports tabs through render(),
-// and the Dashboard's Year to Year cards through buildLine(), which it mounts
-// itself so it can add its hover reading. The Balance Forecast keeps its own
-// engine (widgets/forecast.js): its split history/projection line and date-
-// scaled x axis are a different chart, and only the geometry is shared.
+// The app's month-by-month charts, exposed as window.FinanceChart and drawn by
+// Apache ECharts through widgets/echart-kit.js. Used by the Dashboard's line
+// and Spending cards and by Reports → Saved & Invested.
 //
-// Three forms share the frame: render() draws smoothed lines (one measure over
-// time), renderStacked() draws stacked columns (a part-to-whole breakdown over
-// time, for Reports → Investing), and renderArea() draws a stacked AREA (the
-// same breakdown as one continuous shape, for Reports → Spending). They share
-// the axis, the padding, the label stride and the responsive mount, which would
-// otherwise be duplicated in a second widget file. The tick maths and the curve
-// itself are shared wider still, with the other two chart engines — see
-// core/chartmath.js.
+// Three forms over the same months:
+//   render()        LINES: one measure over time, smoothed, each with a soft
+//                   gradient under it and a dot per month (the last one larger;
+//                   `dots: false` leaves the dots off).
+//   renderArea()    LARGE AREA: ECharts' "Large scale area chart", without its
+//                   zoom slider. One measure as a filled area with no dots,
+//                   thinned by LTTB sampling when the months outnumber the
+//                   pixels. The Dashboard's Net Worth card.
+//   renderStacked() STACKED COLUMNS: a part-to-whole breakdown per month. The
+//                   months are separate amounts, and a month with nothing in it
+//                   is a real gap, which columns draw.
 //
-// STACKED COLUMNS vs STACKED AREA is a question about the months, not a style
-// choice. Columns suit months that are separate deposits — a month with nothing
-// put away is a real gap, and columns draw a gap. Spending is continuous: there
-// is no month without any, so the months are samples of one running quantity
-// and an unbroken shape is what that is. The area form is also the only one of
-// the three with the visual mass to sit beside the Cash Flow sankey.
+// Series shape:  [{ label, color, points: [{ year, monthIdx, value }] }]
+// Slots:         [{ year, monthIdx }], the x-axis months to plot across.
 //
-// Series shape:  [{ label, color, points: [{ year, monthIdx, value }], id? }]
-//                `id` is optional and opaque. It is stamped as data-series — on
-//                each band group in the stacked-area form, on each mark in the
-//                line form — so a click in the plot can name a series, and so
-//                setFocus() can re-mark a focus change in place (see Focus).
-// Slots:         [{ year, monthIdx }]  — the x-axis columns to plot across.
+// The y axis ticks come from ChartMath (core/chartmath.js) and their labels from
+// axisFormatter (currency.js), handed the whole tick set so neighbouring ticks
+// never share a label. The container's CSS sets the chart's size (.ec-box in
+// css/echart.css for a chart alone in a card; a Dashboard card's plot box).
 //
-// Uses the existing globals escapeHtml (escape.js) and CURRENCY_SYMBOL
-// (currency.js), which the page loads before this file.
+// Globals: EChartKit (echart-kit.js), ChartMath (chartmath.js), axisFormatter
+// and formatCurrency (currency.js), MONTHS_SHORT (format.js).
 
 (function () {
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
-  // Two series palettes, both read from CSS tokens at colorMap() time so they
-  // retone on a theme swap; the arrays are only first-paint fallbacks for the
-  // rare frame before styles resolve.
-  //
-  //   'accent' (default) — the --chart-* tokens (ant.css, from the theme's chart palette).
-  //       One measure over time; the series are variations of the same thing.
-  //   'categorical'      — the --cat-* tokens (ant.css). For a chart whose
-  //       series are CATEGORIES rather than one measure over time. Both are the
-  //       first eight hues of the theme's chart palette.
-  const PALETTE = [
-    '#8fb088', '#5c7152', '#a9c1a4', '#33402d',
-    '#7c9670', '#b6c8b2', '#647a59', '#5a6f50',
-  ];
-  const CAT_PALETTE = [
-    '#1e2422', '#283a36', '#33514b', '#3e6860',
-    '#4b7f75', '#659188', '#80a29c', '#99b3ae',
-  ];
 
-  function readPalette(name) {
-    const cs = getComputedStyle(document.documentElement);
-    const [fallbacks, token] = name === 'categorical'
-      ? [CAT_PALETTE, 'cat']
-      : [PALETTE, 'chart'];
-    return fallbacks.map((fb, i) => cs.getPropertyValue(`--${token}-${i + 1}`).trim() || fb);
+  const LINE_W = 2.25;
+  const DOT = 6;
+  const END_DOT = 9;
+  const BAR_MAX = 24;
+  const BAR_RADIUS = 4;
+  const GRID = { left: 0, right: 16, top: 16, bottom: 0, containLabel: true };
+
+  const fmtTip = (n) => formatCurrency(n, true);
+  const slotKey = (s) => `${s.year}-${s.monthIdx}`;
+  const slotTitle = (s) => `${MONTHS[s.monthIdx]} ${s.year}`;
+
+  /** The x labels: the short month, or the year in place of January when the
+   *  span crosses one, the only date context a 12- or 24-month axis needs. */
+  function slotLabels(slots) {
+    const multiYear = new Set(slots.map((s) => s.year)).size > 1;
+    return slots.map((s) => (multiYear && s.monthIdx === 0 ? String(s.year) : MONTHS_SHORT[s.monthIdx]));
   }
 
-  const CHART_RATIO = 200 / 800;
-  const CHART_PAD = { l: 56, r: 20, t: 18, b: 30 };
-
-  // The y axis labels are set FLUSH LEFT at the SVG's own left edge rather than
-  // right-aligned against the plot. The chart fills its card column, so x=0 is
-  // the card's content edge — the same line the card title sits on, which is
-  // what the labels line up with. Right-aligning them indented every label by
-  // whatever it was short of the widest one, so a "$0" tick sat ~30px in from
-  // the title above it and the card read as two left edges.
-  const Y_LABEL_X = 0;
-
-  // …and the plot then starts where the widest label ends, so CHART_PAD.l is
-  // only the fallback. A fixed column was sized for the longest label a chart
-  // might ever carry, which left an axis reading "$0 … $40" paying for one
-  // reading "$120.5K": dead card between the numbers and the first gridline.
-  // MEASURED, not counted per character, for the reason the Spending rail's
-  // width is measured — the font, the theme and the app zoom all move it, and
-  // a hard-coded width drifts the moment any of them changes. Floored so a
-  // short axis still leaves the first x-axis label (centred on the plot's left
-  // edge) inside the card, and capped so one freak label cannot eat the plot.
-  const AXIS_LABEL_PX = 11;        // mirrors .chart-label in trends.css / forecast.css
-  const AXIS_LABEL_TRACK = 0.05;   // …and its letter-spacing, in em
-  const AXIS_GAP = 12;
-  const AXIS_PAD_MIN = 28;
-  const AXIS_PAD_MAX = 96;
-  let labelCtx = null;
-
-  function axisPadLeft(labels) {
-    if (!labels.length) return CHART_PAD.l;
-    let widest = 0;
-    try {
-      if (!labelCtx) labelCtx = document.createElement('canvas').getContext('2d');
-      const cs = getComputedStyle(document.documentElement);
-      const family = cs.getPropertyValue('--font-h3').trim() || 'sans-serif';
-      const weight = cs.getPropertyValue('--weight-semibold').trim() || '600';
-      labelCtx.font = `${weight} ${AXIS_LABEL_PX}px ${family}`;
-      for (const t of labels) {
-        const track = t.length * AXIS_LABEL_PX * AXIS_LABEL_TRACK;
-        widest = Math.max(widest, labelCtx.measureText(t).width + track);
+  /** Each series' values lined up with `slots`; null where it has no point. */
+  function alignValues(series, slots) {
+    const index = new Map(slots.map((s, i) => [slotKey(s), i]));
+    return series.map((s) => {
+      const row = new Array(slots.length).fill(null);
+      for (const p of s.points) {
+        const i = index.get(slotKey(p));
+        if (i !== undefined) row[i] = (row[i] || 0) + (Number(p.value) || 0);
       }
-    } catch (_err) {
-      return CHART_PAD.l;   // no canvas to measure with: keep the fixed column
-    }
-    return Math.round(Math.min(AXIS_PAD_MAX, Math.max(AXIS_PAD_MIN, widest + AXIS_GAP)));
+      return row;
+    });
   }
 
-  // Gridlines and the smoothed curve come from ChartMath (core/chartmath.js),
-  // shared with widgets/forecast.js and pages/dashboard.js so all three engines
-  // draw the same geometry.
-  //
-  // Axis labels come from axisFormatter (currency.js), which is handed the whole
-  // tick set: formatting ticks one at a time made distinct gridlines share a
-  // label whenever the step wasn't a round thousand (step 200 → "$9K, $9K, $9K").
-
-  function fmtTooltip(n) {
-    return formatCurrency(n, true);
-  }
-
-  // A chart is normally as tall as its width says (CHART_RATIO, floored at 170),
-  // which is right for one sitting alone in a card. `fill` lets it take the box
-  // it was given instead, for a chart laid out BESIDE something taller: the
-  // Spending report puts the rail next to the plot, and on a narrow window the
-  // rail is the taller of the two, so a ratio-only chart left a slab of card
-  // under its x axis. It only ever GROWS to the box — a box shorter than the
-  // ratio is left alone, since the answer to a cramped chart is not a flatter
-  // one.
-  //
-  // `fit` is the other answer, for a chart whose box is someone else's choice: a
-  // Dashboard card is as tall as the user sized it on the grid, so its chart
-  // takes that height exactly, shorter than the ratio included. Floored where
-  // the axis labels would start to collide.
-  const FIT_MIN_H = 96;
-  function boxHeight(W, boxH = 0, fill = false, fit = false) {
-    if (fit && boxH > 0) return Math.max(Math.round(boxH), FIT_MIN_H);
-    const ratio = Math.max(Math.round(W * CHART_RATIO), 170);
-    return fill ? Math.max(ratio, Math.round(boxH) || 0) : ratio;
-  }
-
-  /** The y axis ticks for a line chart's values.
+  /** The y ticks for lines.
    *
-   *  By default the ticks fit the data. `zeroBase` floors the axis at zero:
-   *  right once the line carries an AREA FILL, because a filled shape reads its
-   *  height from the baseline and a baseline of 1,800 states a swing that isn't
-   *  there. Any report pairing this chart with a stacked one (Reports →
-   *  Investing) also needs both halves on the same floor, or the same months
-   *  look volatile above and steady below.
+   *  By default they fit the data. `zeroBase` floors the axis at zero: right
+   *  once a line carries an area fill, because a filled shape reads its height
+   *  from the baseline, and for a line read beside a zero-based stack.
    *
-   *  `centred` gives the data a minimum vertical span instead (a quarter of its
-   *  magnitude, floored at 1) and centres it with some headroom. The Dashboard
-   *  uses it: a balance that barely moves sits mid-card rather than filling the
-   *  plot edge to edge, and peaks stay off the frame. A FLAT series always takes
-   *  this path: fitted ticks for a zero-height range collapse to one gridline
-   *  and glue the line to the bottom axis. */
+   *  `centred` gives the data a minimum span (a quarter of its magnitude) and
+   *  centres it with headroom, so a balance that barely moves sits mid-card
+   *  rather than filling it edge to edge (the Dashboard). A FLAT series always
+   *  takes this path: fitted ticks for a zero-height range collapse to one. */
   function lineTicks(values, { zeroBase = false, centred = false } = {}) {
     const lo = Math.min(...values);
     const hi = Math.max(...values);
@@ -169,609 +86,191 @@
     return ChartMath.niceTicks(zeroBase ? Math.min(0, lo) : lo, hi, 4);
   }
 
-  /** Smoothed lines with a gradient under each, over `slots`.
-   *
-   *  `hover` adds what the Dashboard's month reading needs: one hit column per
-   *  month with a value (see hoverLayer) and, on each dot, the series name and
-   *  formatted amount the reading prints. The reading itself is wired by the
-   *  page (dashboard.js wireChartHover), since it lives outside the SVG.
-   *
-   *  SECURITY: series.label is user-controlled (a column name) and is escaped
-   *  wherever it is written. Every other interpolated value is a number, a
-   *  month name, or an attribute-safe constant. */
-  function buildChartSVG({ series, slots, W, boxH = 0, fill = false, fit = false, animate = true,
-    zeroBase = false, centred = false, hover = false }) {
-    const N = slots.length;
-    const allValues = series.flatMap((s) => s.points.map((p) => p.value));
-    if (allValues.length === 0) return null;
-
-    const H = boxHeight(W, boxH, fill, fit);
-    const { r: PR, t: PT, b: PB } = CHART_PAD;
-    const CH = H - PT - PB;
-
-    const yTicks = lineTicks(allValues, { zeroBase, centred });
-    const minVal = yTicks[0];
-    const maxVal = yTicks[yTicks.length - 1];
-    const valRange = maxVal - minVal || 1;
-
-    // The axis labels are what set the left padding, so they are formatted
-    // before the plot is measured rather than at the point they are drawn.
-    const fmtAxis = axisFormatter(yTicks);
-    const PL = axisPadLeft(yTicks.map(fmtAxis));
-    const CW = W - PL - PR;
-
-    const xScale = (i) => PL + (i / (N - 1 || 1)) * CW;
-    const yScale = (v) => PT + CH - ((v - minVal) / valRange) * CH;
-    const rnd = Math.random().toString(36).slice(2, 9);
-
-    let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" class="dashboard-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">`;
-
-    for (const v of yTicks) {
-      const y = yScale(v);
-      svg += `<line class="chart-grid" x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}"/>`;
-      svg += `<text class="chart-label" x="${Y_LABEL_X}" y="${y}" text-anchor="start" dominant-baseline="middle">${escapeHtml(fmtAxis(v))}</text>`;
-    }
-
-    if (minVal < 0 && maxVal > 0) {
-      const y0 = yScale(0);
-      svg += `<line class="chart-zero" x1="${PL}" y1="${y0}" x2="${W - PR}" y2="${y0}"/>`;
-    }
-
-    svg += xAxisLabels(slots, xScale, H - PB + 18);
-
-    // Which slots ended up with at least one plotted value. Only those get a
-    // hover column: a month no series reached has no reading to give.
-    const slotHasData = new Array(N).fill(false);
-
-    series.forEach((s, si) => {
-      const pointMap = new Map(s.points.map((p) => [`${p.year}-${p.monthIdx}`, p.value]));
-      const slotData = slots.map((sl, i) => ({ ...sl, i, value: pointMap.get(`${sl.year}-${sl.monthIdx}`) ?? null }));
-      const drawn = slotData.filter((sl) => sl.value !== null);
-      const linePts = drawn.map((sl) => ({ x: xScale(sl.i), y: yScale(sl.value) }));
-      const delay = si * 140;
-      // A series the caller has marked `dim` stays drawn and steps back, which
-      // is how the Spending rail's focus reads: the other categories are still
-      // the context the focused one is being judged against, so removing them
-      // would answer a different question. Styled in trends.css.
-      //
-      // `id` rides out on every mark of the series, the way the stacked-area
-      // form puts it on the group around each band, so a later focus change can
-      // be re-marked onto the drawn chart by setFocus() instead of rebuilding
-      // it. It is identity only: nothing in this form is a click target.
-      const marks = (s.id == null ? '' : ` data-series="${escapeHtml(String(s.id))}"`)
-        + (s.dim ? ' data-dim="true"' : '')
-        + (s.active ? ' data-active="true"' : '');
-
-      if (linePts.length > 1) {
-        const baseY = H - PB;
-        const lineD = ChartMath.smoothPath(linePts);
-        const areaD = `${lineD} L ${linePts[linePts.length - 1].x} ${baseY} L ${linePts[0].x} ${baseY} Z`;
-        const lineTopY = Math.min(...linePts.map((p) => p.y));
-        const gradId = `areagrad-${rnd}-${si}`;
-        svg += `<defs>
-                <linearGradient id="${gradId}" gradientUnits="userSpaceOnUse"
-                                x1="0" y1="${lineTopY}" x2="0" y2="${baseY}">
-                    <stop offset="0%"   stop-color="${s.color}" stop-opacity="0.30"/>
-                    <stop offset="100%" stop-color="${s.color}" stop-opacity="0"/>
-                </linearGradient>
-            </defs>`;
-        svg += `<path class="chart-area-fill" d="${areaD}" fill="url(#${gradId})"${marks} style="animation-delay:${delay + 400}ms"/>`;
-        svg += `<path class="chart-line" d="${lineD}" pathLength="1" fill="none" stroke="${s.color}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"${marks} style="animation-delay:${delay}ms"/>`;
+  /** The shared tooltip: the month, then every series with a value in it, and
+   *  for a stack the month's total. */
+  function tipFormatter(series, slots, { total = false } = {}) {
+    return (params) => {
+      const items = Array.isArray(params) ? params : [params];
+      if (!items.length) return '';
+      const slot = slots[items[0].dataIndex];
+      let sum = 0;
+      const rows = [];
+      for (const p of items) {
+        const s = series[p.seriesIndex];
+        const v = p.value;
+        if (!s || v == null || (total && !(v > 0))) continue;
+        sum += Number(v) || 0;
+        rows.push({ color: s.color, name: s.label, value: fmtTip(Number(v)) });
       }
-
-      drawn.forEach((sl, di) => {
-        const x = xScale(sl.i);
-        const y = yScale(sl.value);
-        const isEnd = di === drawn.length - 1;
-        const dotDelay = Math.min(delay + 300 + di * 18, delay + 900);
-        slotHasData[sl.i] = true;
-        // data-slot ties the dot to its hover column; data-name and data-amount
-        // are what the reading prints, so it needs no copy of the series.
-        const hoverAttrs = hover
-          ? ` data-slot="${sl.i}" data-name="${escapeHtml(s.label)}" data-amount="${escapeHtml(fmtTooltip(sl.value))}"`
-          : '';
-        svg += `<circle class="chart-dot${isEnd ? ' chart-dot-end' : ''}" cx="${x}" cy="${y}" r="${isEnd ? 4.5 : 3}" fill="${s.color}"${marks}${hoverAttrs} style="animation-delay:${dotDelay}ms">
-                <title>${escapeHtml(s.label)} — ${MONTHS[sl.monthIdx]} ${sl.year}: ${fmtTooltip(sl.value)}</title>
-            </circle>`;
-      });
-    });
-
-    // Last, so it sits over every series and takes the pointer itself.
-    if (hover) svg += hoverLayer({ slots, slotHasData, xScale, PL, PT, CW, CH });
-
-    svg += '</svg>';
-    return svg;
+      if (!rows.length) return '';
+      if (total && rows.length > 1) rows.push({ name: 'Total', value: fmtTip(sum), total: true });
+      return EChartKit.tipHtml({ title: slot ? slotTitle(slot) : '', rows });
+    };
   }
 
-  /**
-   * The hover layer for a line chart: one transparent hit rect per month that
-   * has a value, plus the single guide rule the pointer moves between them.
-   *
-   * The columns are what make the hover usable. A 3px dot is a target nobody
-   * can hit on a 60-month range, so the pointer reads the whole column
-   * instead: each rect spans half a slot either side of its month, edge to
-   * edge, so every pixel of the plot belongs to exactly one month and moving
-   * across the chart steps the reading from month to month without gaps.
-   *
-   * One guide line is emitted, not one per column: only ever one is on, and
-   * the page moves it. The reading itself is an HTML tooltip outside the SVG
-   * (dashboard.js wireChartHover): .chart-area clips on purpose, so an
-   * in-chart one would be cut off at the card edge.
-   */
-  function hoverLayer({ slots, slotHasData, xScale, PL, PT, CW, CH }) {
-    const N = slots.length;
-    const px = (n) => Math.round(n * 10) / 10;
-    // Half a slot each side. A single-slot chart has no neighbour to split
-    // the difference with, so its one column is the whole plot.
-    const half = N > 1 ? CW / (N - 1) / 2 : CW;
-
-    let out = `<line class="chart-guide" x1="0" y1="${PT}" x2="0" y2="${PT + CH}"/>`;
-    for (let i = 0; i < N; i++) {
-      if (!slotHasData[i]) continue;
-      const x = xScale(i);
-      const x0 = Math.max(PL, x - half);
-      const x1 = Math.min(PL + CW, x + half);
-      out += `<rect class="chart-hit" x="${px(x0)}" y="${PT}" width="${px(x1 - x0)}" height="${CH}"`
-        + ` data-slot="${i}" data-x="${px(x)}"`
-        + ` data-when="${MONTHS[slots[i].monthIdx]} ${slots[i].year}"/>`;
-    }
-    return out;
+  function lineOption(t, { series, slots, zeroBase, centred, dots }) {
+    const rows = alignValues(series, slots);
+    const values = rows.flat().filter((v) => v != null);
+    if (!values.length) return null;
+    const ticks = lineTicks(values, { zeroBase, centred });
+    const fmt = axisFormatter(ticks);
+    return {
+      grid: GRID,
+      tooltip: EChartKit.tooltip(t, {
+        trigger: 'axis',
+        axisPointer: { type: 'line', lineStyle: { color: t.textTertiary, type: 'dashed' } },
+        formatter: tipFormatter(series, slots),
+      }),
+      xAxis: EChartKit.categoryAxis(t, slotLabels(slots), { boundaryGap: false }),
+      yAxis: EChartKit.valueAxis(t, ticks, fmt),
+      series: series.map((s, si) => {
+        const row = rows[si];
+        const last = row.reduce((at, v, i) => (v == null ? at : i), -1);
+        // Without dots a lone month has no line to draw, so it keeps its dot.
+        const showSymbol = dots || row.filter((v) => v != null).length === 1;
+        return {
+          type: 'line',
+          name: s.label,
+          smooth: true,
+          connectNulls: true,
+          color: s.color,
+          lineStyle: { width: LINE_W },
+          symbol: 'circle',
+          symbolSize: DOT,
+          showSymbol,
+          data: row.map((v, i) => (i === last && v != null ? { value: v, symbolSize: END_DOT } : v)),
+          areaStyle: {
+            color: {
+              type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: EChartKit.alpha(s.color, 0.3) },
+                { offset: 1, color: EChartKit.alpha(s.color, 0) },
+              ],
+            },
+          },
+          emphasis: { focus: 'series' },
+        };
+      }),
+    };
   }
 
-  /** The month labels under the plot. Shared by both chart forms so a line and
-   *  a stack of the same months read the same across a report: every slot while
-   *  they fit, then a widening stride, and the newest slot is always labelled
-   *  unless it would crowd the one before it. January prints its YEAR instead
-   *  of its name when the span crosses one, which is the only date context a
-   *  12- or 24-month axis needs. */
-  function xAxisLabels(slots, xAt, y) {
-    const N = slots.length;
-    const multiYear = new Set(slots.map((s) => s.year)).size > 1;
-    const stride = N <= 8 ? 1 : N <= 14 ? 2 : N <= 26 ? 3 : 6;
-    const lastDist = (N - 1) % stride;
-    let out = '';
-    slots.forEach((s, i) => {
-      const isLast = i === N - 1;
-      if (!isLast && i % stride !== 0) return;
-      if (isLast && lastDist !== 0 && lastDist < 2) return;
-      const label = (multiYear && s.monthIdx === 0) ? s.year : MONTHS_SHORT[s.monthIdx];
-      out += `<text class="chart-label" x="${xAt(i)}" y="${y}" text-anchor="middle">${label}</text>`;
-    });
-    return out;
+  function areaOption(t, { series, slots, centred }) {
+    const s = series[0];
+    const row = alignValues([s], slots)[0];
+    const values = row.filter((v) => v != null);
+    if (!values.length) return null;
+    const ticks = lineTicks(values, { centred });
+    return {
+      grid: GRID,
+      tooltip: EChartKit.tooltip(t, {
+        trigger: 'axis',
+        axisPointer: { type: 'line', lineStyle: { color: t.textTertiary, type: 'dashed' } },
+        formatter: tipFormatter([s], slots),
+      }),
+      xAxis: EChartKit.categoryAxis(t, slotLabels(slots), { boundaryGap: false }),
+      yAxis: EChartKit.valueAxis(t, ticks, axisFormatter(ticks)),
+      series: [{
+        type: 'line',
+        name: s.label,
+        color: s.color,
+        connectNulls: true,
+        sampling: 'lttb',
+        // No dots, as the example draws it: the area is the reading. A lone
+        // month has no line to draw, so it alone keeps its dot.
+        symbol: 'circle',
+        symbolSize: END_DOT,
+        showSymbol: values.length === 1,
+        lineStyle: { width: LINE_W },
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: EChartKit.alpha(s.color, 0.5) },
+              { offset: 1, color: EChartKit.alpha(s.color, 0.04) },
+            ],
+          },
+        },
+        data: row,
+      }],
+    };
   }
 
-  // ─── Stacked columns ───────────────────────────────────────────────────────
-  // One column per slot, split into a segment per series, growing from a zero
-  // baseline. Written for Reports → Investing, which shows amounts per merchant
-  // over the same months.
-  //
-  // Geometry notes:
-  //   - Columns sit at BAND CENTRES (PL + (i + 0.5) * band), not at the line
-  //     form's endpoints-on-the-axis scale. A bar drawn at x = PL has half its
-  //     width outside the plot; a band is the only layout where the first and
-  //     last columns are whole.
-  //   - The bar is CAPPED at BAR_MAX and never fills its band. The leftover is
-  //     air between columns, which is what makes a stack read as one column
-  //     rather than as a wall.
-  //   - Segments are separated by a 2px GAP OF SURFACE, not by a stroke. A
-  //     border around a segment adds ink that isn't data, and on a thin segment
-  //     the border becomes most of the segment.
-  //   - Only the top of the whole column is rounded (BAR_RADIUS), and only when
-  //     the segment is tall enough to take a radius without deforming. The
-  //     baseline end stays square: it is a shared zero, not a data end.
-  //   - The y axis starts at zero, always. A stacked column whose baseline is
-  //     not zero states a proportion that isn't true.
-  const BAR_MAX = 24;
-  const BAR_RADIUS = 4;
-  const SEG_GAP = 2;
-  // A band this tall or shorter keeps its full height and forgoes its gap. The
-  // gap exists to separate two fills; on a 3px band it eats most of the fill
-  // and a column of small contributors turns into a barcode, which is a worse
-  // failure than two neighbouring bands touching. The bands that DO have room
-  // all keep the same 2px, so the gap is still one consistent width wherever
-  // it is drawn.
-  const SEG_GAP_MIN_H = 5;
-
-  /** A rect with only its top corners rounded, or a plain rect when there is no
-   *  room for the radius (a short segment with rounded corners reads as a lozenge
-   *  rather than as a bar end). */
-  /** Every value a stacked form needs, read once: a slot-indexed row per series
-   *  plus the per-slot column totals. Shared by the columns and the area, which
-   *  stack the same numbers and differ only in what they draw with them.
-   *
-   *  The lookup used to be a linear `find` over the series' points at every
-   *  cell, which is series x slots x points reads — at a five-year window with a
-   *  dozen categories that is six figures of comparisons before a single path is
-   *  written, and it ran again on every resize callback. A slot a series has no
-   *  point for counts as zero: a stack cannot skip a month the way a line can,
-   *  since leaving one out would shift every band above it sideways. */
-  function stackValues(series, slots) {
-    const N = slots.length;
-    const slotIndex = new Map(slots.map((sl, i) => [`${sl.year}-${sl.monthIdx}`, i]));
-    const values = series.map((s) => {
-      const row = new Array(N).fill(0);
-      for (const p of s.points) {
-        const i = slotIndex.get(`${p.year}-${p.monthIdx}`);
-        if (i !== undefined) row[i] += Number(p.value) || 0;
-      }
-      return row;
-    });
-    const totals = slots.map((sl, i) => values.reduce((sum, row) => sum + row[i], 0));
-    return { values, totals };
-  }
-
-  function topRoundedRect(x, y, w, h, r) {
-    const rr = Math.min(r, w / 2, h);
-    if (rr < 1.5) return `<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`;
-    return `<path d="M ${x} ${y + h} L ${x} ${y + rr} A ${rr} ${rr} 0 0 1 ${x + rr} ${y}`
-      + ` L ${x + w - rr} ${y} A ${rr} ${rr} 0 0 1 ${x + w} ${y + rr} L ${x + w} ${y + h} Z"/>`;
-  }
-
-  function buildStackedSVG({ series, slots, W, boxH = 0, fit = false, animate = true }) {
-    const N = slots.length;
-    if (!N || !series.length) return null;
-
-    const { values, totals } = stackValues(series, slots);
+  function stackedOption(t, { series, slots }) {
+    const rows = alignValues(series, slots).map((row) => row.map((v) => (v > 0 ? v : null)));
+    const totals = slots.map((_, i) => rows.reduce((sum, row) => sum + (row[i] || 0), 0));
     const maxTotal = Math.max(...totals);
     if (!(maxTotal > 0)) return null;
-
-    const H = boxHeight(W, boxH, false, fit);
-    const { r: PR, t: PT, b: PB } = CHART_PAD;
-    const CH = H - PT - PB;
-
-    const yTicks = ChartMath.niceTicks(0, maxTotal, 4);
-    const maxVal = yTicks[yTicks.length - 1] || 1;
-    const baseY = PT + CH;
-    const yScale = (v) => baseY - (v / maxVal) * CH;
-
-    // Labels first, then the plot: see axisPadLeft.
-    const fmtAxis = axisFormatter(yTicks);
-    const PL = axisPadLeft(yTicks.map(fmtAxis));
-    const CW = W - PL - PR;
-
-    const band = CW / N;
-    const barW = Math.max(3, Math.min(BAR_MAX, band * 0.62));
-    const xCentre = (i) => PL + band * (i + 0.5);
-
-    let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" class="dashboard-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">`;
-
-    for (const v of yTicks) {
-      const y = yScale(v);
-      svg += `<line class="chart-grid" x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}"/>`;
-      svg += `<text class="chart-label" x="${Y_LABEL_X}" y="${y}" text-anchor="start" dominant-baseline="middle">${escapeHtml(fmtAxis(v))}</text>`;
-    }
-    svg += xAxisLabels(slots, xCentre, H - PB + 18);
-
-    slots.forEach((sl, i) => {
-      if (!(totals[i] > 0)) return;
-      const x = xCentre(i) - barW / 2;
-      // Which series actually appear in THIS column, bottom-first. A series
-      // that contributed nothing this month draws nothing and, crucially, does
-      // not spend a gap — otherwise a column with one contributor would carry
-      // seven invisible seams.
-      const parts = series
-        .map((s, si) => ({ s, value: values[si][i] }))
-        .filter((p) => p.value > 0);
-
-      // The whole column scales up from the baseline as one piece, so the stack
-      // assembles the way it is read rather than each segment sprouting alone.
-      svg += `<g class="chart-col" style="transform-origin:0px ${baseY}px;animation-delay:${Math.min(i * 22, 500)}ms">`;
-      svg += `<title>${MONTHS[sl.monthIdx]} ${sl.year}: ${fmtTooltip(totals[i])}</title>`;
-
-      let bottom = 0;
-      parts.forEach((p, pi) => {
-        const top = bottom + p.value;
-        const yTop = yScale(top);
-        const yBottom = yScale(bottom);
-        const isTop = pi === parts.length - 1;
-        // The gap is taken off the TOP of every segment but the highest, so it
-        // falls between two fills and the column still meets the baseline. A
-        // band with no room to spare keeps its height instead (SEG_GAP_MIN_H).
-        const raw = yBottom - yTop;
-        const gap = isTop || raw <= SEG_GAP_MIN_H ? 0 : SEG_GAP;
-        const h = Math.max(raw - gap, 1);
-        const yDraw = yTop + gap;
-        const shape = isTop
-          ? topRoundedRect(x, yDraw, barW, h, BAR_RADIUS)
-          : `<rect x="${x}" y="${yDraw}" width="${barW}" height="${h}"/>`;
-        svg += `<g class="chart-seg" fill="${p.s.color}">${shape}`
-          + `<title>${escapeHtml(p.s.label)} — ${MONTHS[sl.monthIdx]} ${sl.year}: ${fmtTooltip(p.value)}</title></g>`;
-        bottom = top;
-      });
-      svg += '</g>';
-    });
-
-    svg += '</svg>';
-    return svg;
+    // Only the top of each column is rounded: the baseline end is a shared
+    // zero, not a data end. So each month finds its topmost series.
+    const topOf = slots.map((_, i) => rows.reduce((at, row, si) => (row[i] != null ? si : at), -1));
+    const ticks = ChartMath.niceTicks(0, maxTotal, 4);
+    return {
+      grid: GRID,
+      tooltip: EChartKit.tooltip(t, {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow', shadowStyle: { color: EChartKit.alpha(t.text, 0.04) } },
+        formatter: tipFormatter(series, slots, { total: true }),
+      }),
+      xAxis: EChartKit.categoryAxis(t, slotLabels(slots)),
+      yAxis: EChartKit.valueAxis(t, ticks, axisFormatter(ticks)),
+      series: series.map((s, si) => ({
+        type: 'bar',
+        name: s.label,
+        stack: 'total',
+        color: s.color,
+        barMaxWidth: BAR_MAX,
+        barCategoryGap: '38%',
+        data: rows[si].map((v, i) => (v != null && topOf[i] === si
+          ? { value: v, itemStyle: { borderRadius: [BAR_RADIUS, BAR_RADIUS, 0, 0] } }
+          : v)),
+        emphasis: { focus: 'series' },
+      })),
+    };
   }
 
-  // ─── Stacked area ──────────────────────────────────────────────────────────
-  // The same part-to-whole reading as the columns above, drawn as one filled
-  // shape per series stacked on the one below. Written for Reports → Spending.
-  //
-  // Geometry notes:
-  //   - Boundaries are STRAIGHT, not smoothed. Every other line in this file
-  //     runs through ChartMath.smoothPath, but a stacked area is a set of CUMULATIVE
-  //     boundaries whose only guarantee is that each sits at or above the one
-  //     under it. Two clamped Catmull-Rom curves hold that at their endpoints
-  //     and not in between, so a thin band under a steep one can cross its own
-  //     neighbour mid-segment and paint a category as negative. Straight
-  //     segments cannot.
-  //   - The FIRST series is the bottom band. Callers hand them over biggest
-  //     first, so the --cat-* ramp grades magnitude rather than identity — the
-  //     rule the Cash Flow sankey already applies to its expense side.
-  //   - The stack is REVEALED LEFT TO RIGHT, by one clip rect widening across
-  //     every band at once, and not by each band rising from the baseline. The
-  //     x axis is time, so a wipe along it plays the months in the order they
-  //     happened, which is the same entrance the line form's stroke-dash draw
-  //     already makes; growing upward animated along the value axis instead and
-  //     read as the totals changing. One shared rect also means the bands
-  //     arrive together, so the stack is never briefly a set of shapes that do
-  //     not add up.
-  //   - Bands are separated by their own GRADIENT, not by a stroke and not by a
-  //     gap. An area has no air between its parts to take a gap out of, and a
-  //     stroke in the card's colour drew a hard line through the middle of the
-  //     shape — near-white on light and near-black on dark, which read as a
-  //     border rather than as a seam. Each band instead runs full strength at
-  //     its own TOP edge and fades toward its bottom, so every boundary is a
-  //     strong edge meeting a faint one and the separation comes from the fill
-  //     itself.
-  //   - Bands sit at a fraction of full opacity and lift to full under the
-  //     pointer, which is the Cash Flow sankey's ribbon idiom (0.42 resting,
-  //     0.72 hovered) applied to a stack. The transparency is what lets the grid
-  //     read through the fill, so the chart still has an axis behind it rather
-  //     than six blocks of paint.
-  //   - The y axis starts at zero, always, for the reason the columns do.
-  //   - Values come from stackValues, shared with the columns above.
-  //
-  // The band's own fade, top edge to bottom edge. This is the gradient only —
-  // the band's overall transparency is an `opacity` on the path (trends.css), so
-  // hovering can lift the whole band without the fade having to be rebuilt. The
-  // bottom stops well short of transparent: it is the boundary that has to stay
-  // visible against the band under it, and a band that reached the card's colour
-  // would look like a hole.
-  const AREA_FILL_TOP = 1;
-  const AREA_FILL_BOTTOM = 0.55;
-
-  function buildAreaSVG({ series, slots, W, boxH = 0, fill = false, animate = true }) {
-    const N = slots.length;
-    if (!N || !series.length) return null;
-
-    const { values, totals } = stackValues(series, slots);
-    const maxTotal = Math.max(...totals);
-    if (!(maxTotal > 0)) return null;
-
-    const H = boxHeight(W, boxH, fill);
-    const { r: PR, t: PT, b: PB } = CHART_PAD;
-    const CH = H - PT - PB;
-
-    const yTicks = ChartMath.niceTicks(0, maxTotal, 4);
-    const maxVal = yTicks[yTicks.length - 1] || 1;
-    const baseY = PT + CH;
-    const yScale = (v) => baseY - (v / maxVal) * CH;
-
-    // Labels first, then the plot: see axisPadLeft.
-    const fmtAxis = axisFormatter(yTicks);
-    const PL = axisPadLeft(yTicks.map(fmtAxis));
-    const CW = W - PL - PR;
-    const xScale = (i) => PL + (i / (N - 1 || 1)) * CW;
-    const rnd = Math.random().toString(36).slice(2, 9);
-    const f = (n) => Math.round(n * 100) / 100;
-
-    let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" class="dashboard-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">`;
-
-    for (const v of yTicks) {
-      const y = yScale(v);
-      svg += `<line class="chart-grid" x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}"/>`;
-      svg += `<text class="chart-label" x="${Y_LABEL_X}" y="${y}" text-anchor="start" dominant-baseline="middle">${escapeHtml(fmtAxis(v))}</text>`;
-    }
-    svg += xAxisLabels(slots, xScale, H - PB + 18);
-
-    // One hit strip per month, carrying that month's whole reading as a native
-    // tooltip. The question a stack is read for ("what made up March") needs
-    // every value at one x, which is what a strip can carry and a shape cannot.
-    // The same strips are emitted twice, for two different jobs:
-    //   - once UNDER the bands, so the empty plot above the stack still answers;
-    //   - once inside each band, CLIPPED to that band's own shape, so the strip
-    //     the pointer actually lands on belongs to a band and can light it up.
-    // Hit testing takes the topmost element, so a clipped strip wins wherever
-    // its band is drawn and the background strip answers everywhere else.
-    //
-    // Geometry and tooltip text are built ONCE per month here and the markup is
-    // assembled from them, rather than re-formatting every series' value for
-    // every band the strips are repeated into.
-    const halfBand = CW / (N - 1 || 1) / 2;
-    const strip = slots.map((sl, i) => {
-      if (!(totals[i] > 0)) return null;
-      const x0 = Math.max(PL, xScale(i) - halfBand);
-      const x1 = Math.min(W - PR, xScale(i) + halfBand);
-      const rows = series
-        .map((sr, si) => ({ label: sr.label, value: values[si][i] }))
-        .filter((p) => p.value > 0)
-        .sort((a, b) => b.value - a.value)
-        .map((p) => `${p.label}: ${fmtTooltip(p.value)}`);
-      const tip = [`${MONTHS[sl.monthIdx]} ${sl.year}`, ...rows, `Total: ${fmtTooltip(totals[i])}`].join('\n');
-      return `<rect class="chart-hit" x="${f(x0)}" y="${PT}" width="${f(x1 - x0)}" height="${CH}" fill="transparent">`
-        + `<title>${escapeHtml(tip)}</title></rect>`;
-    });
-
-    svg += strip.join('');
-
-    // The entrance wipe is a CSS clip-path on each band path (.chart-band in
-    // trends.css). Do not reintroduce an SVG <clipPath> with an animated child
-    // for it: Chromium does not repaint the shapes such a clip applies to, so
-    // the stack sat frozen for the length of the animation and then appeared
-    // all at once. The full reasoning is at .chart-band in trends.css.
-
-    let base = slots.map(() => 0);
-    series.forEach((s, si) => {
-      const row = values[si];
-      const top = base.map((b, i) => b + row[i]);
-      let d = `M ${f(xScale(0))} ${f(yScale(top[0]))}`;
-      for (let i = 1; i < N; i++) d += ` L ${f(xScale(i))} ${f(yScale(top[i]))}`;
-      for (let i = N - 1; i >= 0; i--) d += ` L ${f(xScale(i))} ${f(yScale(base[i]))}`;
-      d += ' Z';
-
-      // The gradient spans THIS band's own extent, not the whole plot. Anchored
-      // to the plot it was one ramp sliced across every band, so a band's shade
-      // said where it sat on the chart rather than where its own edges were,
-      // and the bottom band — the thickest, and the one with a flat baseline to
-      // read against — got almost none of the ramp at all.
-      const yTop = Math.min(...top.map(yScale));
-      const yBottom = Math.max(yTop + 1, ...base.map(yScale));
-      const gradId = `bandgrad-${rnd}-${si}`;
-      const bandClip = `bandclip-${rnd}-${si}`;
-      svg += `<defs>
-                <linearGradient id="${gradId}" gradientUnits="userSpaceOnUse"
-                                x1="0" y1="${f(yTop)}" x2="0" y2="${f(yBottom)}">
-                    <stop offset="0%"   stop-color="${s.color}" stop-opacity="${AREA_FILL_TOP}"/>
-                    <stop offset="100%" stop-color="${s.color}" stop-opacity="${AREA_FILL_BOTTOM}"/>
-                </linearGradient>
-                <clipPath id="${bandClip}"><path d="${d}"/></clipPath>
-            </defs>`;
-      // A band only repeats the strips for the months it actually occupies —
-      // the neighbours count too, since the shape between two months slopes
-      // across half of each strip beside them. The rest were emitted only to be
-      // clipped away to nothing, and on a ledger where most categories are used
-      // in a few months that was the bulk of the nodes in the chart.
-      const bandStrips = strip
-        .map((mk, i) => (mk && (row[i] > 0 || row[i - 1] > 0 || row[i + 1] > 0) ? mk : ''))
-        .join('');
-      // The group is what :hover is read off — the strips inside it are the hit
-      // target, and CSS lifts the sibling path. The path carries no <title> of
-      // its own: the strips cover it, so that title could never be reached, and
-      // a band's name is already in the month reading they carry.
-      // `s.id`, when the caller supplies one, rides out on the group so a click
-      // in the plot can be traced back to the series without the page having to
-      // re-derive it from a position — the series list it handed in is already
-      // filtered, so an index would mean two places agreeing on that filter.
-      // `s.active` marks the one series the caller has singled out, so CSS can
-      // hold it at its hovered fill for as long as it is the selected one.
-      svg += `<g class="chart-band-group"${s.id == null ? '' : ` data-series="${escapeHtml(String(s.id))}"`}${s.active ? ' data-active="true"' : ''}>`
-        + `<path class="chart-band" d="${d}" fill="url(#${gradId})"${s.dim ? ' data-dim="true"' : ''}/>`
-        + `<g clip-path="url(#${bandClip})">${bandStrips}</g>`
-        + `</g>`;
-      base = top;
-    });
-
-    svg += '</svg>';
-    return svg;
-  }
-
-  /** Render a stacked area into a container. Pass empty `series` to clear.
-   *  Series are drawn bottom-up in the order given. */
-  function renderArea(containerId, { series, slots, fill }) {
-    mount(containerId, series.length > 0 && slots.length > 0, (W, animate, boxH) =>
-      buildAreaSVG({ series, slots, W, boxH, fill, animate }), { fill });
-  }
-
-  /** Render stacked columns into a container. Pass empty `series` to clear. */
-  function renderStacked(containerId, { series, slots }) {
-    mount(containerId, series.length > 0 && slots.length > 0, (W, animate) =>
-      buildStackedSVG({ series, slots, W, animate }));
-  }
-
-  // ─── Focus ───────────────────────────────────────────────────────────────────
-  // Singling one series out moves no point: the same chart is drawn, with one
-  // series held at the front and the rest stepped back. So a focus change is
-  // re-marked onto the SVG already on screen instead of going back through
-  // mount(), which would rebuild it and replay the entrance animation — the
-  // chart would read as having reloaded in answer to a click that only asked
-  // which series to look at.
-
-  /** The marks a focus steps back. The stacked-area form dims the band path
-   *  inside its group rather than the group itself: the path carries a resting
-   *  opacity that a dim on the group around it would multiply instead of
-   *  replace. */
-  const DIM_MARKS = '.chart-band, .chart-line, .chart-area-fill, .chart-dot';
-
-  /** What setFocus() last applied to a container, so a repaint from inside
-   *  mount() can put it back. Keyed by the element, so a container that leaves
-   *  the page takes its entry with it. */
-  const appliedFocus = new WeakMap();
-
-  function setMark(el, name, on) {
-    if (on) el.setAttribute(name, 'true');
-    else el.removeAttribute(name);
-  }
-
-  /** Mark `activeId`'s series as the focused one on a drawn chart and step the
-   *  others back; null clears the focus. False when the container holds no
-   *  chart naming its series — an empty state, or a first paint still pending. */
-  function markFocus(el, activeId) {
-    const owners = el.firstElementChild
-      ? el.firstElementChild.querySelectorAll('[data-series]')
-      : [];
-    if (!owners.length) return false;
-    const key = activeId == null ? null : String(activeId);
-    for (const owner of owners) {
-      const active = key !== null && owner.dataset.series === key;
-      setMark(owner, 'data-active', active);
-      // The owner is the mark itself in the line form, and the group around
-      // the band in the stacked-area one.
-      const dimmable = owner.matches(DIM_MARKS) ? [owner] : owner.querySelectorAll(DIM_MARKS);
-      for (const mark of dimmable) setMark(mark, 'data-dim', key !== null && !active);
-    }
-    return true;
-  }
-
-  /** Re-mark which series is focused on the chart already drawn in
-   *  `containerId`, without redrawing it. `activeId` is a series `id`, or null
-   *  to clear. Returns false when there is no drawn chart to re-mark, so the
-   *  caller can fall back to a render. See the block above. */
-  function setFocus(containerId, activeId) {
-    const el = document.getElementById(containerId);
-    if (!el || !markFocus(el, activeId)) return false;
-    appliedFocus.set(el, activeId ?? null);
-    return true;
-  }
-
-  /** Draw into a container and keep it responsive (UI.observeChart): the first
-   *  paint animates and resizes do not. `build(W, animate, H)` returns the SVG
-   *  for a given pixel width, with the container's measured height alongside
-   *  it for the forms that fill their box (see `fill` in buildChartSVG); only
-   *  those track height changes. Shared by all three chart forms, which is the
-   *  main reason stacked bars live in this file rather than a separate one. */
-  function mount(containerId, hasData, build, { fill = false } = {}) {
-    const el = document.getElementById(containerId);
+  /** Draw into `target` (an element or its id), or clear it when there is
+   *  nothing to draw. A cleared container is left empty for the caller's own
+   *  empty state. */
+  function draw(target, hasData, build, animate) {
+    const el = typeof target === 'string' ? document.getElementById(target) : target;
     if (!el) return;
-    // The series handed in here carry their own focus marks, so whatever
-    // setFocus() put on the chart being replaced is spent.
-    appliedFocus.delete(el);
     if (!hasData) {
-      UI.unobserveChart(el);
+      EChartKit.unmount(el);
       el.innerHTML = '';
       return;
     }
-    UI.observeChart(el, (w, h, animate) => {
-      el.innerHTML = build(w, animate, h) || '';
-      // A resize rebuilds from the series this mount captured, which predate
-      // any setFocus() since, so the focus is put back on the new SVG.
-      if (appliedFocus.has(el)) markFocus(el, appliedFocus.get(el));
-    }, { height: fill });
+    EChartKit.mount(el, build, { animate: animate !== false });
   }
 
-  /** Render smoothed lines into a container. Pass empty `series` to clear.
-   *  `zeroBase` floors the y axis at zero and `fill` lets the chart take its
-   *  container's height — see buildChartSVG. */
-  function render(containerId, { series, slots, zeroBase, fill }) {
-    mount(containerId, series.length > 0 && slots.length > 0, (W, animate, boxH) =>
-      buildChartSVG({ series, slots, W, boxH, fill, animate, zeroBase }), { fill });
+  /** Lines. `zeroBase` floors the y axis at zero, `centred` gives a flat
+   *  series headroom (see lineTicks), `dots` false draws the lines bare,
+   *  `animate` false skips the entrance. */
+  function render(target, { series, slots, zeroBase = false, centred = false, dots = true, animate = true }) {
+    draw(target, series.length > 0 && slots.length > 0,
+      (t) => lineOption(t, { series, slots, zeroBase, centred, dots }), animate);
   }
 
-  /** Map<key, colour>, assigned in order. `palette` is 'accent' (default) or
-   *  'categorical'; see the palette block at the top of this file. */
-  function colorMap(keys, palette) {
-    const colors = readPalette(palette);
+  /** The large area: the first series alone. `centred` as for render(). */
+  function renderArea(target, { series, slots, centred = false, animate = true }) {
+    draw(target, series.length > 0 && slots.length > 0,
+      (t) => areaOption(t, { series, slots, centred }), animate);
+  }
+
+  /** Stacked columns, the first series at the bottom. */
+  function renderStacked(target, { series, slots, animate = true }) {
+    draw(target, series.length > 0 && slots.length > 0,
+      (t) => stackedOption(t, { series, slots }), animate);
+  }
+
+  /** Map<key, colour>, assigned in order from the theme's chart palette.
+   *  'categorical' reads --cat-* (series that are CATEGORIES); the default
+   *  'accent' reads --chart-* (one measure over time). Read fresh, so call it
+   *  again after a theme change. */
+  function colorMap(keys, palette = 'accent') {
+    const t = EChartKit.theme();
+    const colors = palette === 'categorical' ? t.cat : t.chart;
     return new Map(keys.map((k, i) => [k, colors[i % colors.length]]));
   }
 
-  window.FinanceChart = {
-    render, renderStacked, renderArea, setFocus, colorMap, PALETTE, CAT_PALETTE,
-    // The bare line builder, for a page that mounts the chart itself
-    // (dashboard.js, which clears its hover reading on every redraw).
-    buildLine: buildChartSVG,
-    // The bare stacked-column builder, for the Dashboard's Spending card.
-    buildStacked: buildStackedSVG,
-  };
+  window.FinanceChart = { render, renderArea, renderStacked, colorMap };
 }());

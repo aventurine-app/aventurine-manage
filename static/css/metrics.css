@@ -91,28 +91,16 @@
 
 /* ─── Sparklines ──────────────────────────────────────────────────────────────
    Every tracked year of one figure, with the selected year marked, drawn under
-   the number at the tile's full width and a fixed height. The line is in a
-   stretched inner box with a non-scaling stroke and the marker dot is placed
-   in the outer svg by percentage, so widening the tile widens the chart and
-   nothing else. margin-top:auto drops it to the tile's bottom edge, so every
-   chart in a row shares one baseline whatever the lines above them wrap to. */
+   the number at the tile's full width and a fixed height (an ECharts line,
+   metrics.js; the room above the line is its grid's). margin-top:auto drops it
+   to the tile's bottom edge, so every chart in a row shares one baseline
+   whatever the lines above them wrap to. */
 .met-spark {
     display: block;
     width: 100%;
     height: 48px;
     margin-top: auto;
-    padding-top: 12px;
-    overflow: visible;
 }
-.met-spark-area { fill: color-mix(in srgb, var(--met-spark) 14%, transparent); }
-.met-spark-line {
-    fill: none;
-    stroke: var(--met-spark);
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-.met-spark-dot { fill: var(--met-spark); }
 
 /* ─── Ratio grid ──────────────────────────────────────────────────────────── */
 .met-metrics {
@@ -160,137 +148,26 @@
     margin-top: 8px;
 }
 
-/* Reserved on every tile whether or not there is a value to pin, so a row of
-   gauges keeps one baseline and an N/A tile doesn't ride up out of line. Tall
-   enough for a headline-sized pin plus its point and the gap under it. */
-.met-gauge-pins {
-    position: relative;
-    height: 44px;
+/* The ECharts gauge (metrics.js): the tag's lane above, the 8px track, and the
+   boundary labels under it. One height on every tile, value or not, so a row
+   of gauges keeps one baseline. The canvas reaches --met-gauge-bleed into the
+   gutter on both sides (the chart insets its track by the same amount), so a
+   tag centred on 0% or 100% overhangs the track instead of being clipped. */
+.met-gauge-chart {
+    --met-gauge-bleed: 28px;
+    width: calc(100% + 2 * var(--met-gauge-bleed));
+    height: 78px;
+    margin-inline: calc(-1 * var(--met-gauge-bleed));
 }
 
 /* A ratio with no value for this year. It has no point on the track to stand on,
-   so it is not drawn as a pin — but the tile still has to SAY so. */
+   so it is not drawn as a tag — but the tile still has to SAY so. */
 .met-gauge-none {
     position: absolute;
     left: 0;
-    bottom: 8px;
+    top: 10px;
+    z-index: 1;
     color: var(--ant-color-text-tertiary);
     font-size: 20px;
     font-weight: var(--ant-font-weight-strong);
-}
-
-/* Progress's track: 8px, fully rounded. */
-.met-gauge-track {
-    position: relative;
-    height: 8px;
-    border-radius: 100px;
-    overflow: hidden;
-    background: var(--ant-color-fill-secondary);
-    /* Grows as ONE piece, the way it is read. */
-    transform: scaleX(0);
-    transform-origin: left center;
-    animation: met-fill-grow 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-/* A year with no value for this ratio still gets its scale, quietly: the ranges
-   are what the tile is about even when there is nothing to plot on them. */
-.met-metric-na .met-gauge-track { opacity: 0.45; }
-
-.met-gauge-band { position: absolute; top: 0; bottom: 0; }
-.met-gauge-good    { background: color-mix(in srgb, var(--ant-color-success) 50%, transparent); }
-.met-gauge-caution { background: color-mix(in srgb, var(--ant-color-warning) 50%, transparent); }
-.met-gauge-bad     { background: color-mix(in srgb, var(--ant-color-error) 50%, transparent); }
-
-/* The boundary between two ranges. Inside the track rather than overhanging it,
-   because the number underneath is what names the boundary — the tick only has
-   to say which point on the track that number belongs to. */
-.met-gauge-tick {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    margin-left: -1px;
-    background: var(--ant-color-bg-container);
-}
-
-.met-gauge-scale {
-    position: relative;
-    height: 20px;
-}
-.met-gauge-mark {
-    position: absolute;
-    top: 4px;
-    transform: translateX(-50%);
-    color: var(--ant-color-text-tertiary);
-    font-size: var(--ant-font-size-sm);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-/* ─── The pin ─────────────────────────────────────────────────────────────────
-   The year's value, sitting above the track at the point it names, pointing
-   down at it: a Tag in the colour of the range it landed in, at the size of a
-   headline figure, because it IS the tile's number.
-
-   A tinted box with a coloured edge, not a solid block of the range colour, so
-   the number keeps the body text colour and stays legible in both themes.
-
-   Centred on the true value even at 0% and 100%, where it overhangs the track by
-   about half its width — that overhang lands in the grid gutter or the card
-   padding, and nudging it inward would point it at a percentage the year did
-   not have. */
-.met-pin {
-    position: absolute;
-    bottom: 8px;
-    padding: 0 8px;
-    border: var(--ant-line-width) solid;
-    border-radius: var(--ant-radius);
-    color: var(--ant-color-text);
-    font-size: 20px;
-    font-weight: var(--ant-font-weight-strong);
-    font-variant-numeric: tabular-nums;
-    line-height: 1.5;
-    white-space: nowrap;
-    opacity: 0;
-    transform: translateX(-50%);
-    animation: met-pin-drop 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.15s forwards;
-}
-/* The point. A square turned 45° with two of its edges kept, so the pin's
-   outline carries on around the tip; its unbordered half covers the box's
-   bottom edge where the two meet. */
-.met-pin::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    bottom: -5px;
-    width: 8px;
-    height: 8px;
-    margin-left: -4px;
-    background: inherit;
-    border-right: var(--ant-line-width) solid;
-    border-bottom: var(--ant-line-width) solid;
-    border-color: inherit;
-    transform: rotate(45deg);
-}
-.met-pin-good {
-    border-color: color-mix(in srgb, var(--ant-color-success) 45%, var(--ant-color-bg-container));
-    background: color-mix(in srgb, var(--ant-color-success) 10%, var(--ant-color-bg-container));
-}
-.met-pin-caution {
-    border-color: color-mix(in srgb, var(--ant-color-warning) 50%, var(--ant-color-bg-container));
-    background: color-mix(in srgb, var(--ant-color-warning) 12%, var(--ant-color-bg-container));
-}
-.met-pin-bad {
-    border-color: color-mix(in srgb, var(--ant-color-error) 45%, var(--ant-color-bg-container));
-    background: color-mix(in srgb, var(--ant-color-error) 10%, var(--ant-color-bg-container));
-}
-
-@keyframes met-fill-grow { to { transform: scaleX(1); } }
-@keyframes met-pin-drop {
-    from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
-    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .met-gauge-track { animation: none; transform: scaleX(1); }
-    .met-pin { animation: none; opacity: 1; }
 }

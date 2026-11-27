@@ -57,18 +57,17 @@
 //
 // Drawn in Ant Design like the rest of the page: the figures are Statistics
 // with a sparkline and a caret change line, the two sections are inner Cards.
+// The sparklines and the gauges are Apache ECharts (widgets/echart-kit.js),
+// in the theme's colours.
 //
 // Globals (loaded before this script): apiFetch (api.js), escapeHtml
-// (escape.js), formatCurrency (currency.js), UI (ui.js), Ant (ant.js).
+// (escape.js), formatCurrency (currency.js), UI (ui.js), Ant (ant.js),
+// EChartKit (echart-kit.js).
 
 (function () {
-  // Sparkline padding, as a percent of the chart box. The line is drawn in a
-  // 0–100 box stretched to the tile's width (preserveAspectRatio="none"), so
-  // the geometry is in percent and the height is
-  // CSS (.met-spark). Vertical room is what keeps the marker dot on the
-  // highest or lowest year inside the box; horizontally the line runs edge to
-  // edge and overflow:visible lets the end dots overhang.
-  const SPARK = { padX: 0, padY: 8 };
+  // The charts a render() has written placeholders for, mounted once the
+  // markup is in the page (ECharts draws into an element, not a string).
+  const pending = { sparks: [], gauges: [] };
 
   // How close two of a gauge's boundary labels may sit, as a percent of the
   // track, before they are drawn as one range label instead of two crowded ones.
@@ -135,42 +134,46 @@
 
   /**
    * One figure's value across every tracked year, with the selected year's point
-   * marked. Scaled to the series' min..max, since it shows shape rather than
-   * magnitude (the figure beside it gives the magnitude), and skipped below two
-   * points, where there is no trend to draw.
+   * marked: a bare Apache ECharts line (no axes) under the figure, in the
+   * tile's colour (--met-spark, metrics.css). Scaled to the series' min..max,
+   * since it shows shape rather than magnitude (the figure beside it gives the
+   * magnitude), and skipped below two points, where there is no trend to draw.
    *
    * aria-hidden: the pill underneath already states the change in words and
    * every plotted value is one year-pick away, so this adds emphasis, not
    * information.
    */
-  function sparkline(values, activeIdx) {
+  function sparkline(field, values, activeIdx) {
     if (!values || values.length < 2 || activeIdx < 0) return '';
+    pending.sparks.push({ field, values, activeIdx });
+    return `<div class="met-spark" data-spark="${field}" aria-hidden="true"></div>`;
+  }
+
+  function mountSpark(el, { values, activeIdx }) {
     const min = Math.min(...values);
     const max = Math.max(...values);
-    const span = max - min;
-    const innerW = 100 - SPARK.padX * 2;
-    const innerH = 100 - SPARK.padY * 2;
-    const x = (i) => SPARK.padX + (i / (values.length - 1)) * innerW;
-    // A flat series has no span to divide by; draw it down the middle.
-    const y = (v) => SPARK.padY + (span === 0 ? innerH / 2 : innerH - ((v - min) / span) * innerH);
-    const pts = values.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(' ');
-    // The same line closed to the floor. The fill is what stops a run of pale
-    // stroke from reading as a stray mark under the number it belongs to.
-    const floor = (100 - SPARK.padY).toFixed(2);
-    const area = `${x(0).toFixed(2)},${floor} ${pts} ${x(values.length - 1).toFixed(2)},${floor}`;
-    // Two coordinate spaces in one picture: the line and its fill live in the
-    // stretched inner box (non-scaling stroke keeps the line at CSS pixels),
-    // and the marker sits in the outer, unstretched svg at percentage
-    // coordinates, so it stays a circle at any tile width.
-    const cx = x(activeIdx).toFixed(2);
-    const cy = y(values[activeIdx]).toFixed(2);
-    return `<svg class="met-spark" aria-hidden="true" focusable="false">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="100%">
-        <polygon class="met-spark-area" points="${area}" />
-        <polyline class="met-spark-line" points="${pts}" vector-effect="non-scaling-stroke" />
-      </svg>
-      <circle class="met-spark-dot" cx="${cx}%" cy="${cy}%" r="3" />
-    </svg>`;
+    // Room above and below so the dot on the highest or lowest year stays
+    // inside the box; a flat series is drawn down the middle.
+    const pad = max === min ? Math.abs(max) || 1 : (max - min) * 0.12;
+    EChartKit.mount(el, (t) => {
+      const color = EChartKit.color('--met-spark', el) || t.primary;
+      return {
+        grid: { left: 0, right: 0, top: 16, bottom: 4 },
+        xAxis: { type: 'category', show: false, boundaryGap: false, data: values.map((_, i) => i) },
+        yAxis: { type: 'value', show: false, min: min - pad, max: max + pad },
+        series: [{
+          type: 'line',
+          silent: true,
+          symbol: 'none',
+          color,
+          lineStyle: { width: 1.5 },
+          areaStyle: { color: EChartKit.alpha(color, 0.14), origin: 'start' },
+          data: values.map((v, i) => (i === activeIdx
+            ? { value: v, symbol: 'circle', symbolSize: 6, itemStyle: { color } }
+            : v)),
+        }],
+      };
+    });
   }
 
   /** Every tracked year's value for one figure, oldest first, plus the index of
@@ -229,7 +232,7 @@
     <div class="ant-statistic-title">${escapeHtml(label)}</div>
     <div class="ant-statistic-content met-figure-value">${escapeHtml(fmtMoney(value))}</div>
     ${changePill(change, goodWhenUp)}
-    ${sparkline(s.values, s.idx)}
+    ${sparkline(field, s.values, s.idx)}
   </div>`;
   }
 
@@ -252,79 +255,132 @@
   }
 
   /**
-   * The gauge: a 0–100% track pre-coloured into its ranges, a tick and a label
-   * at each boundary between two of them, and the year's value as a waypoint pin
-   * above the track wearing the range's colour.
+   * The gauge: a 0–100% track pre-coloured into its ranges, a label at each
+   * boundary between two of them, and the year's value marked on the track,
+   * wearing the range's colour. Drawn with Apache ECharts on a 0–100 axis: the
+   * ranges are markArea bands in their full colours, and a markPoint tag above
+   * the track carries the number.
    *
-   * ONLY the interior boundaries get a tick and a number. The track's two ends
-   * ARE 0% and 100%, so labelling them would spend two more numbers saying what
-   * the track's extent already says, on a tile that has three of them already.
+   * ONLY the interior boundaries get a number. The track's two ends ARE 0% and
+   * 100%, so labelling them would spend two more numbers saying what the
+   * track's extent already says, on a tile that has three of them already.
    *
-   * The pin is centred on the true value even at the extremes, where it overhangs
-   * the track by about half its width. That overhang lands in the grid gutter or
-   * the card padding (both 28px), and a pin nudged inwards to avoid it would be
-   * pointing at a percentage the year did not have.
+   * The tag is centred on the true value even at the extremes, where it
+   * overhangs the track by about half its width, rather than nudged inwards to
+   * point at a percentage the year did not have.
    *
    * role="img" with one label, because every part of this is one reading: read
    * out piecemeal it would be a list of coordinates.
    */
-  function gauge(label, ratio, bands) {
+  function gauge(key, label, ratio, bands) {
     if (!bands || !bands.length) return '';
-
-    const segs = bands
-      .map((b) => {
-        const from = clampPct(b.from);
-        const width = Math.max(0, clampPct(b.to) - from);
-        return `<span class="met-gauge-band met-gauge-${b.tone}" style="left:${from.toFixed(3)}%;width:${width.toFixed(3)}%"></span>`;
-      })
-      .join('');
-
-    const bounds = bands.slice(0, -1).map((b) => b.to);
-    const ticks = bounds
-      .map((at) => `<span class="met-gauge-tick" style="left:${clampPct(at).toFixed(3)}%"></span>`)
-      .join('');
-    // Two boundaries closer together than a label is wide get ONE label spanning
-    // them ("15–20%"), centred between the pair. That is the right reading
-    // anyway where a narrow band is bracketed by two boundaries — it names the
-    // band — and it is the only way to keep both numbers when they will not fit
-    // side by side.
-    const groups = [];
-    bounds.forEach((at) => {
-      const last = groups[groups.length - 1];
-      const near = last && clampPct(at) - clampPct(last[last.length - 1]) < MIN_LABEL_GAP;
-      if (near) last.push(at);
-      else groups.push([at]);
-    });
-    const scale = groups
-      .map((g) => {
-        const lo = clampPct(g[0]);
-        const hi = clampPct(g[g.length - 1]);
-        const text = g.length === 1
-          ? fmtPct(g[0])
-          : `${Math.round(g[0] * 100)}–${fmtPct(g[g.length - 1])}`;
-        return `<span class="met-gauge-mark" style="left:${((lo + hi) / 2).toFixed(3)}%">${escapeHtml(text)}</span>`;
-      })
-      .join('');
-
-    // The pin carries the value at the size the tile's headline number used to
-    // be, because it IS that number now — printing it a second time under the
-    // label said the same percentage twice, 30px apart. A ratio with no value
-    // has nowhere on the track to stand, so it says so in the pin's lane instead
-    // of leaving the tile with a label and an empty gauge.
     const hit = bandFor(bands, ratio);
-    const pin = hit
-      ? `<span class="met-pin met-pin-${hit.tone}" style="left:${clampPct(ratio).toFixed(3)}%">${escapeHtml(fmtPct(ratio))}</span>`
-      : '<span class="met-gauge-none">N/A</span>';
-
     const reading = hit
       ? `${fmtPct(ratio)}, ${TONE_WORD[hit.tone]}, in the ${fmtPct(hit.from)} to ${fmtPct(hit.to)} range`
       : 'no value for this year';
-
+    pending.gauges.push({ key, ratio, bands, hit });
+    // A ratio with no value has nowhere on the track to stand, so it says so
+    // above the track instead of leaving the tile with a label and an empty gauge.
     return `<div class="met-gauge" role="img" aria-label="${escapeHtml(`${label}: ${reading}`)}">
-      <div class="met-gauge-pins">${pin}</div>
-      <div class="met-gauge-track">${segs}${ticks}</div>
-      <div class="met-gauge-scale">${scale}</div>
+      ${hit ? '' : '<span class="met-gauge-none">N/A</span>'}
+      <div class="met-gauge-chart" data-gauge="${key}"></div>
     </div>`;
+  }
+
+  /** The boundary labels: one per interior boundary, except that two closer
+   *  than MIN_LABEL_GAP share ONE label spanning them ("15–20%"), centred
+   *  between the pair — it names the narrow band they bracket, and is the only
+   *  way to keep both numbers when they will not fit side by side.
+   *  Returns Map<position on the 0–100 axis, text>. */
+  function boundaryLabels(bands) {
+    const groups = [];
+    for (const at of bands.slice(0, -1).map((b) => b.to)) {
+      const last = groups[groups.length - 1];
+      if (last && clampPct(at) - clampPct(last[last.length - 1]) < MIN_LABEL_GAP) last.push(at);
+      else groups.push([at]);
+    }
+    return new Map(groups.map((g) => {
+      const lo = clampPct(g[0]);
+      const hi = clampPct(g[g.length - 1]);
+      const text = g.length === 1 ? fmtPct(g[0]) : `${Math.round(g[0] * 100)}–${fmtPct(g[g.length - 1])}`;
+      return [(lo + hi) / 2, text];
+    }));
+  }
+
+  const TONE_TOKEN = { good: 'success', caution: 'warning', bad: 'error' };
+  // How far a gauge's canvas reaches past its tile on each side
+  // (--met-gauge-bleed in metrics.css).
+  const GAUGE_BLEED = 28;
+
+  function mountGauge(el, { ratio, bands, hit }) {
+    const marks = boundaryLabels(bands);
+    EChartKit.mount(el, (t) => {
+      const tone = (name) => t[TONE_TOKEN[name]] || t.textTertiary;
+      const at = hit ? clampPct(ratio) : null;
+      const series = {
+        type: 'bar',
+        silent: true,
+        // No fill to the value: the tag above the track marks it, and a fill
+        // would grade the year in one place rather than against the ranges.
+        data: [],
+        // The ranges, in their full colours: they are the scale the tag is
+        // read against. A year with no value still gets its scale, faded.
+        markArea: {
+          silent: true,
+          itemStyle: { borderColor: t.bgContainer, borderWidth: 2 },
+          data: bands.map((b) => [
+            { xAxis: clampPct(b.from), itemStyle: { color: hit ? tone(b.tone) : EChartKit.alpha(tone(b.tone), 0.45) } },
+            { xAxis: clampPct(b.to) },
+          ]),
+        },
+      };
+      if (hit) {
+        series.markPoint = {
+          silent: true,
+          symbol: 'triangle',
+          symbolSize: [10, 6],
+          symbolRotate: 180,
+          symbolOffset: [0, -10],
+          itemStyle: { color: tone(hit.tone) },
+          label: {
+            show: true,
+            position: 'top',
+            distance: 4,
+            formatter: fmtPct(ratio),
+            color: t.text,
+            fontFamily: t.font,
+            fontSize: 20,
+            fontWeight: 600,
+            padding: [2, 8],
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: EChartKit.alpha(tone(hit.tone), 0.6),
+            backgroundColor: EChartKit.alpha(tone(hit.tone), 0.12),
+          },
+          data: [{ coord: [at, 0] }],
+        };
+      }
+      return {
+        // Inset by the canvas's bleed into the gutter (metrics.css), so the
+        // track lines up with the tile and a tag at either end has room.
+        grid: { left: GAUGE_BLEED, right: GAUGE_BLEED, top: 48, bottom: 22, containLabel: false },
+        xAxis: {
+          type: 'value',
+          min: 0,
+          max: 100,
+          splitLine: { show: false },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: EChartKit.axisLabel(t, {
+            customValues: [...marks.keys()],
+            formatter: (v) => marks.get(v) || '',
+            margin: 6,
+          }),
+        },
+        yAxis: { type: 'category', show: false, data: [''] },
+        series: [series],
+      };
+    });
   }
 
   /**
@@ -342,7 +398,7 @@
 
     return `<div class="met-metric${na}">
     <div class="met-metric-label">${escapeHtml(label)}${infoIcon(tip)}</div>
-    ${gauge(label, ratio, bands)}
+    ${gauge(o.key, label, ratio, bands)}
   </div>`;
   }
 
@@ -399,9 +455,19 @@
       return;
     }
 
+    pending.sparks = [];
+    pending.gauges = [];
     host.innerHTML = figuresBody(y);
     const vitalsHost = document.getElementById('metrics-vitals');
     if (vitalsHost) vitalsHost.innerHTML = vitalsBody(y);
+    for (const spark of pending.sparks) {
+      const el = host.querySelector(`[data-spark="${spark.field}"]`);
+      if (el) mountSpark(el, spark);
+    }
+    for (const g of pending.gauges) {
+      const el = vitalsHost && vitalsHost.querySelector(`[data-gauge="${g.key}"]`);
+      if (el) mountGauge(el, g);
+    }
   }
 
   // ─── Span picker (the Cash Flow tab's, both halves) ────────────────────────

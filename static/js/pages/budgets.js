@@ -3,17 +3,17 @@
 (function () {
     // ─── Budgets ────────────────────────────────────────────────────────────
     // One monthly target per category, drawn in Ant Design (ant.css, ant.js)
-    // like Recurring, Portfolio and Reports: a toolbar (the month and Circles
+    // like Recurring, Portfolio and Reports: a toolbar (the month and Chart
     // or List on the left, Set Budget on the right), four Statistic cards for
     // the month, then one card
     // holding the targets, and a line under it naming what was spent in
     // categories with no target.
     //
-    // CIRCLES. One per budgeted category, floating in a field that pulls them
-    // all toward the middle. The circle's AREA is the target the user set; the
-    // level it is filled to is how much of that target the shown month has
-    // already reached. An empty ring means nothing has moved in that category
-    // yet. LIST is the same targets as a table, furthest along first.
+    // CHART. A Nightingale rose with one wedge per budgeted category (see Rose
+    // below). The wedge's AREA is the target the user set; the filled wedge
+    // inside it is how much of that target the shown month has already
+    // reached. An unfilled wedge means nothing has moved in that category yet.
+    // LIST is the same targets as a table, furthest along first.
     //
     // TWO KINDS OF TARGET, and the difference is the direction of the category
     // behind it (schema.js categories.cat_type):
@@ -24,20 +24,20 @@
     //              money gone. Drawn in Ant's info blue at EVERY level in every
     //              month, and never graded.
     //
-    // WHY A PUT-AWAY TARGET CARRIES NO VERDICT. A red spending circle names a
+    // WHY A PUT-AWAY TARGET CARRIES NO VERDICT. A red spending wedge names a
     // limit that was passed, which is a fact whatever else happened that month.
     // Coming up short on a savings target is not the same kind of fact: the
     // month may still be running, and a transfer the import has not categorized
     // yet is money that moved but reads here as money that did not. Colouring
     // that amber would state a shortfall the data cannot support. The figures
-    // are printed inside every circle, so a short month is legible without one.
+    // are printed beside every wedge, so a short month is legible without one.
     // Grading how much a user saves is the Metrics tab's job, against the
     // savings-rate and invested-share goals (services/reportCard.js).
     //
     // WHERE THE TWO NUMBERS COME FROM
     //   target — GET /api/budgets (handlers/budgets.js). ONE figure per
     //            category, applied to every month, so stepping to another month
-    //            never changes a circle's size. That is the point: the circles
+    //            never changes a wedge's size. That is the point: the wedges
     //            are the shape of the plan, and only the fill moves.
     //   spent  — the Cash Flow statement (Store 'ie' → GET /api/data), read one
     //            cell at a time. The statement is the blend point — a cell is
@@ -47,8 +47,8 @@
     //            ledger separately would let this page and those two disagree
     //            about what a month cost.
     //
-    // ONLY BUDGETED CATEGORIES GET A CIRCLE OR A ROW. A category with no
-    // target has no size to draw (the circle IS the target) and no fraction to
+    // ONLY BUDGETED CATEGORIES GET A WEDGE OR A ROW. A category with no
+    // target has no size to draw (the wedge IS the target) and no fraction to
     // be part of. What it spent is still on the page, as the one line under
     // the card, and in full on Statements and Spending Trends.
     //
@@ -60,7 +60,7 @@
     // would put this page at odds with both, which costs more than the
     // imprecision does.
     //
-    // CLICKING A CIRCLE OR A ROW opens the ledger on that category and month
+    // CLICKING A WEDGE OR A ROW opens the ledger on that category and month
     // (Transactions' year / month / cat deep link), so every figure can be
     // traced to the rows behind it. Targets are edited in Set Budget, which
     // lists EVERY budgetable category — that is how a category gets its first
@@ -68,14 +68,14 @@
     //
     // COLOUR SAYS TWO THINGS, AND ONLY TWO: the kind of target (accent or blue)
     // and, for spending only, the verdict (red). The category name is printed
-    // inside every circle, so a hue per category would be decoration standing
-    // where a verdict could be. The colours live in budgets.css; this file only
-    // picks the classes.
+    // beside every wedge, so a hue per category would be decoration standing
+    // where a verdict could be. The rose reads them from the theme (the
+    // primary, info and error colours); the list's live in budgets.css.
     //
     // Globals (loaded before this script): apiFetch (api.js), escapeHtml
     // (escape.js), formatCurrency / applyCurrencyFormat / stripCurrencyValue
-    // (currency.js), Store (store.js), UI (ui.js), Ant (ant.js), BubbleField
-    // (bubblefield.js).
+    // (currency.js), Store (store.js), UI (ui.js), Ant (ant.js), EChartKit
+    // (echart-kit.js).
 
     // The statement keys each year's months by name (GET /api/data).
     const MONTHS = [
@@ -91,8 +91,7 @@
         statement: null,      // GET /api/data
         budgets: new Map(),   // category key -> target amount
         month: currentYm(),   // 'YYYY-MM', the month on the toolbar
-        view: 'circles',      // 'circles' | 'list'
-        field: null,          // BubbleField controller
+        view: 'chart',        // 'chart' | 'list'
     };
 
     const els = {};
@@ -248,9 +247,8 @@
 
     /**
      * Every budgeted category for the month on the toolbar, in the user's own
-     * category order. `value` is what BubbleField sizes by, and it is the
-     * TARGET, never the amount reached: a category the user overspent must not
-     * grow a circle for it.
+     * category order. A wedge is sized by the TARGET, never the amount
+     * reached: a category the user overspent must not grow a wedge for it.
      */
     function buildItems() {
         const cells = cellsForMonth(state.month);
@@ -267,7 +265,6 @@
             items.push({
                 key: col.key,
                 label: col.label,
-                value: target,
                 target,
                 actual,
                 away,
@@ -295,7 +292,7 @@
         };
     }
 
-    /** What a circle's tooltip and its screen-reader label say. */
+    /** What a wedge's tooltip and the chart's screen-reader label say. */
     function describe(item) {
         const of = `${item.label}: ${formatCurrency(item.actual)} of ${formatCurrency(item.target)}`;
         if (item.away) return `${of} put away`;
@@ -361,39 +358,100 @@
         ].join('');
     }
 
-    // ─── Circles ────────────────────────────────────────────────────────────
+    // ─── Rose ────────────────────────────────────────────────────────────────
+    // One wedge per budgeted category in a Nightingale rose (Apache ECharts,
+    // widgets/echart-kit.js). Every wedge takes the same angle; its AREA is the
+    // target, and a second wedge inside it, from the centre out, is what the
+    // month has reached. Area rather than radius, because a target twice the
+    // size must get twice the ink: ECharts maps a rose wedge's radius linearly
+    // from its value, so each wedge is handed the square root of its amount.
+    //
+    // The spent wedges share the target wedges' scale by being drawn with a
+    // radius cut to the same proportion: the largest spent wedge's square root
+    // over the largest target's. Spending past a target is held at the target's
+    // edge, where the red says the rest.
+    //
+    // COLOUR, as for the list: the theme's primary for spending, its info blue
+    // for money put away, its error red once spending passes its target.
 
-    /** Fill one circle in. Called on data changes only, never per frame. */
-    function paintBubble(el, item) {
-        el.className = 'bud-bubble'
-            + (item.away ? ' bud-bubble-away' : '')
-            + (item.over ? ' bud-bubble-over' : '')
-            // Nothing moved yet: a bare ring, no waterline across its bottom.
-            + (item.actual > 0 ? '' : ' bud-bubble-empty')
-            // Reached or passed: filled to the top, where a waterline would
-            // only be clipped by the curve.
-            + (item.ratio >= 1 ? ' bud-bubble-filled' : '');
-        // How far up the circle the fill reaches. Its colour is the
-        // stylesheet's, keyed off the classes above.
-        el.style.setProperty('--bud-fill', `${Math.min(item.ratio, 1) * 100}%`);
+    const ROSE_RADIUS = 70;   // the largest wedge, as a percent of the box
 
-        const label = describe(item);
-        el.dataset.tip = label;
-        el.setAttribute('aria-label', label);
+    function wedgeColor(t, item) {
+        if (item.over) return t.error;
+        return item.away ? t.info : t.primary;
+    }
 
-        // The amount is written twice, with and without a ".00", and the
-        // circle's own size picks one (budgets.css): a small circle has no
-        // room for cents that say nothing.
-        el.innerHTML = `
-            <span class="bud-bubble-fill" aria-hidden="true"></span>
-            <span class="bud-bubble-text" aria-hidden="true">
-                <span class="bud-bubble-name">${escapeHtml(item.label)}</span>
-                <span class="bud-bubble-spent">
-                    <span class="bud-amount-full">${escapeHtml(formatCurrency(item.actual))}</span>
-                    <span class="bud-amount-short">${escapeHtml(money(item.actual))}</span>
-                </span>
-                <span class="bud-bubble-target">/ ${escapeHtml(money(item.target))}</span>
-            </span>`;
+    function roseOption(t, items) {
+        const targetR = items.map((item) => Math.sqrt(item.target));
+        const spentR = items.map((item) => Math.sqrt(Math.min(item.actual, item.target)));
+        const maxTarget = Math.max(...targetR);
+        const maxSpent = Math.max(...spentR);
+        const name = (item) => item.label;
+        const tip = (p) => {
+            const item = items[p.dataIndex];
+            return item ? EChartKit.tipHtml({
+                rows: [{ color: wedgeColor(t, item), name: describe(item), value: '' }],
+                note: 'Click to see its transactions',
+            }) : '';
+        };
+        const series = [{
+            type: 'pie',
+            roseType: 'area',
+            radius: [0, `${ROSE_RADIUS}%`],
+            center: ['50%', '52%'],
+            startAngle: 90,
+            cursor: 'pointer',
+            data: items.map((item, i) => {
+                const c = wedgeColor(t, item);
+                return {
+                    name: name(item),
+                    value: targetR[i],
+                    itemStyle: { color: EChartKit.alpha(c, 0.12), borderColor: c, borderWidth: 1.5 },
+                };
+            }),
+            label: {
+                formatter: (p) => {
+                    const item = items[p.dataIndex];
+                    return `{name|${String(item.label).replace(/[{}|]/g, ' ')}}\n{amount|${money(item.actual)}} {target|/ ${money(item.target)}}`;
+                },
+                rich: {
+                    name: { color: t.text, fontFamily: t.font, fontSize: 13, fontWeight: 600, lineHeight: 18 },
+                    amount: { color: t.text, fontFamily: t.font, fontSize: 12, lineHeight: 16 },
+                    target: { color: t.textTertiary, fontFamily: t.font, fontSize: 12, lineHeight: 16 },
+                },
+            },
+            labelLine: { lineStyle: { color: t.border } },
+            emphasis: { scale: true, scaleSize: 4 },
+        }];
+        if (maxSpent > 0) {
+            series.push({
+                type: 'pie',
+                roseType: 'area',
+                radius: [0, `${ROSE_RADIUS * (maxSpent / maxTarget)}%`],
+                center: ['50%', '52%'],
+                startAngle: 90,
+                cursor: 'pointer',
+                label: { show: false },
+                labelLine: { show: false },
+                data: items.map((item, i) => {
+                    const c = wedgeColor(t, item);
+                    return { name: name(item), value: spentR[i], itemStyle: { color: EChartKit.alpha(c, 0.55) } };
+                }),
+            });
+        }
+        return { tooltip: EChartKit.tooltip(t, { trigger: 'item', formatter: tip }), series };
+    }
+
+    function renderRose(items) {
+        EChartKit.mount(els.field, (t) => roseOption(t, items), {
+            label: `Budgets for ${monthLabel(state.month)}: ${items.map(describe).join('; ')}`,
+            on: {
+                click: (p) => {
+                    const item = items[p.dataIndex];
+                    if (item) location.assign(ledgerHref(item.key));
+                },
+            },
+        });
     }
 
     // ─── List ───────────────────────────────────────────────────────────────
@@ -456,13 +514,12 @@
     // ─── Render ─────────────────────────────────────────────────────────────
 
     function renderView(items) {
-        const circles = state.view === 'circles';
+        const circles = state.view === 'chart';
         els.card.classList.toggle('bud-card-list', !circles);
         els.field.hidden = !circles;
         els.list.hidden = circles;
-        // setData measures the field, so it is only fed while it is on screen;
-        // a field fed while hidden would size every circle against nothing.
-        if (circles) state.field.setData(items);
+        // Drawn only while it is on screen; the kit sizes it to the field.
+        if (circles) renderRose(items);
         else els.list.innerHTML = listHtml(items);
     }
 
@@ -707,7 +764,7 @@
         els.empty = document.getElementById('bud-empty');
 
         // Only the fill moves between months: the targets are the same in
-        // every month, so the circles keep their sizes and their places.
+        // every month, so the wedges keep their sizes and their places.
         els.monthPrev.addEventListener('click', () => goToMonth(stepYm(state.month, -1)));
         els.monthNext.addEventListener('click', () => {
             const next = stepYm(state.month, 1);
@@ -728,10 +785,6 @@
             render();
         });
 
-        state.field = BubbleField.create(els.field, {
-            paint: paintBubble,
-            onActivate: (item) => location.assign(ledgerHref(item.key)),
-        });
         // A row opens its ledger from anywhere on it; the name's own link
         // handles itself.
         els.list.addEventListener('click', (e) => {
@@ -747,8 +800,8 @@
 
         // The figures are formatted at render time, so a currency change
         // repaints in place rather than needing a reload. A THEME change needs
-        // no listener: every colour is a CSS token, which the swap re-points on
-        // its own.
+        // no listener: the rose's colours are rebuilt by the chart kit, and the
+        // rest are CSS tokens the swap re-points on its own.
         window.addEventListener('currencychange', render);
 
         // An import or an edit made on another page invalidates 'ie'; redraw

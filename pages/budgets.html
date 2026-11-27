@@ -5,6 +5,7 @@
     <title>Aventurine Manage | Budgets</title>
     <!-- @include head -->
     <link rel="stylesheet" href="/static/css/ant.css">
+    <link rel="stylesheet" href="/static/css/echart.css">
     <link rel="stylesheet" href="/static/css/budgets.css">
 </head>
 <body>
@@ -18,12 +19,12 @@
 
 <!-- The workspace is drawn in Ant Design (ant.css, ant.js), like Recurring,
      Portfolio and Reports: the toolbar, the month's figures as four Statistic
-     cards, then one card holding the targets as circles or as a table. The app
+     cards, then one card holding the targets as a rose chart or as a table. The app
      chrome around it keeps its own design. -->
 <div class="bud-page ant-scope">
 
     <!-- Hard left: a compact previous / month / next control (the month opens
-         Ant's month panel), then the Circles / List switch. Set Budget, the
+         Ant's month panel), then the Chart / List switch. Set Budget, the
          page's one action, hard right. No page heading: the sidebar's active
          link already names the page, as on every other page. -->
     <div class="bud-toolbar">
@@ -39,7 +40,7 @@
                 aria-label="Next month" data-tip="Next month"><span class="anticon" data-ant-icon="right" aria-hidden="true"></span></button>
         </div>
         <div class="ant-segmented" id="bud-view" role="group" aria-label="Show budgets as">
-            <button type="button" class="ant-segmented-item" data-view="circles" aria-pressed="true"><span class="anticon" data-ant-icon="appstore" aria-hidden="true"></span>Circles</button>
+            <button type="button" class="ant-segmented-item" data-view="chart" aria-pressed="true"><span class="anticon" data-ant-icon="appstore" aria-hidden="true"></span>Chart</button>
             <button type="button" class="ant-segmented-item" data-view="list" aria-pressed="false"><span class="anticon" data-ant-icon="unordered-list" aria-hidden="true"></span>List</button>
         </div>
         <button type="button" class="ant-btn ant-btn-primary bud-set-btn" id="bud-set-btn"><span class="anticon" data-ant-icon="edit" aria-hidden="true"></span>Set Budget</button>
@@ -49,8 +50,8 @@
          on the toolbar. Empty until budgets.js has a month to total. -->
     <div class="bud-stats" id="bud-stats" hidden></div>
 
-    <!-- The targets. In Circles, #bud-field is the box BubbleField measures, so
-         it must have a size of its own before the first circle is drawn
+    <!-- The targets. In Chart, #bud-field holds the rose (budgets.js), which
+         fills it, so it must have a size of its own before it is drawn
          (budgets.css gives it one). In List, #bud-list holds the table. -->
     <section class="ant-card bud-card" id="bud-card" aria-label="Budgets" hidden>
         <div class="bud-field" id="bud-field"></div>
@@ -69,12 +70,12 @@
     </div>
 
     <!-- @include scripts -->
-    <!-- No chart.js here. The circles are DOM, not a chart, and their colour is
-         a token in budgets.css rather than a per-category ramp, so nothing on
-         this page needs the chart widget. Ant Design's interactive pieces come
-         after the shared block: its Modal is UI.dialog underneath. -->
+    <!-- Ant Design's interactive pieces come after the shared block: its Modal
+         is UI.dialog underneath. Then Apache ECharts and the app's chart kit,
+         which draw the rose (vendor/echarts/README.md). -->
     <script src="/static/js/widgets/ant.js"></script>
-    <script src="/static/js/widgets/bubblefield.js"></script>
+    <script src="/static/js/vendor/echarts/echarts.min.js"></script>
+    <script src="/static/js/widgets/echart-kit.js"></script>
     <script src="/static/js/pages/budgets.js"></script>
 </body>
 </html>

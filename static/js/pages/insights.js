@@ -20,16 +20,16 @@
 // above or below the diagonal is that quarter's saving or overspending. The
 // category list itemises β: the slopes add up to the total.
 //
-// Every chart is hand-rolled SVG coloured from CSS custom properties, so a
-// theme flip restyles it without a redraw. Hover reads every mark in a small
-// tooltip; the lists beside each chart are its table view.
+// Every chart is Apache ECharts (widgets/echart-kit.js) in the theme's colours
+// and this page's own (--ins-*, insights.css), so a theme flip recolours it.
+// Hover reads every mark in a tooltip; the lists beside each chart are its
+// table view.
 //
 // Globals: apiFetch (api.js), escapeHtml (escape.js), formatCurrency
 // (currency.js), merchantAvatarHtml (avatar.js), ChartMath (chartmath.js),
-// Ant (ant.js).
+// Ant (ant.js), EChartKit (echart-kit.js).
 
 (function () {
-  const SVG_NS = 'http://www.w3.org/2000/svg';
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   // sort: { key: 'name' | 'visits' | 'change', order: 'ascend' | 'descend' },
@@ -72,13 +72,6 @@
   const dirOf = (v) => (v > 0.005 ? 'up' : v < -0.005 ? 'down' : 'flat');
   const arrow = (v) => ({ up: '▲', down: '▼', flat: '■' }[dirOf(v)]);
 
-  function el(tag, attrs = {}, parent) {
-    const n = document.createElementNS(SVG_NS, tag);
-    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-    if (parent) parent.appendChild(n);
-    return n;
-  }
-
   // An ⓘ after a title, its text on hover and focus (Ant's info tip). Each
   // headline figure carries its own: how that one number is worked out.
   function infoTip(text) {
@@ -94,30 +87,38 @@
     </div>`;
   }
 
-  // ─── Tooltip (one per plot) ────────────────────────────────────────────────
+  // ─── Chart box ─────────────────────────────────────────────────────────────
+  // Each plot is an Apache ECharts chart (widgets/echart-kit.js) in a canvas
+  // box of its own inside the host, so the host can still hold an empty state
+  // instead. The box's height is set here: CHART_H for the inflation charts,
+  // square for the scatter.
 
-  function tooltip(host) {
-    let tip = host.querySelector('.ins-tip');
-    if (!tip) {
-      tip = document.createElement('div');
-      tip.className = 'ins-tip';
-      tip.hidden = true;
-      host.appendChild(tip);
+  function canvasBox(host, height) {
+    host.querySelectorAll('.ant-empty').forEach((x) => x.remove());
+    let box = host.querySelector('.ins-canvas');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'ins-canvas';
+      host.prepend(box);
     }
-    return {
-      show(html, x, y) {
-        tip.innerHTML = html;
-        tip.hidden = false;
-        const w = tip.offsetWidth;
-        const left = Math.min(Math.max(x - w / 2, 0), host.clientWidth - w);
-        tip.style.left = `${left}px`;
-        tip.style.top = `${Math.max(0, y - tip.offsetHeight - 12)}px`;
-      },
-      hide() { tip.hidden = true; },
-    };
+    box.style.height = `${height}px`;
+    return box;
   }
 
-  // ─── Axis frame shared by both plots ───────────────────────────────────────
+  /** Clear a host's chart, for an empty state to take its place. */
+  function clearChart(host) {
+    const box = host.querySelector('.ins-canvas');
+    if (box) { EChartKit.unmount(box); box.remove(); }
+  }
+
+  /** The page's own colours (--ins-*, insights.css), read off the host they
+   *  are scoped to. */
+  const insColor = (host, name) => EChartKit.color(`--ins-${name}`, host);
+
+  /** A dashed reference line: the zero baseline, or break-even. */
+  const refLine = (t) => ({ color: t.textTertiary, width: 1.5, type: [6, 5] });
+
+  // ─── Axis ticks ────────────────────────────────────────────────────────────
 
   // Calendar x ticks: the first of each quarter, labelled "Apr", "Jul", "Oct",
   // with Jan 1 labelled by its year ("2025") so the year boundary stands out.
@@ -140,21 +141,11 @@
   }
   const quarterLabel = (q) => (q.year ? String(q.y) : MONTHS[q.m]);
 
-  function frame(host, { height, xTicks, yTicks, x, y, xFmt, yFmt, xClass, pad, xLabelY = height - 8 }) {
-    host.querySelectorAll('svg').forEach((s) => s.remove());
-    const W = host.clientWidth;
-    const svg = el('svg', { width: W, height, viewBox: `0 0 ${W} ${height}`, class: 'ins-svg', role: 'img' });
-    const grid = el('g', { class: 'ins-grid' }, svg);
-    for (const t of yTicks) {
-      el('line', { x1: pad.l, x2: W - pad.r, y1: y(t), y2: y(t) }, grid);
-      el('text', { x: pad.l - 8, y: y(t) + 4, 'text-anchor': 'end', class: 'ins-axis' }, grid).textContent = yFmt(t);
-    }
-    for (const t of xTicks) {
-      el('text', { x: x(t), y: xLabelY, 'text-anchor': 'middle', class: `ins-axis ${xClass ? xClass(t) : ''}` }, grid).textContent = xFmt(t);
-    }
-    host.prepend(svg);
-    return { svg, W };
-  }
+  /** Rich text styles for the quarter labels: a year label is set apart. */
+  const quarterRich = (t) => ({
+    year: { color: t.text, fontWeight: 600, fontFamily: t.font, fontSize: 11 },
+  });
+  const quarterText = (q) => (q.year ? `{year|${quarterLabel(q)}}` : quarterLabel(q));
 
   // ─── Personal Inflation ────────────────────────────────────────────────────
 
@@ -288,7 +279,6 @@
   }
 
   function renderMerchantDetail() {
-    const d = state.inflation;
     const m = findItem(state.selected);
     const title = document.getElementById('inflation-detail-title');
     const statsEl = document.getElementById('inflation-detail-stats');
@@ -325,7 +315,7 @@
     const tr = d.trend || [];
     if (tr.length < 2) {
       statsEl.innerHTML = '';
-      host.querySelectorAll('svg').forEach((x) => x.remove());
+      clearChart(host);
       host.innerHTML = Ant.empty({ compact: true, title: 'Not enough history for a trend yet',
         desc: `Pick a ${isCatView() ? 'category' : 'merchant'} below to see its bills.` });
       return;
@@ -345,8 +335,6 @@
   }
 
   function drawTrend(host, tr) {
-    host.querySelectorAll('.ant-empty').forEach((x) => x.remove());
-    if (!host.clientWidth) return;
     // Plotted as the 12-month change in percent, on a 0% (no change) baseline,
     // the way CPI charts are drawn.
     const chgOf = (p) => p.change * 100;
@@ -355,54 +343,64 @@
     const hi = Math.max(0, ...vals);
     const spread = Math.max(4, hi - lo);
     const yTicks = ChartMath.niceTicks(lo - spread * 0.1, hi + spread * 0.1, 4);
-    const yMin = yTicks[0];
-    const yMax = yTicks[yTicks.length - 1];
-    const H = CHART_H;
-    const pad = { l: 48, r: 16, t: 16, b: 32 };
-    const W = host.clientWidth;
     const n = tr.length;
-    const x = (i) => pad.l + (n > 1 ? i / (n - 1) : 0.5) * (W - pad.l - pad.r);
-    const y = (v) => pad.t + (1 - (v - yMin) / (yMax - yMin)) * (H - pad.t - pad.b);
     // Each point is a month, so a quarter tick sits on that month's index.
     const ymOf = (p) => { const [yy, mm] = p.ym.split('-').map(Number); return { y: yy, m: mm - 1 }; };
     const m0 = ymOf(tr[0]);
-    const qs = quarterTicks(m0, ymOf(tr[n - 1]), W - pad.l - pad.r);
+    const qs = quarterTicks(m0, ymOf(tr[n - 1]), Math.max(0, host.clientWidth - 64));
     const qAt = new Map(qs.map((q) => [(q.y - m0.y) * 12 + (q.m - m0.m), q]));
-    const { svg } = frame(host, {
-      height: H, pad, x, y, yTicks, xTicks: [...qAt.keys()],
-      yFmt: (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v))}%`,
-      xFmt: (i) => quarterLabel(qAt.get(i)),
-      xClass: (i) => (qAt.get(i).year ? 'ins-axis-year' : ''),
+    const box = canvasBox(host, CHART_H);
+    EChartKit.mount(box, (t) => {
+      // The line is one fixed colour, not the up/down red or green: it is a
+      // series to read, and the title's arrowed figure already says which way
+      // it went.
+      const color = insColor(host, 'index') || t.info;
+      return {
+        grid: { left: 0, right: 16, top: 16, bottom: 0, containLabel: true },
+        tooltip: EChartKit.tooltip(t, {
+          trigger: 'axis',
+          axisPointer: { type: 'line', lineStyle: { color: t.border } },
+          formatter: (params) => {
+            const p = tr[params[0].dataIndex];
+            const w = [ymShift(p.ym, -2), p.ym];
+            return EChartKit.tipHtml({
+              title: `${pct(p.change)} vs a year earlier`,
+              rows: [
+                { name: `${rangeLabel(w)} vs ${rangeLabel(w.map((v) => ymShift(v, -12)))}`, value: '' },
+                { name: 'Merchants', value: String(p.merchants) },
+              ],
+            });
+          },
+        }),
+        xAxis: EChartKit.categoryAxis(t, tr.map((p) => p.ym), {
+          boundaryGap: false,
+          axisLine: { show: false },
+          axisLabel: EChartKit.axisLabel(t, {
+            interval: (i) => qAt.has(i),
+            formatter: (_v, i) => (qAt.has(i) ? quarterText(qAt.get(i)) : ''),
+            rich: quarterRich(t),
+          }),
+        }),
+        yAxis: EChartKit.valueAxis(t, yTicks,
+          (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v))}%`),
+        series: [{
+          type: 'line',
+          smooth: true,
+          color,
+          lineStyle: { width: 2.5 },
+          symbol: 'none',
+          data: vals.map((v, i) => (i === n - 1
+            ? { value: v, symbol: 'circle', symbolSize: 8, itemStyle: { borderColor: t.bgContainer, borderWidth: 2 } }
+            : v)),
+          markLine: { silent: true, symbol: 'none', label: { show: false }, lineStyle: refLine(t), data: [{ yAxis: 0 }] },
+        }],
+      };
+    }, {
+      label: `Personal price index, 12-month change by month from ${ymLabel(tr[0].ym)} to ${ymLabel(tr[n - 1].ym)}; latest ${pct(tr[n - 1].change)}.`,
     });
-    svg.setAttribute('aria-label', `Personal price index, 12-month change by month from ${ymLabel(tr[0].ym)} to ${ymLabel(tr[n - 1].ym)}; latest ${pct(tr[n - 1].change)}.`);
-    el('line', { x1: pad.l, x2: W - pad.r, y1: y(0), y2: y(0), class: 'ins-diag' }, svg);
-    // The line is one fixed blue, not the up/down red or green: it is a series
-    // to read, and the title's arrowed figure already says which way it went.
-    const pts = tr.map((p, i) => ({ x: x(i), y: y(chgOf(p)) }));
-    el('path', { d: ChartMath.smoothPath(pts), class: 'ins-trend' }, svg);
-    const end = pts[n - 1];
-    el('circle', { cx: end.x, cy: end.y, r: 4, class: 'ins-trend-end' }, svg);
-
-    const tip = tooltip(host);
-    const guide = el('line', { y1: pad.t, y2: H - pad.b, class: 'ins-guide', visibility: 'hidden' }, svg);
-    const ring = el('circle', { r: 5, class: 'ins-dot-hi', visibility: 'hidden' }, svg);
-    svg.addEventListener('pointermove', (e) => {
-      const r = svg.getBoundingClientRect();
-      const px = e.clientX - r.left;
-      const i = Math.max(0, Math.min(n - 1, Math.round(((px - pad.l) / (W - pad.l - pad.r)) * (n - 1))));
-      const p = tr[i];
-      guide.setAttribute('x1', x(i)); guide.setAttribute('x2', x(i)); guide.setAttribute('visibility', 'visible');
-      ring.setAttribute('cx', x(i)); ring.setAttribute('cy', y(chgOf(p))); ring.setAttribute('visibility', 'visible');
-      const w = [ymShift(p.ym, -2), p.ym];
-      tip.show(`<strong>${pct(p.change)} vs a year earlier</strong><span>${rangeLabel(w)} vs ${rangeLabel(w.map((v) => ymShift(v, -12)))}</span>
-        <span>${p.merchants} merchants</span>`, x(i), y(chgOf(p)));
-    });
-    svg.addEventListener('pointerleave', () => { tip.hide(); guide.setAttribute('visibility', 'hidden'); ring.setAttribute('visibility', 'hidden'); });
   }
 
   function drawVisits(host, m) {
-    host.querySelectorAll('.ant-empty').forEach((x) => x.remove());
-    if (!host.clientWidth) return;
     // The chart spans the 15 months from the start of the year-ago window to
     // the end of the recent one; the two windows are shaded bands, and visits
     // between them are drawn faint (they are not in the comparison).
@@ -416,74 +414,83 @@
       .filter((p) => p.t >= tA && p.t < tB);
     const yMax = Math.max(...pts.map((p) => p.amount), m.early_avg, m.recent_avg);
     const yTicks = ChartMath.niceTicks(0, yMax * 1.08, 4);
-    const top = yTicks[yTicks.length - 1];
-    const H = CHART_H;
-    const pad = { l: 56, r: 16, t: 22, b: 32 };
-    const W = host.clientWidth;
-    const x = (t) => pad.l + ((t - tA) / (tB - tA)) * (W - pad.l - pad.r);
-    const y = (v) => H - pad.b - (v / top) * (H - pad.t - pad.b);
 
     const ymT = (t) => { const dt = new Date(t); return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() }; };
-    const qAt = new Map(quarterTicks(ymT(tA), ymT(tB), W - pad.l - pad.r)
+    const qAt = new Map(quarterTicks(ymT(tA), ymT(tB), Math.max(0, host.clientWidth - 72))
       .map((q) => [Date.UTC(q.y, q.m, 1), q]));
-    const { svg } = frame(host, {
-      height: H, pad, x, y, yTicks, xTicks: [...qAt.keys()],
-      yFmt: moneyRound,
-      xFmt: (t) => quarterLabel(qAt.get(t)),
-      xClass: (t) => (qAt.get(t).year ? 'ins-axis-year' : ''),
-    });
-    svg.setAttribute('aria-label', `${m.name}: average bill ${money(m.early_avg)} in ${rangeLabel(m.prior_window)}, ${money(m.recent_avg)} in ${rangeLabel(m.recent_window)}.`);
-
-    // The two windows: a band each, named above the plot.
-    const bands = el('g', {}, svg);
-    for (const w of [m.prior_window, m.recent_window]) {
-      const a = ymStart(w[0]);
-      const b = ymStart(w[1], 1);
-      el('rect', { x: x(a), y: pad.t, width: x(b) - x(a), height: H - pad.t - pad.b, class: 'ins-window' }, bands);
-      el('text', { x: (x(a) + x(b)) / 2, y: pad.t - 6, 'text-anchor': 'middle', class: 'ins-axis' }, bands)
-        .textContent = rangeLabel(w);
-    }
-
-    const dots = el('g', { class: 'ins-dots' }, svg);
-    for (const p of pts) el('circle', { cx: x(p.t), cy: y(p.amount), r: 4, class: p.inWin ? '' : 'ins-dot-out' }, dots);
-
-    // The two averages, each across its own window, labelled inside it.
-    const tP0 = ymStart(m.prior_window[0]);
-    const tP1 = ymStart(m.prior_window[1], 1);
-    const tR0 = ymStart(m.recent_window[0]);
-    const tR1 = ymStart(m.recent_window[1], 1);
     const dir = dirOf(m.change);
-    const seg = (a, b, v, cls, label, anchorEnd) => {
-      el('line', { x1: x(a), x2: x(b), y1: y(v), y2: y(v), class: `ins-avg ${cls}` }, svg);
-      const tx = el('text', {
-        x: anchorEnd ? x(b) : x(a) + 4, y: y(v) - 8,
-        'text-anchor': anchorEnd ? 'end' : 'start', class: 'ins-avg-label',
-      }, svg);
-      tx.textContent = label;
-    };
-    seg(tP0, tP1, m.early_avg, 'ins-avg-early', `Avg ${money(m.early_avg)}`, false);
-    seg(tR0, tR1, m.recent_avg, `ins-avg-recent ins-stroke-${dir}`, `Avg ${money(m.recent_avg)}`, true);
-
-    // Hover: the nearest visit along x, within reach.
-    const tip = tooltip(host);
-    const hi = el('circle', { r: 6, class: 'ins-dot-hi', visibility: 'hidden' }, svg);
-    svg.addEventListener('pointermove', (e) => {
-      const r = svg.getBoundingClientRect();
-      const px = e.clientX - r.left;
-      const py = e.clientY - r.top;
-      let best = null;
-      let bd = Infinity;
-      for (const p of pts) {
-        const dd = Math.hypot(x(p.t) - px, (y(p.amount) - py) * 0.5);
-        if (dd < bd) { bd = dd; best = p; }
-      }
-      if (!best || bd > 28) { tip.hide(); hi.setAttribute('visibility', 'hidden'); return; }
-      hi.setAttribute('cx', x(best.t));
-      hi.setAttribute('cy', y(best.amount));
-      hi.setAttribute('visibility', 'visible');
-      tip.show(`<strong>${money(best.amount)}</strong><span>${dateLabel(best.date)}</span>`, x(best.t), y(best.amount));
+    const box = canvasBox(host, CHART_H);
+    EChartKit.mount(box, (t) => {
+      const dot = t.textSecondary;
+      const recent = insColor(host, dir) || t.text;
+      // The two averages, each across its own window, labelled inside it.
+      const avg = (w, v, color, end) => [
+        { coord: [ymStart(w[0]), v], lineStyle: { color, width: 2.5, type: 'solid' },
+          label: { show: true, position: end ? 'insideEndTop' : 'insideStartTop', formatter: `Avg ${money(v)}`,
+            color: t.text, fontFamily: t.font, fontSize: 12, fontWeight: 600 } },
+        { coord: [ymStart(w[1], 1), v] },
+      ];
+      return {
+        // Room under the plot for the quarter labels: containLabel does not
+        // count labels placed by customValues, so they would sit on the
+        // canvas's bottom edge and be cut off.
+        grid: { left: 0, right: 16, top: 24, bottom: 22, containLabel: true },
+        tooltip: EChartKit.tooltip(t, {
+          trigger: 'item',
+          formatter: (p) => {
+            const v = pts[p.dataIndex];
+            return v ? EChartKit.tipHtml({ title: dateLabel(v.date), rows: [{ name: 'Bill', value: money(v.amount) }] }) : '';
+          },
+        }),
+        // A plain value axis over UTC timestamps, not a time axis: the ticks
+        // are the quarter starts chosen above (customValues), which a time
+        // axis cannot take.
+        xAxis: {
+          type: 'value',
+          min: tA,
+          max: tB,
+          splitLine: { show: false },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: EChartKit.axisLabel(t, {
+            customValues: [...qAt.keys()],
+            formatter: (v) => (qAt.has(v) ? quarterText(qAt.get(v)) : ''),
+            rich: quarterRich(t),
+          }),
+        },
+        // Two value axes make ECharts draw the y axis's line and ticks too;
+        // the grid alone carries the scale, as on every other chart.
+        yAxis: EChartKit.valueAxis(t, yTicks, moneyRound, { axisLine: { show: false }, axisTick: { show: false } }),
+        series: [{
+          type: 'scatter',
+          symbolSize: 8,
+          data: pts.map((p) => ({
+            value: [p.t, p.amount],
+            itemStyle: { color: dot, opacity: p.inWin ? 0.7 : 0.25, borderColor: t.bgContainer, borderWidth: 1 },
+          })),
+          // The two windows: a band each, named above the plot.
+          markArea: {
+            silent: true,
+            itemStyle: { color: t.fillTertiary },
+            label: { position: 'top', color: t.textSecondary, fontFamily: t.font, fontSize: 11 },
+            data: [m.prior_window, m.recent_window].map((w) => [
+              { xAxis: ymStart(w[0]), name: rangeLabel(w) },
+              { xAxis: ymStart(w[1], 1) },
+            ]),
+          },
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            data: [
+              avg(m.prior_window, m.early_avg, t.text, false),
+              avg(m.recent_window, m.recent_avg, recent, true),
+            ],
+          },
+        }],
+      };
+    }, {
+      label: `${m.name}: average bill ${money(m.early_avg)} in ${rangeLabel(m.prior_window)}, ${money(m.recent_avg)} in ${rangeLabel(m.recent_window)}.`,
     });
-    svg.addEventListener('pointerleave', () => { tip.hide(); hi.setAttribute('visibility', 'hidden'); });
   }
 
   // ─── Lifestyle Beta ────────────────────────────────────────────────────────
@@ -550,64 +557,91 @@
     const ticks = ChartMath.niceTicks(Math.max(0, lo - (hi - lo) * 0.1), hi + (hi - lo) * 0.1, 4);
     const min = ticks[0];
     const max = ticks[ticks.length - 1];
-    const W = host.clientWidth;
-    const pad = { l: 64, r: 16, t: 16, b: 40 };
+    const pad = { l: 72, r: 16, t: 16, b: 48 };
     // Square plot area: one dollar is the same length on both axes, so the
     // break-even diagonal really is at 45°.
-    const side = Math.max(160, Math.min(W - pad.l - pad.r, 520));
-    const H = side + pad.t + pad.b;
-    const x = (v) => pad.l + ((v - min) / (max - min)) * side;
-    const y = (v) => pad.t + side - ((v - min) / (max - min)) * side;
-
-    const { svg } = frame(host, { height: H, pad: { ...pad, r: W - pad.l - side }, x, y, xTicks: ticks, yTicks: ticks, xFmt: moneyRound, yFmt: moneyRound, xLabelY: pad.t + side + 18 });
-    svg.setAttribute('aria-label', `Scatter of ${pts.length} rolling 3-month periods, income against spending. Fitted beta ${b.beta}.`);
-    el('text', { x: pad.l + side / 2, y: H - 4, 'text-anchor': 'middle', class: 'ins-axis-title' }, svg).textContent = 'Income per month →';
-    const yt = el('text', { x: 14, y: pad.t + side / 2, 'text-anchor': 'middle', class: 'ins-axis-title', transform: `rotate(-90 14 ${pad.t + side / 2})` }, svg);
-    yt.textContent = 'Spending per month →';
-
-    // Break-even: on this line, a quarter spent exactly what came in.
-    el('line', { x1: x(min), y1: y(min), x2: x(max), y2: y(max), class: 'ins-diag' }, svg);
-    const dl = el('text', { x: x(max) - 4, y: y(max) + 14, 'text-anchor': 'end', class: 'ins-avg-label ins-muted' }, svg);
-    dl.textContent = 'Spend = income';
-
+    const side = Math.max(160, Math.min(host.clientWidth - pad.l - pad.r, 520));
+    const box = canvasBox(host, side + pad.t + pad.b);
     // The fitted line, across the income range actually observed.
     const iLo = Math.min(...pts.map((p) => p.income));
     const iHi = Math.max(...pts.map((p) => p.income));
     const fy = (i) => b.alpha + b.beta * i;
-    el('line', { x1: x(iLo), y1: y(fy(iLo)), x2: x(iHi), y2: y(fy(iHi)), class: 'ins-fit' }, svg);
-    const fl = el('text', { x: x(iHi) + 8, y: y(fy(iHi)) + 4, 'text-anchor': 'start', class: 'ins-avg-label' }, svg);
-    fl.textContent = `β ${b.beta.toFixed(2)}`;
 
-    // Older periods lighter, newer darker: one hue, so recency reads as order.
-    const dots = el('g', { class: 'ins-bdots' }, svg);
-    pts.forEach((p, i) => {
-      const op = 0.3 + 0.7 * (pts.length > 1 ? i / (pts.length - 1) : 1);
-      el('circle', { cx: x(p.income), cy: y(p.spend), r: 5, 'fill-opacity': op.toFixed(2) }, dots);
+    EChartKit.mount(box, (t) => {
+      const color = insColor(host, 'pos') || t.primary;
+      const axis = (name, rotate) => ({
+        ...EChartKit.valueAxis(t, ticks, moneyRound),
+        name,
+        nameLocation: 'middle',
+        nameGap: rotate ? 56 : 30,
+        nameRotate: rotate ? 90 : 0,
+        nameTextStyle: { color: t.textSecondary, fontFamily: t.font, fontSize: 12 },
+      });
+      return {
+        grid: { left: pad.l, top: pad.t, width: side, height: side },
+        tooltip: EChartKit.tooltip(t, {
+          trigger: 'item',
+          formatter: (p) => {
+            const v = pts[p.dataIndex];
+            if (!v || p.seriesIndex !== 0) return '';
+            const kept = v.income - v.spend;
+            return EChartKit.tipHtml({
+              title: `3 months to ${ymLabel(v.ym)}`,
+              rows: [
+                { name: 'Income', value: `${money(v.income)} / mo` },
+                { name: 'Spending', value: `${money(v.spend)} / mo` },
+                { name: kept >= 0 ? 'Kept' : 'Overspent', value: `${money(Math.abs(kept))} / mo` },
+              ],
+            });
+          },
+        }),
+        xAxis: axis('Income per month →', false),
+        yAxis: axis('Spending per month →', true),
+        series: [
+          {
+            // Older periods lighter, newer darker: one hue, so recency reads as order.
+            type: 'scatter',
+            symbolSize: 10,
+            z: 3,
+            data: pts.map((p, i) => ({
+              value: [p.income, p.spend],
+              itemStyle: {
+                color,
+                opacity: 0.3 + 0.7 * (pts.length > 1 ? i / (pts.length - 1) : 1),
+                borderColor: t.bgContainer,
+                borderWidth: 2,
+              },
+            })),
+            // Break-even: on this line, a quarter spent exactly what came in.
+            markLine: {
+              silent: true,
+              symbol: 'none',
+              lineStyle: refLine(t),
+              label: { position: 'insideEndBottom', formatter: 'Spend = income', color: t.textTertiary, fontFamily: t.font, fontSize: 12 },
+              data: [[{ coord: [min, min] }, { coord: [max, max] }]],
+            },
+          },
+          {
+            type: 'line',
+            silent: true,
+            symbol: 'none',
+            color,
+            lineStyle: { width: 2 },
+            data: [[iLo, fy(iLo)], [iHi, fy(iHi)]],
+            endLabel: {
+              show: true,
+              formatter: `β ${b.beta.toFixed(2)}`,
+              color: t.text,
+              fontFamily: t.font,
+              fontSize: 12,
+              fontWeight: 600,
+            },
+          },
+        ],
+      };
+    }, {
+      label: `Scatter of ${pts.length} rolling 3-month periods, income against spending. Fitted beta ${b.beta}.`,
     });
-
-    const tip = tooltip(host);
-    const ring = el('circle', { r: 7, class: 'ins-dot-hi', visibility: 'hidden' }, svg);
-    svg.addEventListener('pointermove', (e) => {
-      const r = svg.getBoundingClientRect();
-      const px = e.clientX - r.left;
-      const py = e.clientY - r.top;
-      let best = null;
-      let bd = Infinity;
-      for (const p of pts) {
-        const dd = Math.hypot(x(p.income) - px, y(p.spend) - py);
-        if (dd < bd) { bd = dd; best = p; }
-      }
-      if (!best || bd > 24) { tip.hide(); ring.setAttribute('visibility', 'hidden'); return; }
-      ring.setAttribute('cx', x(best.income));
-      ring.setAttribute('cy', y(best.spend));
-      ring.setAttribute('visibility', 'visible');
-      const kept = best.income - best.spend;
-      tip.show(`<strong>3 months to ${ymLabel(best.ym)}</strong>
-        <span>Income ${money(best.income)} / mo</span>
-        <span>Spending ${money(best.spend)} / mo</span>
-        <span>${kept >= 0 ? 'Kept' : 'Overspent'} ${money(Math.abs(kept))} / mo</span>`, x(best.income), y(best.spend));
-    });
-    svg.addEventListener('pointerleave', () => { tip.hide(); ring.setAttribute('visibility', 'hidden'); });
   }
 
   function renderBetaCats(b) {

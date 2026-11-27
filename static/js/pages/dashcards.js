@@ -33,18 +33,18 @@
 // The widget list's schematic of each type is THUMBS, below.
 //
 // DRAWN IN ANT DESIGN (ant.css): a figure in Statistic's voice, series chips as
-// CheckableTags, Progress bars, Tags, Alert, Empty. The charts are the app's
-// own engines (widgets/chart.js, donut.js and the two below), in Ant's palette:
-// see Colours.
+// CheckableTags, Progress bars, Tags, Alert, Empty. The charts are Apache
+// ECharts (widgets/echart-kit.js, through chart.js, donut.js and the two
+// below), in the theme's palette: see Colours.
 //
 // EVERY CARD IS DRAWN FOR A BOX, NOT FOR A PAGE. A card is as large as the user
 // sized it on the grid, so each renderer reads ctx.w and ctx.h and decides what
-// fits: the charts take the box's height exactly (FinanceChart's `fit`), and the
+// fits: the charts fill the box's plot area exactly, and the
 // lists show as many rows as there is room for.
 //
 // SECURITY: category, account and merchant names, transaction descriptions and
 // card titles are user-controlled. Every one passes through escapeHtml before it
-// reaches markup, and the chart reading builds its rows with textContent.
+// reaches markup, and the chart tooltips escape theirs (EChartKit.tipHtml).
 
 (function () {
     const MONTHS = DashPeriod.MONTH_NAMES;
@@ -213,9 +213,9 @@
     // for money leaving, the transfer one for money put away, and the
     // categorical hues for categories (Ant.categoryHue, the same hue a
     // category's tag wears in the ledger) and for accounts. All of it is
-    // var() text over the --ant-chart-* tokens (ant.css), which Preferences
-    // re-points; paint() reads the colour it resolves to, because a chart bakes
-    // its colours into SVG attributes, where var() is not read.
+    // var() text over the --ant-chart-* tokens (ant.css), which the theme
+    // re-points; paint() reads the colour it resolves to, because a chart's
+    // canvas cannot read var().
     const COLOR = {
         primary: 'var(--ant-chart-primary)',
         income: 'var(--ant-chart-income)',
@@ -233,19 +233,12 @@
         debt: COLOR.expense,
     };
 
-    let probe = null;
-    /** The colour `color` paints as: var() text is put on a probe element and
-     *  read back; anything else is already a colour. */
+    /** The colour `color` paints as: a var(--token) is resolved by the chart
+     *  kit (echart-kit.js), so the cards and the charts read the theme the
+     *  same way; anything else is already a colour. */
     function paint(color) {
-        if (!String(color).includes('var(')) return color;
-        if (!probe) {
-            probe = document.createElement('span');
-            probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none';
-            document.body.appendChild(probe);
-        }
-        probe.style.color = '';
-        probe.style.color = color;
-        return getComputedStyle(probe).color || color;
+        const token = /^var\((--[\w-]+)\)$/.exec(String(color).trim());
+        return token ? (EChartKit.color(token[1]) || color) : color;
     }
     const catColor = (key) => paint(Ant.categoryHue(key));
 
@@ -303,15 +296,16 @@
     }).join('')}</div>`;
 
     // ─── Chart frame ─────────────────────────────────────────────────────────
-    // The line charts are FinanceChart.buildLine (widgets/chart.js), the
-    // renderer every line chart in the app shares; `fit` makes one take its
-    // card's height exactly. The column chart below shares its frame (pad,
-    // dashed grid, nice-tick axis, label type) so a card of each reads as one
-    // family; dashboard.css gives all of them G2's axis chrome.
-    const CHART_PAD = { l: 56, r: 20, t: 18, b: 30 };
+    // Every chart here is Apache ECharts (widgets/echart-kit.js): the line,
+    // Net Worth (large area) and Spending cards through FinanceChart
+    // (widgets/chart.js), the ring through
+    // DonutChart, and Savings Rate and Balance Forecast below. Each fills its
+    // card's plot box, so a card's chart is as tall as the user sized it, and
+    // all of them share the kit's frame (dashed grid, axis labels, tooltip).
+    const GRID = { left: 0, right: 16, top: 16, bottom: 0, containLabel: true };
 
-    const lineChart = (series, slots, W, H, animate) =>
-        FinanceChart.buildLine({ series, slots, W, boxH: H, fit: true, animate, centred: true, hover: true });
+    const lineChart = (plot, series, slots, animate) =>
+        FinanceChart.render(plot, { series, slots, centred: true, dots: false, animate });
 
     /** A card's empty state: Ant's Empty, compact, with the action that fills
      *  it where there is one. */
@@ -321,8 +315,7 @@
      *  plot below taking the rest of the height. */
     function chartBody(host, { head = '' } = {}) {
         host.innerHTML = `${head}<div class="dash-plot" data-plot></div>`;
-        const plot = host.querySelector('[data-plot]');
-        return { plot, W: plot.clientWidth, H: plot.clientHeight };
+        return { plot: host.querySelector('[data-plot]') };
     }
 
     /** A card's headline figure over a muted line, in Statistic's voice. Both
@@ -464,7 +457,7 @@
             <span class="dash-legend-value">${escapeHtml(r.valueText)}</span>
             <span class="dash-legend-share">${(r.share * 100).toFixed(0)}%</span></a>`).join('')}</div>`;
 
-    function renderRing(host, ctx, { slices, centerLabel, centerValue, linkHint }) {
+    function renderRing(host, ctx, { slices, centerLabel, centerValue, linkHint, rounded = false }) {
         const total = slices.reduce((s, x) => s + x.value, 0);
         const side = ctx.w >= 380;
         const legend = legendHtml(slices.map((s) => ({
@@ -476,11 +469,7 @@
             ring.remove();
             return;
         }
-        DonutChart.render(ring, { slices, centerLabel, centerValue, linkHint, animate: Boolean(ctx.animate) });
-        // The figure in the hole, as large as fits it (donut.js draws a 280
-        // unit ring whose hole is about 200 across).
-        const value = ring.querySelector('.donut-center-value');
-        if (value) value.style.fontSize = `${Math.round(Math.min(30, 170 / (Math.max(centerValue.length, 4) * 0.6)))}px`;
+        DonutChart.render(ring, { slices, centerLabel, centerValue, linkHint, rounded, animate: Boolean(ctx.animate) });
     }
 
     // The ring's slices are Balance Sheet totals per account type, so its
@@ -519,7 +508,8 @@
         }
         // Assets minus debt at the shown month: Net Worth's sign convention.
         const net = raw.reduce((t, s) => t + s.signed, 0);
-        renderRing(host, ctx, { slices, centerLabel: 'Net', centerValue: fmtValue(net), linkHint: 'open the Balance Sheet' });
+        // ECharts' Doughnut Chart with Rounded Corner (donut.js `rounded`).
+        renderRing(host, ctx, { slices, centerLabel: 'Net', centerValue: fmtValue(net), linkHint: 'open the Balance Sheet', rounded: true });
     }
 
     // The ring keeps its biggest categories and folds the rest into one slice,
@@ -575,8 +565,8 @@
             host.innerHTML = empty(`Nothing in ${period.label}`, ADD_TRANSACTIONS);
             return;
         }
-        const { plot, W, H } = chartBody(host);
-        plot.innerHTML = FinanceChart.buildStacked({ series, slots, W, boxH: H, fit: true, animate: ctx.animate }) || '';
+        const { plot } = chartBody(host);
+        FinanceChart.renderStacked(plot, { series, slots, animate: ctx.animate });
     }
 
     // ─── Lists ───────────────────────────────────────────────────────────────
@@ -677,62 +667,72 @@
     }
 
     /** One column per month, the goal as a dashed rule across them, labelled
-     *  at its right end. A month that met the goal is the info blue; one that
-     *  fell short is the same blue at half strength. A month with no income has
-     *  no rate and draws no column. */
-    function buildRateChartSVG({ months, W, H, animate, goal }) {
-        const { l: PL, r: PR, t: PT, b: PB } = CHART_PAD;
-        const f2 = (n) => Math.round(n * 100) / 100;
+     *  at its right end. A month that met the goal is the transfer colour; one
+     *  that fell short is the same colour at half strength. A month with no
+     *  income has no rate and draws no column. */
+    function rateChart(plot, { months, goal, animate }) {
         const rates = months.filter((m) => m.rate !== null).map((m) => m.rate);
         const ticks = ChartMath.niceTicks(Math.min(0, ...rates), Math.max(goal * 1.25, ...rates), 4);
-        const lo = ticks[0], hi = ticks[ticks.length - 1];
-        const CH = Math.max(20, H - PT - PB);
-        const y = (v) => PT + CH - ((v - lo) / ((hi - lo) || 1)) * CH;
-        const slotW = (W - PL - PR) / months.length;
-        const barW = Math.min(slotW * 0.6, 40);
-        const color = paint(COLOR.transfer);
-        const y0 = y(0);
-
-        let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" class="dashboard-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">`;
-        for (const v of ticks) {
-            svg += `<line class="chart-grid" x1="${PL}" y1="${f2(y(v))}" x2="${W - PR}" y2="${f2(y(v))}"/>`;
-            svg += `<text class="chart-label" x="${PL - 10}" y="${f2(y(v))}" text-anchor="end" dominant-baseline="middle">${Math.round(v * 100)}%</text>`;
-        }
-        // Month labels thin out to every second, third... month as columns
-        // narrow, counted back from the last month so it is always labelled.
-        const every = Math.max(1, Math.ceil(36 / slotW));
-        const last = months.length - 1;
-        months.forEach((m, i) => {
-            const cx = PL + slotW * (i + 0.5);
-            if (m.rate !== null) {
-                const top = Math.min(y(m.rate), y0), h = Math.abs(y0 - y(m.rate));
-                const r = m.rate > 0 ? Math.min(3, barW / 2, h) : 0;
-                const x = cx - barW / 2;
-                const d = `M ${f2(x)} ${f2(top + h)} L ${f2(x)} ${f2(top + r)} Q ${f2(x)} ${f2(top)} ${f2(x + r)} ${f2(top)}`
-                        + ` L ${f2(x + barW - r)} ${f2(top)} Q ${f2(x + barW)} ${f2(top)} ${f2(x + barW)} ${f2(top + r)} L ${f2(x + barW)} ${f2(top + h)} Z`;
-                const met = m.rate >= goal;
-                const tip = `${MONTHS[m.slot.monthIdx]} ${m.slot.year}: ${pctText(m.rate)}, ${fmtValue(m.transfers)} of ${fmtValue(m.income)}${met ? '' : ', under the goal'}`;
-                svg += `<path class="chart-bar" d="${d}" fill="${color}"${met ? '' : ' fill-opacity="0.5"'} style="animation-delay:${i * 50}ms"><title>${escapeHtml(tip)}</title></path>`;
-            }
-            if ((last - i) % every === 0) {
-                svg += `<text class="chart-label" x="${f2(cx)}" y="${H - PB + 18}" text-anchor="middle">${MONTHS_ABBR[m.slot.monthIdx]}</text>`;
-            }
-        });
-        svg += `<line class="chart-goal" x1="${PL}" y1="${f2(y(goal))}" x2="${W - PR}" y2="${f2(y(goal))}"><title>Goal: ${goalText(goal)}</title></line>`;
-        svg += `<text class="chart-goal-label" x="${W - PR}" y="${f2(y(goal) - 6)}" text-anchor="end">Goal ${goalText(goal)}</text>`;
-        return `${svg}</svg>`;
+        const labels = months.map((m) => MONTHS_ABBR[m.slot.monthIdx]);
+        EChartKit.mount(plot, (t) => {
+            const color = paint(COLOR.transfer);
+            return {
+                grid: GRID,
+                tooltip: EChartKit.tooltip(t, {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow', shadowStyle: { color: EChartKit.alpha(t.text, 0.04) } },
+                    formatter: (params) => {
+                        const m = months[params[0].dataIndex];
+                        const title = `${MONTHS[m.slot.monthIdx]} ${m.slot.year}`;
+                        if (m.rate === null) return EChartKit.tipHtml({ title, note: 'No income this month' });
+                        return EChartKit.tipHtml({
+                            title,
+                            rows: [
+                                { color, name: 'Saved', value: pctText(m.rate) },
+                                { name: 'Put away', value: fmtValue(m.transfers) },
+                                { name: 'Income', value: fmtValue(m.income) },
+                            ],
+                            note: m.rate >= goal ? '' : `Under the ${goalText(goal)} goal`,
+                        });
+                    },
+                }),
+                xAxis: EChartKit.categoryAxis(t, labels),
+                yAxis: EChartKit.valueAxis(t, ticks, (v) => `${Math.round(v * 100)}%`),
+                series: [{
+                    type: 'bar',
+                    barMaxWidth: 40,
+                    data: months.map((m) => (m.rate === null ? null : {
+                        value: m.rate,
+                        itemStyle: {
+                            color: m.rate >= goal ? color : EChartKit.alpha(color, 0.5),
+                            borderRadius: m.rate > 0 ? [3, 3, 0, 0] : 0,
+                        },
+                    })),
+                    markLine: {
+                        silent: true,
+                        symbol: 'none',
+                        lineStyle: { color: t.textSecondary, type: [4, 4], width: 1 },
+                        label: {
+                            position: 'insideEndTop',
+                            formatter: `Goal ${goalText(goal)}`,
+                            color: t.textSecondary,
+                            fontFamily: t.font,
+                            fontSize: t.fontSize,
+                        },
+                        data: [{ yAxis: goal }],
+                    },
+                }],
+            };
+        }, { animate });
     }
 
     // ─── Balance Forecast ────────────────────────────────────────────────────
     // The Reports forecast in miniature (widgets/forecast.js carries the
     // reasoning): recorded weekly balances to the left of today, the projection
     // to its right, one hue told apart by weight, solid over a filled area for
-    // the past and dashed for the future.
-    let forecastSeq = 0;
-
-    function buildForecastSVG(d, W, H, animate) {
-        const f2 = (n) => Math.round(n * 100) / 100;
-        const { l: PL, r: PR, t: PT, b: PB } = CHART_PAD;
+    // the past and dashed for the future. A week below zero is marked in the
+    // expense colour.
+    function forecastChart(plot, d, animate) {
         const anchor = d.anchor || { date: d.series[0].weekStart, balance: d.series[0].balance };
         const anchorPt = { date: anchor.date, balance: anchor.balance, anchor: true };
         const past = [...(d.history || []).map((h) => ({ date: h.weekEnd, balance: h.balance, label: h.label })), anchorPt];
@@ -744,62 +744,71 @@
         const lo = Math.min(...values), hi = Math.max(...values);
         const span = (hi - lo) || Math.abs(hi) || 1;
         const ticks = ChartMath.niceTicks(lo <= 0 || lo < span * 0.5 ? Math.min(0, lo) : lo, Math.max(0, hi), 4);
-        const minV = ticks[0], maxV = ticks[ticks.length - 1];
-
         const domain = d.domain || { start: past[0].date, end: future[future.length - 1].date };
-        const day0 = isoDay(domain.start);
-        const days = Math.max(1, isoDay(domain.end) - day0);
-        const CW = W - PL - PR, CH = Math.max(20, H - PT - PB);
-        const x = (iso) => PL + ((isoDay(iso) - day0) / days) * CW;
-        const y = (v) => PT + CH - ((v - minV) / ((maxV - minV) || 1)) * CH;
-        const baseY = PT + CH;
-        const color = paint(COLOR.primary);
-        const negColor = paint(COLOR.expense);
-        const id = `dash-fc-${++forecastSeq}`;
+        const ms = (iso) => isoDay(iso) * 86400000;
+        const tip = (p) => (p.anchor ? `Today: ${fmtValue(p.balance)}`
+            : `${p.projected ? 'Projected week' : 'Week'} of ${p.label}: ${fmtValue(p.balance)}`);
 
-        let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" class="dashboard-chart dash-forecast-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">
-            <defs>
-                <linearGradient id="${id}-past" gradientUnits="userSpaceOnUse" x1="0" y1="${PT}" x2="0" y2="${baseY}">
-                    <stop offset="0%" stop-color="${color}" stop-opacity="0.24"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
-                </linearGradient>
-                <linearGradient id="${id}-next" gradientUnits="userSpaceOnUse" x1="0" y1="${PT}" x2="0" y2="${baseY}">
-                    <stop offset="0%" stop-color="${color}" stop-opacity="0.12"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
-                </linearGradient>
-            </defs>`;
-        const fmtAxis = axisFormatter(ticks);
-        for (const v of ticks) {
-            svg += `<line class="chart-grid" x1="${PL}" y1="${f2(y(v))}" x2="${W - PR}" y2="${f2(y(v))}"/>`;
-            svg += `<text class="chart-label" x="${PL - 10}" y="${f2(y(v))}" text-anchor="end" dominant-baseline="middle">${escapeHtml(fmtAxis(v))}</text>`;
-        }
-        if (minV < 0 && maxV > 0) svg += `<line class="chart-zero" x1="${PL}" y1="${f2(y(0))}" x2="${W - PR}" y2="${f2(y(0))}"/>`;
-
-        const todayX = f2(x(anchor.date));
-        svg += `<line class="dash-fc-today" x1="${todayX}" y1="${PT}" x2="${todayX}" y2="${baseY}"/>`;
-        const labelY = baseY + 18;
-        svg += `<text class="chart-label" x="${PL}" y="${labelY}" text-anchor="start">${escapeHtml(fmtShortDate(domain.start))}</text>`;
-        svg += `<text class="chart-label dash-fc-today-label" x="${todayX}" y="${labelY}" text-anchor="middle">Today</text>`;
-        svg += `<text class="chart-label" x="${W - PR}" y="${labelY}" text-anchor="end">${escapeHtml(fmtShortDate(domain.end))}</text>`;
-
-        const half = (pts, projected) => {
-            if (pts.length < 2) return '';
-            const xy = pts.map((p) => ({ x: x(p.date), y: y(p.balance) }));
-            const line = ChartMath.smoothPath(xy);
-            const area = `${line} L ${f2(xy[xy.length - 1].x)} ${baseY} L ${f2(xy[0].x)} ${baseY} Z`;
-            return `<path class="dash-fc-area" d="${area}" fill="url(#${id}-${projected ? 'next' : 'past'})"/>
-                <path class="${projected ? 'dash-fc-projected' : 'dash-fc-actual'}" d="${line}"${projected ? '' : ' pathLength="1"'}
-                    fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
-        };
-        svg += half(past, false) + half(future, true);
-
-        // A dot per week, read through its tooltip, the way the report's are.
-        const dot = (p) => {
-            const tip = p.anchor ? `Today: ${fmtValue(p.balance)}`
-                : `${p.projected ? 'Projected week' : 'Week'} of ${p.label}: ${fmtValue(p.balance)}`;
-            const cls = `chart-dot dash-fc-dot${p.anchor ? ' is-anchor' : ''}${p.projected ? ' is-projected' : ''}${p.balance < 0 ? ' is-neg' : ''}`;
-            return `<circle class="${cls}" cx="${f2(x(p.date))}" cy="${f2(y(p.balance))}" r="3" fill="${p.balance < 0 ? negColor : color}"><title>${escapeHtml(tip)}</title></circle>`;
-        };
-        svg += [...past, ...future.slice(1)].map(dot).join('');
-        return `${svg}</svg>`;
+        EChartKit.mount(plot, (t) => {
+            const color = paint(COLOR.primary);
+            const negColor = paint(COLOR.expense);
+            const point = (p) => ({
+                value: [ms(p.date), p.balance],
+                tip: tip(p),
+                itemStyle: { color: p.balance < 0 ? negColor : color, opacity: p.projected ? 0.6 : 1 },
+            });
+            const half = (pts, projected) => ({
+                type: 'line',
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                color,
+                lineStyle: { width: 2, type: projected ? [6, 4] : 'solid' },
+                areaStyle: {
+                    origin: 'start',
+                    color: {
+                        type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                        colorStops: [
+                            { offset: 0, color: EChartKit.alpha(color, projected ? 0.12 : 0.24) },
+                            { offset: 1, color: EChartKit.alpha(color, 0.02) },
+                        ],
+                    },
+                },
+                data: pts.map(point),
+            });
+            const pastSeries = half(past, false);
+            pastSeries.markLine = {
+                silent: true,
+                symbol: 'none',
+                lineStyle: { color: t.textTertiary, type: [3, 3], width: 1 },
+                label: { position: 'end', formatter: 'Today', color: t.textSecondary, fontFamily: t.font, fontSize: t.fontSize },
+                data: [{ xAxis: ms(anchor.date) }],
+            };
+            return {
+                // The dates are whole UTC days (isoDay), so the axis ticks on
+                // UTC day boundaries too.
+                useUTC: true,
+                grid: { ...GRID, top: 22, bottom: 4 },
+                tooltip: EChartKit.tooltip(t, {
+                    trigger: 'item',
+                    formatter: (p) => EChartKit.tipHtml({ rows: [{ color: p.color, name: p.data.tip, value: '' }] }),
+                }),
+                xAxis: {
+                    type: 'time',
+                    min: ms(domain.start),
+                    max: ms(domain.end),
+                    axisLine: { lineStyle: { color: t.borderSecondary } },
+                    axisTick: { show: false },
+                    splitLine: { show: false },
+                    axisLabel: EChartKit.axisLabel(t, {
+                        hideOverlap: true,
+                        formatter: (v) => fmtShortDate(new Date(v).toISOString().slice(0, 10)),
+                    }),
+                },
+                yAxis: EChartKit.valueAxis(t, ticks, axisFormatter(ticks)),
+                series: [pastSeries, half(future, true)],
+            };
+        }, { animate });
     }
 
     // ─── Upcoming Bills ──────────────────────────────────────────────────────
@@ -859,8 +868,13 @@
                 // A card sized down to a tile is the figure alone.
                 if (ctx.h < 150) { host.innerHTML = head; return; }
                 if (points.length === 0) { host.innerHTML = head + empty('Nothing in this range'); return; }
-                const { plot, W, H } = chartBody(host, { head });
-                plot.innerHTML = lineChart([{ label: 'Net Worth', color: paint(COLOR.primary), points }], slotsOf(ctx.period), W, H, ctx.animate) || '';
+                const { plot } = chartBody(host, { head });
+                FinanceChart.renderArea(plot, {
+                    series: [{ label: 'Net Worth', color: paint(COLOR.primary), points }],
+                    slots: slotsOf(ctx.period),
+                    centred: true,
+                    animate: ctx.animate,
+                });
             },
         },
 
@@ -916,8 +930,8 @@
                     label: c.label, color: colors.get(c.key), points: inSlots(columnPoints(data, c.key), slots),
                 }));
                 if (!series.some((s) => s.points.length)) { host.innerHTML = chips + empty('Nothing in this range'); return; }
-                const { plot, W, H } = chartBody(host, { head: chips });
-                plot.innerHTML = lineChart(series, slots, W, H, ctx.animate) || '';
+                const { plot } = chartBody(host, { head: chips });
+                lineChart(plot, series, slots, ctx.animate);
             },
         },
 
@@ -943,8 +957,8 @@
                 const visible = all.filter((s) => !hidden.has(s.label)).map((s) => ({ ...s, points: inSlots(s.points, slots) }));
                 if (visible.length === 0) { host.innerHTML = chips + empty('Nothing selected'); return; }
                 if (!visible.some((s) => s.points.length)) { host.innerHTML = chips + empty('Nothing in this range'); return; }
-                const { plot, W, H } = chartBody(host, { head: chips });
-                plot.innerHTML = lineChart(visible, slots, W, H, ctx.animate) || '';
+                const { plot } = chartBody(host, { head: chips });
+                lineChart(plot, visible, slots, ctx.animate);
             },
         },
 
@@ -1082,8 +1096,8 @@
                     `Goal ${escapeHtml(goalText(goal))} · ${escapeHtml(fmtValue(transfers))} put away`);
                 // A single month, or a card sized down to a tile, is the figure alone.
                 if (months.length === 1 || ctx.h < 150) { host.innerHTML = head; return; }
-                const { plot, W, H } = chartBody(host, { head });
-                plot.innerHTML = buildRateChartSVG({ months, W, H, animate: ctx.animate, goal });
+                const { plot } = chartBody(host, { head });
+                rateChart(plot, { months, goal, animate: ctx.animate });
             },
         },
 
@@ -1264,8 +1278,8 @@
                     </div>`;
                 }
                 if (ctx.h < 150) { host.innerHTML = head; return; }
-                const { plot, W, H } = chartBody(host, { head });
-                plot.innerHTML = buildForecastSVG(d, W, H, ctx.animate);
+                const { plot } = chartBody(host, { head });
+                forecastChart(plot, d, ctx.animate);
             },
         },
     };

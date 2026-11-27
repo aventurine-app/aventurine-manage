@@ -508,8 +508,8 @@ app.whenReady().then(async () => {
       await nav('/', 3200);
       const filled = await js(`(() => ({
         cashflow: !!document.querySelector('.dash-card[data-type="cashflow"] .dash-cf-row'),
-        spending: !!document.querySelector('.dash-card[data-type="spending"] .dash-card-body svg'),
-        snapshot: !!document.querySelector('.dash-card[data-type="balances"] .accounts-pie-svg'),
+        spending: !!document.querySelector('.dash-card[data-type="spending"] .dash-plot canvas'),
+        snapshot: !!document.querySelector('.dash-card[data-type="balances"] .dash-donut-ring canvas'),
       }))()`);
       if (!filled.cashflow || !filled.spending || !filled.snapshot) {
         throw new Error('month cards did not render data: ' + JSON.stringify(filled));

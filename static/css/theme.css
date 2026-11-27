@@ -168,16 +168,18 @@
 .settings-theme-swatch[data-theme="light"] {
     /* AntV's categorical palette, for series that are identities rather than
        meanings, such as a portfolio's holdings and accounts. Ant draws it
-       unchanged on light and dark. */
+       unchanged on light and dark. In G2's own order (category10 in
+       @antv/g2 src/theme/light.ts), which is the order Ant Design Charts
+       hands a chart's series their colours in. */
     --ant-chart-1: #1783ff;
     --ant-chart-2: #00c9c9;
-    --ant-chart-3: #7863ff;
-    --ant-chart-4: #f0884d;
-    --ant-chart-5: #60c42d;
-    --ant-chart-6: #d580ff;
-    --ant-chart-7: #2491b3;
-    --ant-chart-8: #bd8f24;
-    --ant-chart-9: #ff80ca;
+    --ant-chart-3: #f0884d;
+    --ant-chart-4: #d580ff;
+    --ant-chart-5: #7863ff;
+    --ant-chart-6: #60c42d;
+    --ant-chart-7: #bd8f24;
+    --ant-chart-8: #ff80ca;
+    --ant-chart-9: #2491b3;
     --ant-chart-10: #17c76f;
 
     /* The hues a category takes once the ten above are spoken for (ant.js

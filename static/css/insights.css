@@ -1,8 +1,9 @@
 /* ============================================================================
    insights.css — Reports → Inflation and Reports → Lifestyle Beta.
    Controller: static/js/pages/insights.js. The cards, tags and statistics are
-   ant.css; the tab shell and page padding are forecast.css. Every chart colour
-   is a custom property, so a theme flip restyles the SVG without a redraw.
+   ant.css; the tab shell and page padding are forecast.css. The charts are
+   Apache ECharts (insights.js), coloured from the --ins-* tokens below and the
+   theme's own, so a theme flip recolours them.
    ============================================================================ */
 
 .ins-page {
@@ -307,81 +308,5 @@
 
 /* ─── Plots ────────────────────────────────────────────────────────────────── */
 .ins-plot { position: relative; width: 100%; }
-.ins-svg { display: block; overflow: visible; }
-.ins-grid line { stroke: var(--ant-color-border-secondary); stroke-width: 1; }
-.ins-axis, .ins-axis-title {
-    fill: var(--ant-color-text-secondary);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-}
-.ins-axis-title { font-size: 12px; }
-.ins-axis-year { fill: var(--ant-color-text); font-weight: 600; }
-/* A merchant's two comparison windows, and the visits that fall between them. */
-.ins-window { fill: var(--ant-color-fill-tertiary); }
-.ins-dots circle.ins-dot-out { fill-opacity: 0.25; }
 
-.ins-dots circle {
-    fill: var(--ant-color-text-secondary);
-    fill-opacity: 0.7;
-    stroke: var(--ant-color-bg-container);
-    stroke-width: 1.5;
-}
-.ins-bdots circle {
-    fill: var(--ins-pos);
-    stroke: var(--ant-color-bg-container);
-    stroke-width: 2;
-}
-.ins-dot-hi {
-    fill: none;
-    stroke: var(--ant-color-text);
-    stroke-width: 2;
-    pointer-events: none;
-}
-.ins-avg { stroke-width: 2.5; stroke-linecap: round; }
-.ins-avg-early { stroke: var(--ant-color-text); }
-.ins-stroke-up   { stroke: var(--ins-up); }
-.ins-stroke-down { stroke: var(--ins-down); }
-.ins-stroke-flat { stroke: var(--ins-flat); }
-.ins-avg-label {
-    fill: var(--ant-color-text);
-    font-size: 12px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    paint-order: stroke;
-    stroke: var(--ant-color-bg-container);
-    stroke-width: 3px;
-    stroke-linejoin: round;
-}
-.ins-avg-label.ins-muted { fill: var(--ant-color-text-tertiary); font-weight: normal; }
-/* The Personal Price Index line: the theme's blue in both directions. */
-.ins-trend { fill: none; stroke: var(--ins-index); stroke-width: 2.5; stroke-linecap: round; }
-.ins-trend-end { fill: var(--ins-index); stroke: var(--ant-color-bg-container); stroke-width: 2; }
-.ins-guide { stroke: var(--ant-color-border); stroke-width: 1; pointer-events: none; }
-.ins-diag {
-    stroke: var(--ant-color-text-tertiary);
-    stroke-width: 1.5;
-    stroke-dasharray: 6 5;
-}
-.ins-fit {
-    stroke: var(--ins-pos);
-    stroke-width: 2;
-    stroke-linecap: round;
-}
 
-.ins-tip {
-    position: absolute;
-    z-index: 2;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 6px 10px;
-    border-radius: var(--ant-radius, 6px);
-    background: var(--ant-color-bg-elevated, var(--ant-color-bg-container));
-    box-shadow: var(--ant-box-shadow-secondary, 0 6px 16px rgba(0, 0, 0, 0.12));
-    color: var(--ant-color-text-secondary);
-    font-size: var(--ant-font-size-sm);
-    white-space: nowrap;
-    pointer-events: none;
-}
-.ins-tip[hidden] { display: none; }
-.ins-tip strong { color: var(--ant-color-text); font-variant-numeric: tabular-nums; }

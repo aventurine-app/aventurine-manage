@@ -695,7 +695,7 @@ html[data-theme="dark"] .avatar-circle-9 { background: #351b02; color: #f2b664; 
     .ui-toast { transition: opacity 0.18s ease; transform: translate(-50%, 0); }
 }
 
-/* A chart's entrance, held until the chart is on screen (UI.observeChart).
+/* A Dashboard card's entrance, held until it is on screen (dashboard.js).
    Inserting a large chart costs the browser a long first frame (style, layout
    and paint for every node), and an animation that started at insertion spent
    that frame running unseen: it arrived part-way through, or already finished.

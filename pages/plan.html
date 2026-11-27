@@ -5,6 +5,7 @@
     <title>Aventurine Manage | Plan</title>
     <!-- @include head -->
     <link rel="stylesheet" href="/static/css/ant.css">
+    <link rel="stylesheet" href="/static/css/echart.css">
     <!-- The Plan section (Aventurine Planner): its tokens and form controls,
          its own small parts, each surface, then the page's layout. -->
     <link rel="stylesheet" href="/static/css/plan/base.css">
@@ -61,6 +62,11 @@
 
     <!-- @include scripts -->
     <script src="/static/js/widgets/ant.js"></script>
+    <!-- Apache ECharts and the app's chart kit, which draw the Plan section's
+         charts, the scrubber and the PDF report's figures
+         (vendor/echarts/README.md). -->
+    <script src="/static/js/vendor/echarts/echarts.min.js"></script>
+    <script src="/static/js/widgets/echart-kit.js"></script>
     <!-- The Plan section. Order is load-bearing: each script attaches its
          globals to window and may use only what loaded above it. -->
     <script src="/static/js/plan/prefs.js"></script>

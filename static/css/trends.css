@@ -15,7 +15,6 @@
     gap: 16px;
 }
 
-#trends-chart { width: 100%; }
 
 /* ─── Chart + rail ────────────────────────────────────────────────────────────
    One row, fixed two columns folding to one — never auto-fit, which sizes by
@@ -42,6 +41,28 @@
 /* A grid item refuses to shrink below its content without this, which would
    turn the fill into a one-way ratchet on the row height. */
 .trends-body .chart-area { min-height: 0; }
+
+/* The ECharts canvas (spending-echart.js) needs a box with a real height, and
+   it must not set the row height itself, or the chart and the row would keep
+   growing each other. So the chart is laid over the column, and an empty
+   ::before gives the column its minimum height: a quarter of its width,
+   floored at 170px, as .ec-box sizes the other charts (echart.css). When the rail is
+   taller, the row stretches the column and the chart fills it. */
+.trends-body .chart-area {
+    position: relative;
+    container-type: inline-size;
+}
+.trends-body .chart-area::before {
+    content: '';
+    display: block;
+    height: max(170px, 25cqw);
+}
+#trends-chart {
+    position: absolute;
+    inset: 0;
+}
+/* The empty state is in the flow and sets the height itself. */
+.trends-body .chart-area:has(#trends-empty:not(:empty))::before { display: none; }
 @media (max-width: 1100px) {
     .trends-body { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 }
@@ -301,85 +322,3 @@
 }
 
 
-/* ─── Chart frame chrome (consumed by chart.js' .dashboard-chart SVG) ────────
-   The axis labels and the grid are styled once for every chart on the page
-   (forecast.css); what is here is this file's two forms. */
-.dashboard-chart .chart-zero { stroke: var(--ant-color-text-tertiary); stroke-width: 1; stroke-dasharray: 4 4; opacity: 0.55; }
-
-/* ─── The stacked-area form (FinanceChart.renderArea) ────────────────────────
-   No stroke: a band separated by a line in the card's colour reads as a bordered
-   shape, and on dark that line is near-black across the middle of the chart. The
-   separation is the fill's own gradient instead — every band runs full strength
-   at its top edge and fades toward its bottom, so each boundary is a strong edge
-   against a faint one (see buildAreaSVG in chart.js).
-
-   Slightly transparent at rest and full under the pointer, as G2's area marks
-   sit: the grid reads through the fill, so the chart keeps an axis behind it
-   rather than six blocks of paint, and "which band am I on" is answered by the
-   band lighting up instead of by reading the tooltip. The hover target is the
-   group's clipped hit strips, so the whole band responds wherever the pointer
-   is inside it. */
-.dashboard-chart .chart-band {
-    stroke: none;
-    opacity: 0.7;
-    transition: opacity 0.15s ease;
-    clip-path: inset(0 100% 0 0);
-    animation: chart-band-wipe 0.9s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-}
-.dashboard-chart .chart-band-group:hover .chart-band { opacity: 1; }
-/* The focused band holds that same lifted fill: it is the band being read, and
-   its own hover then changes nothing, which is the correct answer for a band
-   that is already at the front. */
-.dashboard-chart .chart-band-group[data-active="true"] .chart-band { opacity: 1; }
-
-/* The entrance is a left-to-right wipe along the stack's own time axis, the same
-   direction the line form's stroke draws in. Growing the bands upward animated
-   along the VALUE axis instead, which read as the totals changing rather than
-   as the chart arriving. Every band spans the same months, so one clip on each
-   band path reveals the stack together, and the transparent hit strips are
-   left unclipped because they never needed revealing.
-
-   KEEP THIS A CSS clip-path ANIMATION on .chart-band (declared above). Do not
-   "simplify" it back into an SVG <clipPath> element with an animated rect or
-   transform inside, and do not move the clip onto a group. Chromium keeps the
-   animation clock running for that form but does not repaint the shapes the
-   <clipPath> applies to, so the stack sits frozen for the whole entrance and
-   then appears finished. It looks fine in code review and in a static
-   screenshot; it only shows as the Spending chart "skipping" its animation on
-   a range change or a Stacked/Lines switch. To check a change here, capture
-   frames mid-animation (webContents.capturePage at ~150/450/750ms): the
-   revealed area must grow between frames. */
-.dashboard-chart.chart-no-anim .chart-band { animation: none; clip-path: none; }
-@keyframes chart-band-wipe { to { clip-path: inset(0 0 0 0); } }
-
-/* A series the page has stepped back (the rail's focus). !important because
-   every animated mark here ends on an opacity its animation holds with
-   `forwards`, so a plain rule would be overridden by the finished animation
-   rather than by anything in this file. */
-.dashboard-chart [data-dim="true"] { opacity: 0.16 !important; }
-
-/* The per-month hit strips carry the stack's whole reading as a native tooltip;
-   they are transparent and must not eat the cursor's meaning. The ones INSIDE a
-   band point instead: that band is its own name, and clicking it runs the same
-   focus toggle its rail row's name does. */
-.dashboard-chart .chart-hit { cursor: crosshair; }
-.dashboard-chart .chart-band-group .chart-hit { cursor: pointer; }
-
-.dashboard-chart .chart-line {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: chart-draw 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-.dashboard-chart .chart-area-fill, .dashboard-chart .chart-dot { opacity: 0; animation: chart-fade 0.5s ease forwards; }
-.dashboard-chart .chart-dot { transition: r 0.15s ease; }
-.dashboard-chart .chart-dot:hover { r: 5; }
-
-@keyframes chart-draw { to { stroke-dashoffset: 0; } }
-@keyframes chart-fade { to { opacity: 1; } }
-/* The .chart-no-anim opt-out is stated in forecast.css, loaded on this page too. */
-
-@media (prefers-reduced-motion: reduce) {
-    .dashboard-chart .chart-band { animation: none; clip-path: none; }
-    .dashboard-chart .chart-line { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
-    .dashboard-chart .chart-area-fill, .dashboard-chart .chart-dot { animation: none; opacity: 1; }
-}

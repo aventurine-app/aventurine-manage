@@ -61,7 +61,8 @@
     .report-stat-value { font-size: 14pt; font-weight: 600; font-variant-numeric: tabular-nums; }
 
     .report-figure { break-inside: avoid; }
-    .report-chart { display: block; width: 100%; height: auto; }
+    .report-chart { display: block; width: 100%; }
+    .report-chart svg { display: block; width: 100%; height: auto; }
 
     .report-legend {
         display: flex;

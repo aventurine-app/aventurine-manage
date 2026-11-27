@@ -5,14 +5,15 @@
 // of two forms, beside a rail that states every category's window total.
 //
 // Data comes from GET /api/trends (monthly per-category expense sums). Both
-// forms are the shared FinanceChart (chart.js), off the same payload.
+// forms are drawn with Apache ECharts by SpendingChart (spending-echart.js),
+// off the same payload; the stacked form is ECharts' Gradient Stacked Area.
 //
 // TWO FORMS, ONE PAYLOAD. Stacked (the default) answers "what makes up my
 // spending" and gives the card the mass the Cash Flow sankey has; lines answer
 // "did this one category move", which a stack can only show for its bottom
 // band. Neither is a better chart, so the header carries a switch and the
 // choice is remembered in localStorage. Bands stack in the order the payload
-// ranks them (biggest first), so the --cat-* ramp grades MAGNITUDE rather than
+// ranks them (biggest first), so the palette's order grades MAGNITUDE rather than
 // identity — the rule the sankey applies to its own expense side.
 //
 // THE RAIL IS THE LEGEND AND THE TABLE. The row of chips it replaced carried a
@@ -39,7 +40,7 @@
 // the keyboard path, and the swatch stays the only way to hide a category.
 //
 // Globals: apiFetch (api.js), escapeHtml (escape.js), formatCurrency (currency.js),
-// FinanceChart (chart.js), UI (ui.js), Ant (ant.js).
+// SpendingChart (spending-echart.js), UI (ui.js), Ant (ant.js).
 
 (function () {
   const WINDOW_LABELS = { 3: '3 Months', 6: '6 Months', 12: '1 Year', 24: '2 Years', 60: '5 Years' };
@@ -49,8 +50,8 @@
   const FOCUS_EVENT = 'aventurine:category-focus';
   // The rail's swatch colours, published for the Top Merchants card below,
   // whose bars are drawn in the colour of the category each merchant sits in.
-  // Broadcast rather than recomputed there: FinanceChart.colorMap walks the
-  // ramp in the order the trends payload ranks its categories, so a second
+  // Broadcast rather than recomputed there: SpendingChart.colorMap walks the
+  // palette in the order the trends payload ranks its categories, so a second
   // caller over a different window would hand the same category a different
   // hue and the two cards of this tab would disagree about what blue means.
   const COLORS_EVENT = 'aventurine:category-colors';
@@ -73,11 +74,6 @@
     focus: null,     // categoryKey the rail has focused, or null
   };
 
-  const ymToSlot = (ym) => {
-    const [y, m] = ym.split('-').map(Number);
-    return { year: y, monthIdx: m - 1 };
-  };
-
   function readView() {
     try {
       const saved = localStorage.getItem(VIEW_KEY);
@@ -93,8 +89,7 @@
   const totalOf = (c) => Object.values(c.monthly).reduce((a, b) => a + b, 0);
 
   /** Hand the current key -> colour map to whoever else on the tab paints
-   *  categories. Fired on every load and on every theme change, since the
-   *  --cat-* ramp is re-read from the stylesheet each time. */
+   *  categories. Fired on every load and on every theme change. */
   function publishColors() {
     window.dispatchEvent(new CustomEvent(COLORS_EVENT, { detail: { colors: state.colors } }));
   }
@@ -129,10 +124,9 @@
     // focus, so the focus is dropped rather than left pointing at a row that is
     // no longer on the rail.
     if (state.focus && !keys.includes(state.focus)) setFocus(null);
-    // Categorical, not the accent ramp: every band here is a category, and the
-    // rail's swatches use hue as the legend, so the colours need maximum
-    // separation (see chart.js).
-    state.colors = FinanceChart.colorMap(keys, 'categorical');
+    // The current theme's gradient colours (spending-echart.js), so the chart,
+    // the rail's swatches and the Top Merchants bars share one set.
+    state.colors = SpendingChart.colorMap(keys);
     publishColors();
     // The window's own category set decides what "switched off" can mean, so
     // this follows the load rather than only the swatch.
@@ -197,13 +191,9 @@
   /** Focus one category or clear it, from the rail's name or from its own band. */
   function toggleFocus(key) {
     if (!state.enabled) return;
-    // Showing a category adds a band, which is a different chart and has to be
-    // drawn as one. Focus on its own is not: see refocusChart.
-    let shown = false;
     if (state.focus === key) { setFocus(null); } else {
       // Focusing a hidden category shows it: the click asked for that one
       // category, and answering with a chart it isn't drawn on is a refusal.
-      shown = !state.enabled.has(key);
       state.enabled.add(key);
       // Before the focus goes out, or the card below would take a focus on a
       // category it is still excluding and answer with an empty ranking.
@@ -211,7 +201,7 @@
       setFocus(key);
     }
     renderRail();
-    if (shown) renderChart(); else refocusChart();
+    renderChart();
   }
 
   /** Show or hide one category, from the rail's swatch. */
@@ -247,20 +237,13 @@
 
   // ─── Chart ───────────────────────────────────────────────────────────────────
 
-  /** Move the focus on the chart that is already drawn. Focus does not move a
-   *  single point, so redrawing would replay the entrance wipe and read as the
-   *  card reloading in answer to a click that only asked which category to
-   *  look at. Falls back to a full render when there is no drawn chart to
-   *  re-mark, which is the empty state and the frame before the first paint. */
-  function refocusChart() {
-    if (!FinanceChart.setFocus('trends-chart', state.focus)) renderChart();
-  }
-
+  /** Draw the chart, or the empty state in its place. A focus change or a
+   *  category switched on or off is merged into the chart already drawn (see
+   *  spending-echart.js), so it animates rather than redraws from scratch. */
   function renderChart() {
-    const container = document.getElementById('trends-chart');
-    if (!container || !state.data) return;
+    const empty = document.getElementById('trends-empty');
+    if (!empty || !state.data) return;
     const { months, categories } = state.data;
-    const slots = months.map(ymToSlot);
 
     const series = categories
       .filter((c) => state.enabled.has(c.key))
@@ -270,17 +253,12 @@
         color: state.colors.get(c.key),
         dim: Boolean(state.focus) && state.focus !== c.key,
         active: state.focus === c.key,
-        points: months.map((ym, i) => ({
-          year: slots[i].year,
-          monthIdx: slots[i].monthIdx,
-          value: c.monthly[ym] || 0,
-        })),
+        values: months.map((ym) => c.monthly[ym] || 0),
       }));
 
     if (!series.length) {
-      // Clear whichever form is mounted, then take the container over.
-      FinanceChart.render('trends-chart', { series: [], slots: [] });
-      container.innerHTML = categories.length === 0
+      SpendingChart.clear('trends-chart');
+      empty.innerHTML = categories.length === 0
         ? Ant.empty({
             title: 'No spending to chart yet',
             desc: 'Categorize some transactions and Aventurine Manage will chart how your spending shifts over time.',
@@ -293,13 +271,16 @@
           });
       return;
     }
+    empty.innerHTML = '';
 
-    // `fill`: the rail beside the plot is the taller of the two on a narrow
-    // window, and the grid row is as tall as the rail either way — so without
-    // it the chart sat at its width-derived height with a slab of empty card
-    // under its x axis.
-    if (state.view === 'stacked') FinanceChart.renderArea('trends-chart', { series, slots, fill: true });
-    else FinanceChart.render('trends-chart', { series, slots, fill: true });
+    // Clicking a band runs the same focus toggle as its rail name. Stacked only:
+    // in the line form the only mark is a thin line, which is too easy to miss.
+    SpendingChart.render('trends-chart', {
+      view: state.view,
+      months,
+      series,
+      onSeriesClick: state.view === 'stacked' ? toggleFocus : null,
+    });
   }
 
   // ─── Controls ────────────────────────────────────────────────────────────────
@@ -320,9 +301,6 @@
         state.view = view;
         saveView(view);
         renderViewSwitch();
-        // The two forms mount different SVGs into one container, so the old one
-        // is cleared before the new one measures the box.
-        document.getElementById('trends-chart').innerHTML = '';
         renderChart();
       }));
   }
@@ -333,24 +311,6 @@
       if (!ALLOWED_WINDOWS.includes(w)) return;
       state.window = w;
       load();
-    });
-  }
-
-  /** Clicking a band runs its rail name's focus toggle. Delegated to the
-   *  container, which survives every repaint: the chart's SVG is replaced on
-   *  each render and on every resize, so a listener bound to the bands
-   *  themselves would have to be re-bound each time.
-   *
-   *  Stacked only. Both forms stamp data-series, since that is what lets a
-   *  focus change be re-marked rather than redrawn, but only a band is a
-   *  target: the line form's marks are a 2px stroke and the wide transparent
-   *  fill under it, which overlaps every other series' fill, so a click in the
-   *  plot would land on whichever of them happened to be drawn last. */
-  function wireChartClicks() {
-    document.getElementById('trends-chart').addEventListener('click', (e) => {
-      if (state.view !== 'stacked') return;
-      const band = e.target.closest('[data-series]');
-      if (band) toggleFocus(band.dataset.series);
     });
   }
 
@@ -374,10 +334,9 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    if (!document.getElementById('trends-chart')) return;
+    if (!document.getElementById('trends-chart') || !document.getElementById('trends-empty')) return;
     state.view = readView();
     wireViewSwitch();
-    wireChartClicks();
     wireRailWidth();
     wireRangePicker();
     window.addEventListener('currencychange', render);
@@ -388,18 +347,16 @@
       if (key === state.focus) return;
       // Nothing to focus before the first response has built the category set.
       if (key && !state.enabled) return;
-      const shown = Boolean(key) && !state.enabled.has(key);
       setFocus(key, true);
       if (key) { state.enabled.add(key); publishHidden(); }
       renderRail();
-      if (shown) renderChart(); else refocusChart();
+      renderChart();
     });
-    // The --cat-* ramp flips with the theme, and state.colors was resolved from
-    // it back in load() — so re-map before repainting, from the data we already
-    // hold (no round trip).
+    // Each theme has its own category colours (spending-echart.js), so re-map
+    // and repaint from the data already held (no round trip).
     window.addEventListener('themechange', () => {
       if (state.data) {
-        state.colors = FinanceChart.colorMap(state.data.categories.map((c) => c.key), 'categorical');
+        state.colors = SpendingChart.colorMap(state.data.categories.map((c) => c.key));
         publishColors();
       }
       render();

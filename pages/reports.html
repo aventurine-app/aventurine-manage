@@ -5,6 +5,7 @@
     <title>Aventurine Manage | Reports</title>
     <!-- @include head -->
     <link rel="stylesheet" href="/static/css/ant.css">
+    <link rel="stylesheet" href="/static/css/echart.css">
     <link rel="stylesheet" href="/static/css/forecast.css">
     <link rel="stylesheet" href="/static/css/trends.css">
     <link rel="stylesheet" href="/static/css/transfers.css">
@@ -127,7 +128,10 @@
              shape it made, rather than reachable only by hovering the chart. -->
         <div class="ant-card-body trends-body">
             <div class="chart-area">
+                <!-- The chart (ECharts, static/js/widgets/spending-echart.js)
+                     fills this box; the empty state takes its place. -->
                 <div id="trends-chart"></div>
+                <div id="trends-empty"></div>
             </div>
             <div class="trends-rail" id="trends-rail"></div>
         </div>
@@ -215,7 +219,7 @@
 
         <div class="ant-card-body">
             <div class="chart-area">
-                <div id="transfers-chart"></div>
+                <div id="transfers-chart" class="ec-box"></div>
             </div>
         </div>
     </section>
@@ -229,7 +233,7 @@
 
         <div class="ant-card-body">
             <div class="chart-area">
-                <div id="transfers-accounts-chart"></div>
+                <div id="transfers-accounts-chart" class="ec-box"></div>
             </div>
             <div class="tfr-legend" id="transfers-legend"></div>
         </div>
@@ -308,10 +312,10 @@
             <div class="forecast-summary" id="forecast-summary"></div>
 
             <!-- The plot and its pointer overlay (the add-here guide) share this
-                 box; forecast.js sizes the overlay to the SVG it just drew. -->
+                 box; forecast.js sizes the overlay to the chart it just drew. -->
             <div class="chart-area">
                 <div class="forecast-plot" id="forecast-plot">
-                    <div id="forecast-chart"></div>
+                    <div id="forecast-chart" class="ec-box"></div>
                     <div class="fc-overlay" id="forecast-overlay" aria-hidden="true"></div>
                 </div>
             </div>
@@ -503,15 +507,19 @@
          window.MERCHANT_ICONS. -->
     <script src="/static/js/core/merchant-icons.js"></script>
     <script src="/static/js/core/avatar.js"></script>
-    <!-- The shared chart geometry (core/chartmath.js). Per-page rather than in
-         the shared block: only this page and /reports draw charts, so the other
-         four would parse it for nothing. It has no dependencies and must load
-         before any script that draws. -->
+    <!-- The charts: the shared tick maths (core/chartmath.js), Apache ECharts
+         (vendor/echarts/README.md) and the app's chart kit over it
+         (widgets/echart-kit.js), which every chart below draws through.
+         Per-page rather than in the shared block: only the pages that draw
+         charts load them. -->
     <script src="/static/js/core/chartmath.js"></script>
+    <script src="/static/js/vendor/echarts/echarts.min.js"></script>
+    <script src="/static/js/widgets/echart-kit.js"></script>
     <script src="/static/js/pages/reports.js"></script>
     <script src="/static/js/widgets/chart.js"></script>
     <script src="/static/js/widgets/forecast.js"></script>
     <script src="/static/js/widgets/cashflow-sankey.js"></script>
+    <script src="/static/js/widgets/spending-echart.js"></script>
     <script src="/static/js/pages/trends.js"></script>
     <script src="/static/js/pages/topmerchants.js"></script>
     <script src="/static/js/pages/transfers.js"></script>

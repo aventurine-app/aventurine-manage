@@ -1,7 +1,8 @@
 'use strict';
 
 // ─── chart.js ───────────────────────────────────────────────────────────────
-// The charts of Analyze and Compare, drawn as SVG in Ant Design's chart style:
+// The charts of Analyze and Compare, drawn by Apache ECharts through the app's
+// chart kit (widgets/echart-kit.js):
 //
 //   area   stacked bands over time (accounts above zero, debts below) with
 //          lines on top (net worth; or Compare's plans, with no bands)
@@ -9,25 +10,21 @@
 //          line on top (cash flow)
 //
 // Both share the same frame (recessive dashed grid, compact currency ticks,
-// year ticks along the bottom) and the same hover layer: a crosshair, a
-// tooltip listing every series at that point, and onHover(index) so the rest
-// of the app can follow the cursor through time.
+// year ticks along the bottom) and the same hover: an axis pointer, a tooltip
+// listing every series at that point, and onHover(index) so the rest of the
+// app can follow the cursor through time.
 //
-// Colours arrive as CSS custom-property names and are applied as
-// `fill: var(--x)`, so a theme switch recolours a drawn chart with no redraw.
+// Colours arrive as CSS custom-property names (the Plan section's chart
+// tokens, plan/base.css) and are resolved by the kit, which rebuilds the chart
+// when the theme changes.
 
 (function () {
-    const SVG_NS = 'http://www.w3.org/2000/svg';
+    // The plot's margins. Fixed rather than fitted to the labels, so a marker's
+    // x position is known before the chart is drawn (see goalMarks).
     const M = { top: 10, right: 16, bottom: 26, left: 60 };
     // Height of the marker label strip above the plot.
-    const MARKER_STRIP = 18;
-    // A marker's badge: its height (and the side of the square that holds the
-    // target), the target's size, its corner radius, and the padding after
-    // its label.
-    const BADGE_H = 18;
-    const BADGE_ICON = 12;
-    const BADGE_R = 4;
-    const BADGE_PAD = 6;
+    const MARKER_STRIP = 22;
+    const BADGE_PAD = 16;
 
     /** Round tick steps (1, 2, 2.5, 5 × 10^n) covering [lo, hi] in ~5 steps. */
     function niceTicks(lo, hi, count = 5) {
@@ -42,22 +39,56 @@
         return ticks;
     }
 
-    /** The width of a marker label (12px semibold, as .chart-marker-label
-     *  sets it) in the chart's font, measured on a canvas since the chart is
-     *  drawn before it joins the page. */
+    /** The width of a marker label (12px semibold) in the chart's font. */
     let measurer = null;
     function labelWidth(box, text) {
         if (!measurer) measurer = document.createElement('canvas').getContext('2d');
+        if (!measurer) return text.length * 7;
         const weight = getComputedStyle(document.documentElement).getPropertyValue('--font-weight-strong').trim() || '600';
         measurer.font = `${weight} 12px ${getComputedStyle(box).fontFamily}`;
         return measurer.measureText(text).width;
     }
 
-    function el(tag, attrs = {}, parent = null) {
-        const n = document.createElementNS(SVG_NS, tag);
-        for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-        if (parent) parent.appendChild(n);
-        return n;
+    /** The element the chart is drawn into: a box of its own filling `box`,
+     *  shared by PlanChart and PlanSankey so a view switch reuses one chart. */
+    function canvasOf(box) {
+        let canvas = box.querySelector(':scope > .chart-canvas');
+        if (!canvas) {
+            canvas = document.createElement('div');
+            canvas.className = 'chart-canvas';
+            box.prepend(canvas);
+        }
+        return canvas;
+    }
+
+    /** A token name ('--chart-in') as a colour, read off the box. */
+    const colorOf = (box, name, fallback = '') => (name ? EChartKit.color(name, box) : '') || fallback;
+
+    /** The tooltip card's content: who is how old, the title, then a row per
+     *  series. Every string is escaped (plan and module names are the user's). */
+    function tipContent(box, t) {
+        const people = (t.people || []).map((p) => `<div class="chart-tip-person"><span>${escapeHtml(p.name)}</span>${p.age ? `<b>${escapeHtml(p.age)}</b>` : ''}</div>`).join('');
+        return (people ? `<div class="chart-tip-people">${people}</div>` : '')
+            + EChartKit.tipHtml({
+                title: t.title,
+                rows: t.rows.map((r) => ({ color: colorOf(box, r.color || '--chart-grid'), name: r.label, value: r.value, total: r.total })),
+            });
+    }
+
+    /** Which markers keep their label: a label goes right of its rule, else
+     *  left, and is left off where it would cover another or run off the plot
+     *  (the tooltip still names every marker). */
+    function goalMarks(box, markers, X, W) {
+        let end = -Infinity;
+        return [...markers].sort((a, b) => a.i - b.i).map((mk) => {
+            const x = X(mk.i);
+            const w = labelWidth(box, mk.label) + BADGE_PAD;
+            let side = null;
+            if (x >= end + 4 && x + w <= W) side = 'right';
+            else if (x - w >= Math.max(0, end + 4)) side = 'left';
+            if (side) end = side === 'right' ? x + w : x;
+            return { mk, side };
+        });
     }
 
     /**
@@ -69,252 +100,184 @@
      *   opts.bars       bars: [{ label, color, values, sign }]   sign -1 stacks below zero
      *                   (a negative value flips its side too: an overdrawn
      *                   account stacks below zero with the debts)
-     *   opts.gap        bars: px of surface between stacked segments (default 2;
-     *                   0 butts them together with no seam)
      *   opts.line       { label, color, values }
      *   opts.lines      [{ label, color, values }], drawn in order, for more than
      *                   one line (opts.line is the one-line form)
      *   opts.between    shade the gap between the first two lines (Compare)
      *   opts.markers    optional [{ i, label, color, fill }]: a dated event at
      *                   index i (a goal met), drawn as a dashed rule topped with
-     *                   a rounded badge in a strip above the plot: a white target
-     *                   and label on `fill`. `color` and `fill` are custom
-     *                   property names for the rule and the badge (default: the
-     *                   primary colour; `fill` defaults to `color`). A label that would
-     *                   overlap another badge is left off, leaving the target's
-     *                   square; the tooltip still names every marker.
+     *                   a badge in a strip above the plot. `color` and `fill`
+     *                   are custom property names for the rule and the badge.
      *   opts.format     value → axis label
      *   opts.tooltip    index → { people, title, rows: [{ label, color, value, total }] }
-     *                   people: optional [{ name, age }] shown above the title;
-     *                   age is text ('Age 42') or '' when it is not known
      *   opts.onHover    index | null
+     *   opts.label      the chart's accessible name
      */
     function draw(box, opts) {
-        box.querySelector('.chart-svg')?.remove();
-        box.querySelector('.chart-tip')?.remove();
-        const W = box.clientWidth;
-        const H = box.clientHeight;
-        if (W < 60 || H < 60 || opts.count < 2) return;
+        const canvas = canvasOf(box);
+        if (opts.count < 2) { EChartKit.unmount(canvas); return; }
+        const n = opts.count;
+        const bars = opts.kind === 'bars';
         const markers = opts.markers || [];
         const lines = opts.lines || (opts.line ? [opts.line] : []);
-        // Markers get a strip of their own above the plot for their labels.
-        const top = M.top + (markers.length ? MARKER_STRIP : 0);
-        const pw = W - M.left - M.right;
-        const ph = H - top - M.bottom;
+        const layers = (bars ? opts.bars : opts.bands) || [];
 
-        // ── Domain ─────────────────────────────────────────────────────────
-        let lo = 0;
-        let hi = 0;
-        const n = opts.count;
-        const up = new Float64Array(n);
-        const down = new Float64Array(n);
-        const layers = (opts.kind === 'area' ? opts.bands : opts.bars) || [];
         // Where a layer's value at i sits: above zero (positive) or below.
         // Less than half a cent is nothing, so float dust picks no side.
         const signed = (s, i) => {
             const v = (s.sign < 0 ? -1 : 1) * (s.values[i] || 0);
             return Math.abs(v) < 0.005 ? 0 : v;
         };
-        for (const s of layers) {
-            for (let i = 0; i < n; i++) {
-                const v = signed(s, i);
-                if (v < 0) down[i] -= v; else up[i] += v;
-            }
+        const rows = layers.map((s) => Array.from({ length: n }, (_, i) => signed(s, i)));
+
+        // ── Domain ─────────────────────────────────────────────────────────
+        let lo = 0;
+        let hi = 0;
+        for (let i = 0; i < n; i++) {
+            let up = 0;
+            let down = 0;
+            for (const row of rows) { if (row[i] < 0) down += row[i]; else up += row[i]; }
+            hi = Math.max(hi, up);
+            lo = Math.min(lo, down);
         }
-        for (let i = 0; i < n; i++) { hi = Math.max(hi, up[i]); lo = Math.min(lo, -down[i]); }
         for (const ln of lines) for (let i = 0; i < n; i++) { hi = Math.max(hi, ln.values[i]); lo = Math.min(lo, ln.values[i]); }
         // A flat-zero plan still gets a readable axis rather than $0..$1.
         if (hi - lo < 1) hi = lo + 1000;
         const ticks = niceTicks(lo, hi);
-        const y0 = ticks[0];
-        const y1 = ticks[ticks.length - 1];
-        const Y = (v) => top + ph - ((v - y0) / (y1 - y0)) * ph;
+        const tickAt = new Map((opts.xTicks || []).map((t) => [t.i, t.label]));
 
-        const bars = opts.kind === 'bars';
-        const slot = bars ? pw / n : 0;
-        const X = bars ? (i) => M.left + slot * (i + 0.5) : (i) => M.left + (i / (n - 1)) * pw;
+        EChartKit.mount(canvas, (t) => {
+            const W = canvas.clientWidth;
+            const top = M.top + (markers.length ? MARKER_STRIP : 0);
+            const pw = W - M.left - M.right;
+            const X = bars ? (i) => M.left + (pw / n) * (i + 0.5) : (i) => M.left + (i / (n - 1)) * pw;
+            const series = [];
 
-        const svg = el('svg', { class: 'chart-svg', role: 'img', 'aria-label': opts.label || 'Chart' });
-
-        // ── Frame ──────────────────────────────────────────────────────────
-        for (const t of ticks) {
-            el('line', { class: t === 0 ? 'chart-zero' : 'chart-grid', x1: M.left, x2: M.left + pw, y1: Y(t), y2: Y(t) }, svg);
-            const label = el('text', { class: 'chart-tick', x: M.left - 10, y: Y(t) + 4, 'text-anchor': 'end' }, svg);
-            label.textContent = opts.format(t);
-        }
-        for (const t of opts.xTicks || []) {
-            const label = el('text', { class: 'chart-tick', x: X(t.i), y: H - 6, 'text-anchor': 'middle' }, svg);
-            label.textContent = t.label;
-        }
-
-        // ── Marks ──────────────────────────────────────────────────────────
-        // The gap between two lines, shaded under them (Compare's plans).
-        if (opts.between && lines.length >= 2) {
-            const [a, b] = lines;
-            let d = '';
-            for (let i = 0; i < n; i++) d += `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(a.values[i]).toFixed(1)}`;
-            for (let i = n - 1; i >= 0; i--) d += `L${X(i).toFixed(1)},${Y(b.values[i]).toFixed(1)}`;
-            el('path', { class: 'chart-between', d: `${d}Z` }, svg);
-        }
-        if (!bars) {
-            const accUp = new Float64Array(n);
-            const accDown = new Float64Array(n);
-            for (const s of layers) {
-                let top = '';
-                let bottom = '';
-                for (let i = 0; i < n; i++) {
-                    const sv = signed(s, i);
-                    const below = sv < 0;
-                    const acc = below ? accDown : accUp;
-                    const v = Math.abs(sv);
-                    const a = acc[i];
-                    const b = a + v;
-                    acc[i] = b;
-                    const ya = Y(below ? -a : a);
-                    const yb = Y(below ? -b : b);
-                    top += `${i ? 'L' : 'M'}${X(i).toFixed(1)},${yb.toFixed(1)}`;
-                    bottom = `L${X(i).toFixed(1)},${ya.toFixed(1)}${bottom}`;
-                }
-                el('path', { class: 'chart-band', d: `${top}${bottom}Z`, style: `fill: var(${s.color})` }, svg);
+            // The gap between two lines, shaded under them (Compare's plans):
+            // the lower of the two at each point, then the difference stacked
+            // on it as a filled band.
+            if (opts.between && lines.length >= 2) {
+                const [a, b] = lines;
+                const base = Array.from({ length: n }, (_, i) => Math.min(a.values[i], b.values[i]));
+                const gap = Array.from({ length: n }, (_, i) => Math.abs(a.values[i] - b.values[i]));
+                const band = { type: 'line', stack: 'between', symbol: 'none', silent: true, lineStyle: { opacity: 0 }, z: 1 };
+                series.push(
+                    { ...band, data: base },
+                    { ...band, data: gap, areaStyle: { color: colorOf(box, '--color-fill-secondary', t.fillTertiary), opacity: 1 } },
+                );
             }
-        } else {
-            // Series stack away from zero: ups upward, downs downward. Only the
-            // outermost segment of each stack gets the rounded data end; the
-            // others are square, separated by opts.gap of surface. With no gap,
-            // each segment tucks 0.5px under the next so antialiasing leaves
-            // no hairline between them.
-            const bw = Math.max(2, Math.min(36, slot * 0.62));
-            const r = Math.min(4, bw / 2);
-            const gap = opts.gap ?? 2;
-            const accUp = new Float64Array(n);
-            const accDown = new Float64Array(n);
+
             layers.forEach((s, li) => {
-                for (let i = 0; i < n; i++) {
-                    const sv = signed(s, i);
-                    const below = sv < 0;
-                    const v = Math.abs(sv);
-                    const acc = below ? accDown : accUp;
-                    const a = acc[i];
-                    const b = a + v;
-                    acc[i] = b;
-                    if (v <= 0) continue;
-                    const ya = Y(below ? -a : a);
-                    const yb = Y(below ? -b : b);
-                    const join = a > 0 ? (gap || -0.5) : 0;
-                    const h = Math.abs(yb - ya) - join;
-                    if (h < 0.5) continue;
-                    const x = X(i) - bw / 2;
-                    const start = below ? ya + join : ya - join;
-                    // Is anything stacked beyond this segment at this index?
-                    let outer = true;
-                    for (let k = li + 1; k < layers.length; k++) {
-                        const other = signed(layers[k], i);
-                        if (other !== 0 && (other < 0) === below) { outer = false; break; }
-                    }
-                    const rr = outer ? Math.min(r, h) : 0;
-                    const d = below
-                        ? `M${x},${start}h${bw}v${h - rr}q0,${rr} ${-rr},${rr}h${-(bw - 2 * rr)}q${-rr},0 ${-rr},${-rr}Z`
-                        : `M${x},${start}v${-(h - rr)}q0,${-rr} ${rr},${-rr}h${bw - 2 * rr}q${rr},0 ${rr},${rr}v${h - rr}Z`;
-                    el('path', { class: 'chart-bar', d, style: `fill: var(${s.color})` }, svg);
+                const color = colorOf(box, s.color, t.textTertiary);
+                const row = rows[li];
+                if (!bars) {
+                    series.push({
+                        type: 'line', name: s.label, stack: 'bands', symbol: 'none', color,
+                        lineStyle: { width: 0 },
+                        areaStyle: { color, opacity: 0.85 },
+                        data: row,
+                    });
+                    return;
                 }
+                // Only the outermost segment of each stack gets the rounded data
+                // end; the others are square.
+                series.push({
+                    type: 'bar', name: s.label, stack: 'bars', color,
+                    barMaxWidth: 36,
+                    barCategoryGap: '38%',
+                    data: row.map((v, i) => {
+                        if (v === 0) return null;
+                        const outer = !rows.slice(li + 1).some((r) => r[i] !== 0 && (r[i] < 0) === (v < 0));
+                        if (!outer) return v;
+                        return { value: v, itemStyle: { borderRadius: v < 0 ? [0, 0, 4, 4] : [4, 4, 0, 0] } };
+                    }),
+                });
             });
-        }
 
-        // Marker rules sit under the headline line, so the line stays readable.
-        // Each hangs from a rounded badge in the marker's colour: a square
-        // holding a white target centred on the rule, and the white label
-        // after it, or before it where that would cover another badge or run
-        // off the plot. With room on neither side the label is left off,
-        // leaving the square.
-        const placed = [...markers].sort((a, b) => a.i - b.i).map((mk) => ({ mk, x: X(mk.i) }));
-        const markY = M.top + 4;
-        const half = BADGE_H / 2;
-        let badgeEnd = -Infinity;
-        for (const { mk, x } of placed) {
-            const rule = `color: var(${mk.color || '--color-primary'})`;
-            const fill = `fill: var(${mk.fill || mk.color || '--color-primary'})`;
-            el('line', { class: 'chart-marker', x1: x, x2: x, y1: markY + half, y2: top + ph, style: rule }, svg);
-            const width = labelWidth(box, mk.label) + BADGE_PAD;
-            // A label that fits right of its square, else left of it.
-            const fits = (from) => {
-                const to = from + BADGE_H + width;
-                return from >= 0 && to <= W && from >= badgeEnd + 4
-                    && !placed.some((o) => o.mk !== mk && Math.abs(o.x - x) > 0.5 && o.x + half + 4 > from && o.x - half - 4 < to);
+            lines.forEach((ln, k) => {
+                const color = colorOf(box, ln.color, t.text);
+                const s = {
+                    type: 'line', name: ln.label, color, symbol: 'circle', showSymbol: false, symbolSize: 9,
+                    lineStyle: { width: 2 },
+                    itemStyle: { borderColor: t.bgContainer, borderWidth: 2 },
+                    emphasis: { disabled: true },
+                    z: 4,
+                    data: Array.from(ln.values),
+                };
+                // Goal markers hang from the first line.
+                if (k === 0 && markers.length) {
+                    s.markLine = {
+                        silent: true,
+                        symbol: 'none',
+                        data: goalMarks(box, markers, X, W).map(({ mk, side }) => {
+                            const fill = colorOf(box, mk.fill || mk.color, t.primary);
+                            return {
+                                xAxis: mk.i,
+                                lineStyle: { color: colorOf(box, mk.color, t.primary), type: [3, 3], width: 1, opacity: 0.8 },
+                                label: {
+                                    show: Boolean(side),
+                                    position: 'end',
+                                    align: side === 'left' ? 'right' : 'left',
+                                    offset: [side === 'left' ? 8 : -8, 0],
+                                    formatter: mk.label,
+                                    color: colorOf(box, '--goal-ink', '#fff'),
+                                    backgroundColor: fill,
+                                    padding: [3, 8],
+                                    borderRadius: 4,
+                                    fontFamily: t.font,
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                },
+                            };
+                        }),
+                    };
+                }
+                series.push(s);
+            });
+
+            return {
+                grid: { left: M.left, right: M.right, top, bottom: M.bottom, containLabel: false },
+                tooltip: EChartKit.tooltip(t, {
+                    trigger: 'axis',
+                    className: 'ec-tip plan-chart-tip',
+                    axisPointer: {
+                        type: bars ? 'shadow' : 'line',
+                        lineStyle: { color: t.textQuaternary, type: [3, 3] },
+                        shadowStyle: { color: EChartKit.alpha(t.text, 0.04) },
+                    },
+                    formatter: (params) => {
+                        const i = Array.isArray(params) && params.length ? params[0].dataIndex : null;
+                        return i == null ? '' : tipContent(box, opts.tooltip(i));
+                    },
+                }),
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: bars,
+                    data: Array.from({ length: n }, (_, i) => i),
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: EChartKit.axisLabel(t, {
+                        interval: (i) => tickAt.has(i),
+                        formatter: (_v, i) => tickAt.get(i) || '',
+                    }),
+                },
+                yAxis: {
+                    ...EChartKit.valueAxis(t, ticks, opts.format),
+                    axisLabel: EChartKit.axisLabel(t, { formatter: (v) => opts.format(v), margin: 10 }),
+                },
+                series,
             };
-            const side = fits(x - half) ? 'right' : fits(x - half - width) ? 'left' : null;
-            const flip = side === 'left';
-            const labelled = side !== null;
-            const badge = labelled ? { x: flip ? x - half - width : x - half, w: BADGE_H + width } : { x: x - half, w: BADGE_H };
-            badgeEnd = badge.x + badge.w;
-            el('rect', { class: 'chart-marker-badge', x: badge.x, y: markY - half, width: badge.w, height: BADGE_H, rx: BADGE_R, style: fill }, svg);
-            const target = el('svg', {
-                class: 'chart-marker-icon', x: x - BADGE_ICON / 2, y: markY - BADGE_ICON / 2,
-                width: BADGE_ICON, height: BADGE_ICON, viewBox: '0 0 256 256',
-            }, svg);
-            target.innerHTML = window.PLAN_ICON_DATA.regular.target;
-            if (!labelled) continue;
-            const text = el('text', { class: 'chart-marker-label', x: flip ? x - half : x + half, y: markY + 4, 'text-anchor': flip ? 'end' : 'start' }, svg);
-            text.textContent = mk.label;
-        }
-
-        for (const ln of lines) {
-            let d = '';
-            for (let i = 0; i < n; i++) d += `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(ln.values[i]).toFixed(1)}`;
-            el('path', { class: 'chart-line', d, style: `stroke: var(${ln.color})` }, svg);
-        }
-
-        // ── Hover ──────────────────────────────────────────────────────────
-        const cross = el('line', { class: 'chart-cross', x1: 0, x2: 0, y1: top, y2: top + ph, visibility: 'hidden' }, svg);
-        const dots = lines.map((ln) => el('circle', { class: 'chart-dot', r: 4.5, cx: 0, cy: 0, visibility: 'hidden', style: `fill: var(${ln.color})` }, svg));
-        const hit = el('rect', { class: 'chart-hit', x: M.left, y: top, width: pw, height: ph }, svg);
-        box.appendChild(svg);
-
-        const tip = document.createElement('div');
-        tip.className = 'chart-tip';
-        tip.hidden = true;
-        box.appendChild(tip);
-
-        let last = -1;
-        function show(i) {
-            if (i === last) return;
-            last = i;
-            const x = X(i);
-            cross.setAttribute('x1', x);
-            cross.setAttribute('x2', x);
-            cross.setAttribute('visibility', 'visible');
-            dots.forEach((dot, j) => {
-                dot.setAttribute('cx', x);
-                dot.setAttribute('cy', Y(lines[j].values[i]));
-                dot.setAttribute('visibility', 'visible');
-            });
-            const t = opts.tooltip(i);
-            const people = (t.people || []).map((p) => `
-                <div class="chart-tip-person"><span>${escapeHtml(p.name)}</span>${p.age ? `<b>${escapeHtml(p.age)}</b>` : ''}</div>`).join('');
-            tip.innerHTML = `${people ? `<div class="chart-tip-people">${people}</div>` : ''}<div class="chart-tip-title">${escapeHtml(t.title)}</div>${t.rows.map((r) => `
-                <div class="chart-tip-row${r.total ? ' is-total' : ''}"><i style="--swatch: var(${r.color || '--chart-grid'})"></i>
-                    <span>${escapeHtml(r.label)}</span><b>${escapeHtml(r.value)}</b></div>`).join('')}`;
-            tip.hidden = false;
-            const tw = tip.offsetWidth;
-            const left = x + 16 + tw > W ? x - 16 - tw : x + 16;
-            tip.style.left = `${Math.max(0, left)}px`;
-            // A tall tooltip grows upward rather than off the bottom.
-            tip.style.top = `${Math.min(M.top, H - tip.offsetHeight - 4)}px`;
-            if (opts.onHover) opts.onHover(i);
-        }
-        function hide() {
-            last = -1;
-            cross.setAttribute('visibility', 'hidden');
-            for (const dot of dots) dot.setAttribute('visibility', 'hidden');
-            tip.hidden = true;
-            if (opts.onHover) opts.onHover(null);
-        }
-        hit.addEventListener('pointermove', (e) => {
-            const r = svg.getBoundingClientRect();
-            const px = e.clientX - r.left - M.left;
-            const i = bars ? Math.floor(px / slot) : Math.round((px / pw) * (n - 1));
-            show(Math.max(0, Math.min(n - 1, i)));
+        }, {
+            label: opts.label || 'Chart',
+            animate: false,
+            on: {
+                updateAxisPointer: (e) => {
+                    const info = e.axesInfo && e.axesInfo.find((a) => a.axisDim === 'x');
+                    if (info && opts.onHover) opts.onHover(Number(info.value));
+                },
+                globalout: () => { if (opts.onHover) opts.onHover(null); },
+            },
         });
-        hit.addEventListener('pointerleave', hide);
     }
 
     /** Ticks for a monthly series of `count` points from `plan`'s start:
@@ -333,5 +296,5 @@
         return ticks.filter((_, i) => i % step === 0);
     }
 
-    window.PlanChart = { draw, yearTicks };
+    window.PlanChart = { draw, yearTicks, canvasOf, colorOf };
 }());

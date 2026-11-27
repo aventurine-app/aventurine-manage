@@ -18,19 +18,22 @@
 // four-column one.
 //
 // Nothing balances the two sides here: they are two sums over the same span,
-// not one amount conserved through the diagram. So the channel is sized by the
-// income alone, and the outflow bar is sized by the spending — a year that
-// outspent its income reaches past the channel by the difference.
+// not one amount conserved through the diagram. So the inflow bar is sized by
+// the income and the outflow bar by the spending, and the channel between them
+// by the smaller of the two: money kept shows as inflow bar standing past the
+// channel, and a year that outspent its income as outflow bar reaching past it.
 //
 // Pure renderer. It reuses GET /api/data (the Cash Flow table payload) and
 // GET /api/data/tags (the same cells split by tag) and aggregates each
 // category and tag on the client, over the span the header's joined
-// year+month picker names: a whole year, or one month of it. Self-contained inline SVG, the same approach as
-// forecast.js / dashboard.js (CSP-clean: no CDN library, no inline handlers). Styled
-// in forecast.css under the .cashflow-sankey namespace.
+// year+month picker names: a whole year, or one month of it. Drawn by Apache
+// ECharts' Sankey through widgets/echart-kit.js. A click on a band opens its
+// rows in the ledger; the same links are listed, visually hidden, beside the
+// canvas for the keyboard and screen readers.
 //
 // Globals in play (loaded before this script): apiFetch (api.js), escapeHtml
-// (escape.js), UI (ui.js), Ant.empty (ant.js), formatCurrency (currency.js).
+// (escape.js), UI (ui.js), Ant.empty (ant.js), formatCurrency (currency.js),
+// EChartKit (echart-kit.js).
 
 (function () {
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -67,85 +70,14 @@
   // makes them something held rather than something flowing, and a hub from a
   // third family cannot be read as one more source. Both bars take the same
   // colour: they are two ends of one stage, not two stages.
-  // Colours are read from the tokens at render time so a theme or
-  // palette change re-colours the diagram; the arrays below are first-paint
-  // fallbacks matching the light theme.
+  // Colours are read from the theme's tokens on every paint (EChartKit.theme),
+  // so a theme change re-colours the diagram.
+  //
   // Ribbons are GRADIENTS rather than flat fills: one starts in the colour of
   // the bar it leaves and ends in the colour of the bar it meets - category to
   // net on the income side, net to category on the expense side - so the middle
   // channel's colour is what both halves hand off through. A flat ribbon had to
   // take one end's colour, which left a seam at the other end.
-  const NET_FALLBACK = '#4e5153';
-  const INCOME_FALLBACK = ['#0a5b47', '#10744c', '#1a8b52', '#2ba25b', '#48b76b', '#72c983'];
-  const TAG_FALLBACK = '#bfbfbf';
-
-  function readSankeyPalettes() {
-    const cs = getComputedStyle(document.documentElement);
-    const v = (name, fb) => cs.getPropertyValue(name).trim() || fb;
-    return {
-      net: v('--chart-net', NET_FALLBACK),
-      tag: v('--chart-tag', TAG_FALLBACK),
-      income: INCOME_FALLBACK.map((fb, i) => v(`--chart-inflow-${i + 1}`, fb)),
-      expense: ChartRamp.outflow(),
-    };
-  }
-
-  const CHART_RATIO = 320 / 800;   // taller than the line charts — Sankeys need room
-
-  // ─── Layout width vs box width (why app zoom used to shrink the diagram) ─────
-  // The paddings, gaps and label text below are fixed lengths, so they keep
-  // their size while the container does not: app zoom shrinks the box in CSS
-  // pixels, and the same 300px of label gutter then eats a far bigger share of
-  // it. The ribbons paid for all of it — at 250% the span between the columns
-  // had collapsed to almost nothing while the labels around it grew.
-  //
-  // So the diagram is LAID OUT wider than the box and the whole SVG is scaled
-  // down to fit through a viewBox. Bands and labels shrink together, which keeps
-  // the proportions the layout was tuned at, and zoom is what pays for the
-  // shrink. It buys the layout the SQUARE ROOT of the zoom factor, which splits
-  // the zoom between the two things asking for it: the labels still get visibly
-  // larger (else the chart reads as the one thing on the page that ignored the
-  // zoom) and the ribbons still get room instead of surrendering all of it. At
-  // 100% this is a no-op — the box IS the layout width, nothing scales — so only
-  // zoomed views change, and the type never ends up smaller than unzoomed.
-  const MIN_CHART_W = 1280;   // widest we will lay out for; ~a comfortable window
-
-  /** App zoom as a plain factor (1 = 100%). Only Electron has app zoom; in a
-   *  plain browser (fixtures) window.aventurineZoom is absent. */
-  function zoomFactor() {
-    const z = window.aventurineZoom;
-    const f = z ? Math.pow(1.2, z.get()) : 1;
-    return Number.isFinite(f) && f > 1 ? f : 1;
-  }
-
-  /** Logical width to lay the diagram out at, for a box `boxW` CSS px wide. */
-  function layoutWidth(boxW) {
-    const stretched = Math.round(boxW * Math.sqrt(zoomFactor()));
-    return Math.min(Math.max(boxW, MIN_CHART_W), stretched);
-  }
-
-  const PAD = { t: 12, b: 16 };
-  const LABEL_OFFSET = 10;         // gap between a node's inner edge and its label text
-  const EDGE_PAD = 10;             // gap between a side column and the container edge
-  const NODE_W = 13;               // node-bar thickness
-  const CAP_R = 4;                 // rounding on a side bar's OUTER corners only; the inner
-                                   // face is square so the ribbon meets it flush
-  const MIN_BAND = 1.5;            // floor so a tiny category is still visible
-  const LABEL_GAP = 32;            // min vertical spacing between adjacent labels (name + amount)
-  const GAP = LABEL_GAP;           // vertical gap between stacked side nodes. Tied to the label block:
-                                   // two adjacent bands are at least this far apart centre to centre
-                                   // whatever they are worth, so every label sits on its own band's
-                                   // centreline and the leader lines below stay unused
-  const LABEL_MARGIN = 16;         // height held back at each end of a side column, so a hairline band
-                                   // at the very top or bottom still has room for its own label
-
-  /* ─── Labels sit INSIDE, over the ribbons ─────────────────────────────────
-     Each category's name and amount hang off the inner face of its bar, out
-     over its own ribbon, rather than in a gutter outside it. The gutter used to
-     be measured off the longest label and the ribbons paid for it; with the
-     labels inside, the side columns sit EDGE_PAD from the card edge and the
-     ribbons get the whole width. */
-
   const state = {
     data: null,   // last /api/data payload
     tagNames: new Map(),  // tag id → name, from /api/data/tags
@@ -155,8 +87,6 @@
   };
 
   const ENTIRE_YEAR = 'Entire year';
-
-  let firstPaint = true;
 
   // Deep-link a category to the Transactions ledger, pre-filtered to that
   // category and the year on screen. The Transactions page reads these back from
@@ -286,425 +216,176 @@
     }));
   }
 
-  // ─── SVG builder ─────────────────────────────────────────────────────────────
+  // ─── Diagram ─────────────────────────────────────────────────────────────────
+  // Apache ECharts' Sankey (widgets/echart-kit.js). The columns are fixed by
+  // each node's `depth`, and layoutIterations: 0 keeps every column in the
+  // order given (largest first), so the biggest band leads each side. The
+  // node gap is a label's height, so every label sits on its own band.
 
-  // Width of a hub's two-line label block (its name over its figure), in layout
-  // units — the text is drawn at these same sizes in layout units, so a CSS-px
-  // measurement at 11/13px IS the layout width. MEASURED, not counted per
-  // character, for the reason widgets/chart.js measures its axis gutter: the
-  // font, the theme and the app zoom all move it, and a counted width drifts the
-  // moment any of them changes.
-  let labelCtx = null;
-  function hubLabelWidth(name, amount) {
-    try {
-      if (!labelCtx) labelCtx = document.createElement('canvas').getContext('2d');
-      const cs = getComputedStyle(document.documentElement);
-      const family = cs.getPropertyValue('--font-h3').trim() || 'sans-serif';
-      const semibold = cs.getPropertyValue('--weight-semibold').trim() || '600';
-      const bold = cs.getPropertyValue('--weight-bold').trim() || '700';
-      labelCtx.font = `${semibold} 11px ${family}`;
-      // + .sankey-label's own 0.03em tracking, which measureText does not carry.
-      const nameW = labelCtx.measureText(name).width + name.length * 11 * 0.03;
-      labelCtx.font = `${bold} 13px ${family}`;
-      return Math.max(nameW, labelCtx.measureText(amount).width);
-    } catch (_err) {
-      return Infinity;   // nothing to measure with: treat the pair as not fitting
-    }
-  }
+  const NODE_W = 13;          // node-bar thickness
+  const LABEL_GAP = 32;       // a label block's height (name over amount); the gap between bands
+  const LINK_OPACITY = 0.4;   // G2's Sankey links sit at about a third of their colour
 
-  /** Horizontal Sankey ribbon between two equal-height slots. */
-  function ribbon(sx, s0, tx, t0, h) {
-    const f = (n) => Math.round(n * 100) / 100;
-    const mx = (sx + tx) / 2;
-    const s1 = s0 + h;
-    const t1 = t0 + h;
-    return `M ${f(sx)} ${f(s0)} C ${f(mx)} ${f(s0)} ${f(mx)} ${f(t0)} ${f(tx)} ${f(t0)}`
-         + ` L ${f(tx)} ${f(t1)} C ${f(mx)} ${f(t1)} ${f(mx)} ${f(s1)} ${f(sx)} ${f(s1)} Z`;
-  }
+  /** A user label made safe for ECharts rich text, where braces and bars are
+   *  markup: they are swapped for look-alikes so a name can never restyle or
+   *  break its own label. */
+  const richSafe = (text) => String(text).replace(/[{}|]/g, (c) => ({ '{': '❴', '}': '❵', '|': '¦' }[c]));
 
-  function buildSVG(boxW, boxH) {
-    // Geometry below is in layout units; `k` maps them onto the box at the end.
-    const W = layoutWidth(boxW);
-    const k = boxW / W;   // 1 when the box was wide enough to lay out in directly
+  /** Everything the diagram draws for the span on screen, or null when it
+   *  has no money in it. */
+  function buildModel() {
     const { income, expense, totalIncome, totalExpense } = aggregate(state.year, state.month);
-    if (totalIncome <= 0 && totalExpense <= 0) return null; // caller → empty state
+    if (totalIncome <= 0 && totalExpense <= 0) return null;
     const incomeTags = tagSide(income, state.year, state.month);
     const expenseTags = tagSide(expense, state.year, state.month);
 
-    // Read fresh so an accent/theme swap retones the diagram.
-    const { net: NET_COLOR, tag: TAG_COLOR, income: INCOME_PALETTE, expense: EXPENSE_PALETTE } = readSankeyPalettes();
+    // Column numbers: a side with tagged money adds its tag column at the
+    // outer edge, and everything inside it moves one column in.
+    let col = 0;
+    const depth = {};
+    if (incomeTags.length) depth.incomeTag = col++;
+    depth.income = col++;
+    depth.hubIn = col++;
+    depth.hubOut = col++;
+    depth.expense = col++;
+    if (expenseTags.length) depth.expenseTag = col++;
 
-    // Tall enough that every label in the busiest column gets LABEL_GAP of
-    // vertical room, so the spread pass below never overlaps labels.
-    const labelRoom = Math.max(income.length, expense.length, incomeTags.length, expenseTags.length) * LABEL_GAP
-      + PAD.t + PAD.b + LABEL_MARGIN * 2 + 12;
-    // Height comes from the BOX when the page gave it one (see the
-    // #rep-panel-cashflow rules in forecast.css): the card is stretched to the
-    // viewport, so the diagram fills whatever is left under the header rather
-    // than standing at a share of its own width. CHART_RATIO is only the
-    // fallback for a box with no definite height — a plain browser opening the
-    // page file without the app chrome, where nothing above sets one. Divide by
-    // `k` because these are LAYOUT units and `k` is what maps them to CSS px, so
-    // a zoomed (scaled-down) diagram still lands at boxH on screen.
-    const wantH = boxH > 0 ? Math.round(boxH / k) : Math.round(W * CHART_RATIO);
-    const H = Math.max(wantH, labelRoom, 260);
-    // Every column is centred on ONE shared horizontal midline — the two hub bars
-    // sit on it, and each side column is centred on it too — so the ribbons fan
-    // out above and below the middle channel by about the same amount instead of
-    // all hanging downward off a top edge. PAD.t + LABEL_MARGIN is the inset that
-    // keeps the topmost band's own label on screen.
-    const TOP = PAD.t + LABEL_MARGIN;
-    const availH = H - TOP - PAD.b - LABEL_MARGIN;
-
-    // One value→px scale shared by every column so band widths line up. Each
-    // stacked column also needs its inter-node gaps to fit, so take the
-    // tightest. Each term already caps its own column at availH, and the two hub
-    // bars are sized off the side totals, so nothing else needs clamping here.
-    const gaps = (n) => Math.max(0, n - 1) * GAP;
-    const fit = (nodes, total) => (availH - gaps(nodes.length)) / (total || 1);
-    const sum = (nodes) => nodes.reduce((a, n) => a + n.total, 0);
-    const scale = Math.min(
-      fit(income, totalIncome),
-      fit(expense, totalExpense),
-      incomeTags.length ? fit(incomeTags, sum(incomeTags)) : Infinity,
-      expenseTags.length ? fit(expenseTags, sum(expenseTags)) : Infinity
-    );
-
-    // FOUR columns, not three: the income bars, the bar their total gathers
-    // into, the bar the expenses leave from, and the expense bars. That gives
-    // the total a CHANNEL across the middle instead of a single bar the two
-    // fans meet at, so the diagram reads as three stages of one journey. A side
-    // with tagged money adds its tag column at the outer edge. The width
-    // between the outermost columns is split into equal ribbon runs.
-    const columns = 4 + (incomeTags.length ? 1 : 0) + (expenseTags.length ? 1 : 0);
-    const run = Math.max(0, (W - EDGE_PAD * 2 - NODE_W * columns) / (columns - 1));
-    let nextX = EDGE_PAD;
-    const column = () => { const x = nextX; nextX += NODE_W + run; return x; };
-    const incomeTagX = incomeTags.length ? column() : null;
-    const incomeX = column();
-    const hubInX = column();       // where the income arrives
-    const hubOutX = column();      // where the expenses leave
-    const expenseX = column();
-    const expenseTagX = expenseTags.length ? column() : null;
-    // Each hub bar is sized to the total it actually seats: the inflow bar to
-    // the income that stacks against it, the outflow bar to the expenses that
-    // leave it. The CHANNEL between them stays at the inflow height, because
-    // what crosses the middle is the money that arrived.
-    //
-    // Sizing both bars to the larger side is what this replaced: it drew the
-    // inflow bar at the expense total while printing the income figure on it, so
-    // a year that outspent its income showed a middle bar taller than the income
-    // bar carrying the same amount. Now only the outflow bar reaches past the
-    // channel, and the length it reaches by is the overspend.
-    const midY = TOP + availH / 2;
-    const inflowH = totalIncome * scale;
-    const outflowH = totalExpense * scale;
-    // The inflow bar (and the channel it feeds) is centred on the midline; the
-    // outflow bar hangs from the channel's top edge, so it lines up with the top
-    // of the total flow and any overspend reaches past the channel's bottom.
-    const inflowTop = midY - inflowH / 2;
-    const outflowTop = inflowTop;
-
-    // Lay out a stacked side column centred on the midline. Returns nodes with
-    // y/h and a colour from that side's palette, in payload order.
-    const layoutSide = (items, x, palette) => {
-      const heights = items.map((c) => Math.max(c.total * scale, MIN_BAND));
-      const extent = heights.reduce((a, h) => a + h, 0) + gaps(items.length);
-      let y = midY - extent / 2;
-      return items.map((c, i) => {
-        const node = { ...c, x, y, h: heights[i], color: palette[i % palette.length] };
-        y += heights[i] + GAP;
-        return node;
-      });
+    const nodes = [];
+    const links = [];
+    const node = (id, n) => nodes.push({ name: id, ...n });
+    const link = (source, target, value, extra) => {
+      if (value > 0) links.push({ source, target, value, ...extra });
     };
+    const IN = 'hub:in';
+    const OUT = 'hub:out';
+    const span = state.month ? 'month' : 'year';
 
-    const incomeNodes = layoutSide(income, incomeX, INCOME_PALETTE);
-    const expenseNodes = layoutSide(expense, expenseX, EXPENSE_PALETTE);
+    income.forEach((c, i) => {
+      node(`in:${c.key}`, { label: c.label, total: c.total, side: 'income', depth: depth.income, rank: i,
+        href: categoryHref(c.key), share: fmtShare(c.total, totalIncome) });
+      link(`in:${c.key}`, IN, c.total, { href: categoryHref(c.key), label: `${c.label} → Net Inflow` });
+    });
+    expense.forEach((c, i) => {
+      node(`out:${c.key}`, { label: c.label, total: c.total, side: 'expense', depth: depth.expense, rank: i,
+        href: categoryHref(c.key), share: fmtShare(c.total, totalExpense) });
+      link(OUT, `out:${c.key}`, c.total, { href: categoryHref(c.key), label: `Net Inflow → ${c.label}` });
+    });
+    if (totalIncome > 0) node(IN, { label: 'Net Inflow', total: totalIncome, side: 'hub', depth: depth.hubIn });
+    if (totalExpense > 0 || totalIncome > 0) node(OUT, { label: 'Net Outflow', total: totalExpense, side: 'hub', depth: depth.hubOut });
+    // The channel across the middle carries the money that arrived AND left.
+    // A node is as tall as the larger of its two sides, so this is what lets
+    // each hub bar keep its own total: with money left over, the inflow bar
+    // stands taller than the channel by what was kept; a year that outspent
+    // its income shows the outflow bar reaching past it by the difference.
+    link(IN, OUT, Math.min(totalIncome, totalExpense), { label: 'Net Inflow → Net Outflow' });
 
-    // A tag column is placed by where its money comes from: each tag aims for
-    // the value-weighted mean height of the categories feeding it, so a tag fed
-    // by one category sits level with it and its ribbon runs nearly straight.
-    // Where two tags would overlap, the later one is pushed down by GAP (the
-    // same spacing every stacked column keeps); a column that then runs past
-    // the bottom is settled back upward from its end.
-    const layoutTags = (tags, parents, x) => {
-      const centre = new Map(parents.map((n) => [n.key, n.y + n.h / 2]));
-      const aim = (t) => t.flows.reduce((a, f) => a + centre.get(f.key) * f.value, 0) / t.total;
-      const nodes = tags
-        .map((t) => {
-          const h = Math.max(t.total * scale, MIN_BAND);
-          return { ...t, x, h, y: aim(t) - h / 2, color: TAG_COLOR };
-        })
-        .sort((a, b) => a.y - b.y);
-      const bottom = TOP + availH;
-      let floor = TOP;
-      for (const n of nodes) {
-        n.y = Math.max(n.y, floor);
-        floor = n.y + n.h + GAP;
-      }
-      let ceiling = bottom;
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        nodes[i].y = Math.min(nodes[i].y, ceiling - nodes[i].h);
-        ceiling = nodes[i].y - GAP;
-      }
-      return nodes;
-    };
-    const incomeTagNodes = incomeTags.length ? layoutTags(incomeTags, incomeNodes, incomeTagX) : [];
-    const expenseTagNodes = expenseTags.length ? layoutTags(expenseTags, expenseNodes, expenseTagX) : [];
-
-    // Nodes + labels. GAP already holds adjacent bands a label's height apart, so
-    // in the normal case every label lands on its own band's centreline. This pass
-    // is the backstop for the cases that beats — a very short chart, more
-    // categories than the height can seat — pushing labels apart to at least
-    // LABEL_GAP within the chart bounds and drawing a thin leader back to any node
-    // it had to move away from. The bands stay exactly value-proportional either way.
-    const spreadLabels = (sideNodes) => {
-      const top = PAD.t + 10;
-      const bottom = H - PAD.b - 12;
-      const ys = sideNodes.map((n) => n.y + n.h / 2);
-      for (let i = 1; i < ys.length; i++) {
-        if (ys[i] < ys[i - 1] + LABEL_GAP) ys[i] = ys[i - 1] + LABEL_GAP;
-      }
-      // If the stack overflowed the bottom, settle it back upward from the end.
-      if (ys.length && ys[ys.length - 1] > bottom) {
-        ys[ys.length - 1] = bottom;
-        for (let i = ys.length - 2; i >= 0; i--) {
-          if (ys[i] > ys[i + 1] - LABEL_GAP) ys[i] = ys[i + 1] - LABEL_GAP;
-        }
-      }
-      if (ys.length && ys[0] < top) {
-        ys[0] = top;
-        for (let i = 1; i < ys.length; i++) {
-          if (ys[i] < ys[i - 1] + LABEL_GAP) ys[i] = ys[i - 1] + LABEL_GAP;
-        }
-      }
-      return ys;
-    };
-
-    const r1 = (v) => Math.round(v * 10) / 10;
-
-    // A horizontal fill that starts at `from` where the ribbon leaves its bar
-    // and reaches `to` where it meets the next one. userSpaceOnUse so the stops
-    // sit at the ribbon's real x positions rather than at its bounding box -
-    // every ribbon on a side then turns colour across the same two verticals,
-    // and the fan reads as one blend instead of a set of separate ones. Two
-    // equal colours need no gradient, so the flat fill comes back as-is.
-    let gradDefs = '';
-    let gradSeq = 0;
-    const rampFill = (x1, x2, from, to) => {
-      if (from === to) return from;
-      const id = `sk-ramp-${gradSeq++}`;
-      gradDefs += `<linearGradient id="${id}" gradientUnits="userSpaceOnUse"`
-                + ` x1="${r1(x1)}" y1="0" x2="${r1(x2)}" y2="0">`
-                + `<stop offset="0" stop-color="${from}"/>`
-                + `<stop offset="1" stop-color="${to}"/></linearGradient>`;
-      return `url(#${id})`;
-    };
-    // A side bar as a path: the two corners on the card-edge side are rounded,
-    // the two on the ribbon side are square. outer: -1 → rounded on the left
-    // (income), +1 → rounded on the right (expense), 0 → square all round, for
-    // a category bar with tag ribbons leaving its outer face too.
-    const capPath = (x, y, w, h, outer) => {
-      const r = Math.min(CAP_R, h / 2, w / 2);
-      const x0 = r1(x), x1 = r1(x + w), y0 = r1(y), y1 = r1(y + h);
-      if (outer === 0) return `M ${x0} ${y0} L ${x1} ${y0} L ${x1} ${y1} L ${x0} ${y1} Z`;
-      if (outer < 0) {
-        return `M ${x1} ${y0} L ${r1(x + r)} ${y0} Q ${x0} ${y0} ${x0} ${r1(y + r)}`
-             + ` L ${x0} ${r1(y + h - r)} Q ${x0} ${y1} ${r1(x + r)} ${y1} L ${x1} ${y1} Z`;
-      }
-      return `M ${x0} ${y0} L ${r1(x + w - r)} ${y0} Q ${x1} ${y0} ${x1} ${r1(y + r)}`
-           + ` L ${x1} ${r1(y + h - r)} Q ${x1} ${y1} ${r1(x + w - r)} ${y1} L ${x0} ${y1} Z`;
-    };
-    // Build one side. Each category is a single link wrapping its WAVE (the
-    // ribbon) + leader + labels — that whole flow is the click target, so you
-    // click the big wave, not the thin end bar. The bars come back separately to
-    // paint on top as bare caps, outside any link. The ribbon stacks against the
-    // centre node from its top (income flows node→centre, expense centre→node).
-    // dir points from the bar toward its labels, which sit on the INNER face:
-    // +1 → income (labels to the right, over the ribbon), -1 → expense (labels
-    // to the left).
-    const sideMarkup = (sideNodes, anchor, dir, isIncome, rounded) => {
-      const labelYs = spreadLabels(sideNodes);
-      let waves = '';
-      let bars = '';
-      let slot = isIncome ? inflowTop : outflowTop;
-      sideNodes.forEach((n, i) => {
-        const cy = n.y + n.h / 2;
-        const ly = labelYs[i];
-        const edgeX = dir > 0 ? n.x + NODE_W : n.x; // inner node edge, facing the label
-        const labelX = edgeX + dir * LABEL_OFFSET;  // text anchor x
-        const h = n.total * scale;                  // true height; slot stays exact
-        // Income flows node→hub slot; expense flows hub slot→node, and the
-        // fill ramps between the two bars' colours over that same run.
-        const bh = Math.max(h, MIN_BAND);
-        const d = isIncome
-          ? ribbon(n.x + NODE_W, n.y, hubInX, slot, bh)
-          : ribbon(hubOutX + NODE_W, slot, n.x, n.y, bh);
-        const fill = isIncome
-          ? rampFill(n.x + NODE_W, hubInX, n.color, NET_COLOR)
-          : rampFill(hubOutX + NODE_W, n.x, NET_COLOR, n.color);
-        const flow = isIncome
-          ? `${escapeHtml(n.label)} → Net Inflow`
-          : `Net Inflow → ${escapeHtml(n.label)}`;
-        const aria = `${n.label}: ${fmtMoney(n.total)} — view transactions for ${state.year}`;
-
-        // Wave + leader + labels are one link; the <title> gives the whole flow
-        // a single hover tooltip.
-        let g = `<a class="sankey-cat" href="${escapeHtml(categoryHref(n.key))}" tabindex="0" role="link" aria-label="${escapeHtml(aria)}">`
-              + `<title>${flow}: ${fmtMoney(n.total)}</title>`
-              + `<path class="sankey-link" d="${d}" fill="${fill}"></path>`;
-        if (Math.abs(ly - cy) > 1) {
-          g += `<path class="sankey-leader" d="M ${r1(edgeX)} ${r1(cy)} L ${r1(labelX)} ${r1(ly)}" fill="none"/>`;
-        }
-        const share = fmtShare(n.total, isIncome ? totalIncome : totalExpense);
-        g += `<text class="sankey-label" x="${labelX}" y="${r1(ly - 3)}" text-anchor="${anchor}">${escapeHtml(n.label)}</text>`
-           + `<text class="sankey-amount" x="${labelX}" y="${r1(ly + 13)}" text-anchor="${anchor}">${escapeHtml(fmtMoney(n.total))}`
-           + (share ? ` <tspan class="sankey-share">${escapeHtml(share)}</tspan>` : '')
-           + `</text></a>`;
-        waves += g;
-
-        // Bare node cap, painted on top of the waves layer (outside the link).
-        bars += `<path class="sankey-node" d="${capPath(n.x, n.y, NODE_W, n.h, rounded ? -dir : 0)}" fill="${n.color}">`
-              + `<title>${escapeHtml(n.label)}: ${fmtMoney(n.total)}</title></path>`;
-        slot += h;
-      });
-      return { waves, bars };
-    };
-
-    const inc = sideMarkup(incomeNodes, 'start', 1, true, !incomeTagNodes.length);
-    const exp = sideMarkup(expenseNodes, 'end', -1, false, !expenseTagNodes.length);
-
-    // The tag junction on one side. Ribbons run between each category's OUTER
-    // face and the tags it feeds: on the category, its tags stack in the tag
-    // column's order; on the tag, its categories stack in theirs, so the two
-    // ends keep the same order and ribbons cross only where they must. Each tag
-    // is one link (its ribbons and its label) to its rows in the ledger, and
-    // its label hangs off its inner face over those ribbons, as a category's
-    // does over its own.
-    const tagMarkup = (tagNodes, parents, isIncome) => {
-      if (!tagNodes.length) return { waves: '', bars: '' };
-      const sideTotal = isIncome ? totalIncome : totalExpense;
-      const parentAt = new Map(parents.map((n, i) => [n.key, i]));
-      const catSlot = new Map(parents.map((n) => [n.key, n.y]));
-      // `${key}|${tagId}` -> where that ribbon meets its category. Filled in tag
-      // order, so each category's stack follows the tag column's.
-      const catY = new Map();
-      for (const t of tagNodes) {
-        for (const f of [...t.flows].sort((a, b) => parentAt.get(a.key) - parentAt.get(b.key))) {
-          const y = catSlot.get(f.key);
-          catY.set(`${f.key}|${t.id}`, y);
-          catSlot.set(f.key, y + f.value * scale);
-        }
-      }
-      const labelYs = spreadLabels(tagNodes);
-      const dir = isIncome ? 1 : -1;
-      let waves = '';
-      let bars = '';
-      tagNodes.forEach((t, i) => {
-        const money = fmtMoney(t.total);
-        const aria = `${t.label}: ${money} of ${isIncome ? 'income' : 'spending'} — view its transactions for ${state.year}`;
-        let g = `<a class="sankey-cat" href="${escapeHtml(tagHref(t.id, isIncome ? 'income' : 'expense'))}" tabindex="0" role="link" aria-label="${escapeHtml(aria)}">`
-              + `<title>${escapeHtml(t.label)}: ${money}</title>`;
-        let slot = t.y;
-        for (const f of [...t.flows].sort((a, b) => parentAt.get(a.key) - parentAt.get(b.key))) {
-          const parent = parents[parentAt.get(f.key)];
-          const h = f.value * scale;
-          const bh = Math.max(h, MIN_BAND);
-          const y = catY.get(`${f.key}|${t.id}`);
-          const d = isIncome
-            ? ribbon(t.x + NODE_W, slot, parent.x, y, bh)
-            : ribbon(parent.x + NODE_W, y, t.x, slot, bh);
-          const fill = isIncome
-            ? rampFill(t.x + NODE_W, parent.x, TAG_COLOR, parent.color)
-            : rampFill(parent.x + NODE_W, t.x, parent.color, TAG_COLOR);
-          g += `<path class="sankey-link" d="${d}" fill="${fill}"></path>`;
-          slot += h;
-        }
-        const cy = t.y + t.h / 2;
-        const ly = labelYs[i];
-        const edgeX = isIncome ? t.x + NODE_W : t.x;
-        const labelX = edgeX + dir * LABEL_OFFSET;
-        const anchor = isIncome ? 'start' : 'end';
-        if (Math.abs(ly - cy) > 1) {
-          g += `<path class="sankey-leader" d="M ${r1(edgeX)} ${r1(cy)} L ${r1(labelX)} ${r1(ly)}" fill="none"/>`;
-        }
-        const share = fmtShare(t.total, sideTotal);
-        g += `<text class="sankey-label" x="${labelX}" y="${r1(ly - 3)}" text-anchor="${anchor}">${escapeHtml(t.label)}</text>`
-           + `<text class="sankey-amount" x="${labelX}" y="${r1(ly + 13)}" text-anchor="${anchor}">${escapeHtml(money)}`
-           + (share ? ` <tspan class="sankey-share">${escapeHtml(share)}</tspan>` : '')
-           + '</text></a>';
-        waves += g;
-        bars += `<path class="sankey-node sankey-node-tag" d="${capPath(t.x, t.y, NODE_W, t.h, -dir)}" fill="${t.color}">`
-              + `<title>${escapeHtml(t.label)}: ${money}</title></path>`;
-      });
-      return { waves, bars };
-    };
-    const incTags = tagMarkup(incomeTagNodes, incomeNodes, true);
-    const expTags = tagMarkup(expenseTagNodes, expenseNodes, false);
-    // The middle stage: an inflow bar, an outflow bar, and the channel running
-    // straight across between them at the inflow height. None of it is a
-    // category, so none of it is a link; ribbons meet both bars on both faces,
-    // so neither bar has an outer corner to round. The channel sits in the waves
-    // layer, under the bars.
-    const inflowAmount = fmtMoney(totalIncome);
-    const outflowAmount = fmtMoney(totalExpense);
-    const inflowTitle = `<title>Net Inflow: ${inflowAmount}</title>`;
-    const outflowTitle = `<title>Net Outflow: ${outflowAmount}</title>`;
-    const channel = `<path class="sankey-link sankey-link-net"`
-                  + ` d="${ribbon(hubInX + NODE_W, inflowTop, hubOutX, inflowTop, inflowH)}"`
-                  + ` fill="${NET_COLOR}">${inflowTitle}</path>`;
-
-    // bottom layer: ribbons + labels (clickable); top layer: bare node caps
-    const waves = channel + inc.waves + exp.waves + incTags.waves + expTags.waves;
-    let bars = inc.bars + exp.bars + incTags.bars + expTags.bars;
-
-    const hubBar = (x, y, h, title) =>
-      `<rect class="sankey-node sankey-node-center" x="${r1(x)}" y="${r1(y)}"`
-      + ` width="${NODE_W}" height="${r1(h)}" fill="${NET_COLOR}">${title}</rect>`;
-    bars += hubBar(hubInX, inflowTop, inflowH, inflowTitle) + hubBar(hubOutX, outflowTop, outflowH, outflowTitle);
-
-    // Each hub label hangs off its bar's INNER face and floats out over the
-    // channel, the same way a category's label floats over its ribbon: the
-    // inflow figure reads rightward off the first bar, the outflow figure
-    // leftward off the second. Both are centred on their own bar, so when the
-    // two totals differ the labels sit at different heights and the taper
-    // between them stays legible.
-    //
-    // In a narrow window the run between the bars shrinks until the two blocks
-    // would meet in the middle. The channel still has height to spare there, so
-    // the outflow label steps away vertically instead — by LABEL_GAP, the same
-    // clearance a stack of category labels keeps — rather than overlapping the
-    // inflow label or being dropped.
-    const inflowLabelY = inflowTop + inflowH / 2;
-    let outflowLabelY = outflowTop + outflowH / 2;
-    const sideBySide = hubLabelWidth('Net Inflow', inflowAmount)
-                     + hubLabelWidth('Net Outflow', outflowAmount)
-                     + LABEL_OFFSET * 2 <= run;
-    if (!sideBySide && Math.abs(outflowLabelY - inflowLabelY) < LABEL_GAP) {
-      // Step it in the direction its own bar already lies, so it stays on the
-      // side of the inflow label that its height puts it on.
-      const away = inflowLabelY + (outflowH >= inflowH ? LABEL_GAP : -LABEL_GAP);
-      outflowLabelY = Math.min(Math.max(away, PAD.t + 10), H - PAD.b - 12);
+    // Tags: a tag gathers from every category on its side whose rows carry
+    // it, so "Vacation" shows what it took from Travel, Dining and the rest.
+    for (const t of incomeTags) {
+      const href = tagHref(t.id, 'income');
+      node(`intag:${t.id}`, { label: t.label, total: t.total, side: 'incomeTag', depth: depth.incomeTag,
+        href, share: fmtShare(t.total, totalIncome) });
+      for (const f of t.flows) link(`intag:${t.id}`, `in:${f.key}`, f.value, { href, label: `${t.label} → ${(income.find((c) => c.key === f.key) || {}).label}` });
     }
-    const hubLabel = (x, cy, anchor, name, amount) =>
-      `<text class="sankey-label" x="${r1(x)}" y="${r1(cy - 3)}" text-anchor="${anchor}">${name}</text>`
-      + `<text class="sankey-amount" x="${r1(x)}" y="${r1(cy + 13)}" text-anchor="${anchor}">${escapeHtml(amount)}</text>`;
-    bars += hubLabel(hubInX + NODE_W + LABEL_OFFSET, inflowLabelY, 'start', 'Net Inflow', inflowAmount)
-          + hubLabel(hubOutX - LABEL_OFFSET, outflowLabelY, 'end', 'Net Outflow', outflowAmount);
-
-    const cls = `cashflow-sankey${firstPaint ? ' sankey-enter' : ''}`;
-    // Normally H*k IS boxH. It is larger only when the labels needed more room
-    // than the viewport had (labelRoom / the 260 floor won above), and then the
-    // svg is capped at the box and preserveAspectRatio="meet" shrinks the whole
-    // diagram to fit instead of letting it spill out of .chart-area's clip.
-    const drawH = boxH > 0 ? Math.min(Math.round(H * k), Math.round(boxH)) : Math.round(H * k);
-    return `<svg width="${boxW}" height="${drawH}" viewBox="0 0 ${W} ${H}"`
-         + ` preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"`
-         + ` class="${cls}" style="display:block;">`
-         + `<defs>${gradDefs}</defs>${waves}${bars}</svg>`;
+    for (const t of expenseTags) {
+      const href = tagHref(t.id, 'expense');
+      node(`outtag:${t.id}`, { label: t.label, total: t.total, side: 'expenseTag', depth: depth.expenseTag,
+        href, share: fmtShare(t.total, totalExpense) });
+      for (const f of t.flows) link(`out:${f.key}`, `outtag:${t.id}`, f.value, { href, label: `${(expense.find((c) => c.key === f.key) || {}).label} → ${t.label}` });
+    }
+    return { nodes, links, span };
   }
 
-  // ─── Render + responsive redraw ──────────────────────────────────────────────
+  // GREEN on the left, GOLD on the right, GREY in the middle (see the block at
+  // the top of this file): each node's colour by its side and its rank.
+  function nodeColor(t, n) {
+    if (n.side === 'hub') return t.net;
+    if (n.side === 'incomeTag' || n.side === 'expenseTag') return t.tag;
+    const ramp = n.side === 'income' ? t.inflow : t.outflow;
+    return ramp[n.rank % ramp.length];
+  }
+
+  /** Labels hang off each bar's INNER face, out over its own ribbon: to the
+   *  right on the income side, to the left on the expense side. */
+  const LABEL_SIDE = { income: 'right', incomeTag: 'right', expense: 'left', expenseTag: 'left' };
+
+  function buildOption(t, model) {
+    const labelFor = (n) => {
+      const amount = fmtMoney(n.total);
+      return `{name|${richSafe(n.label)}}\n{amount|${richSafe(amount)}}${n.share ? ` {share|${n.share}}` : ''}`;
+    };
+    const rich = {
+      name: { color: t.textSecondary, fontFamily: t.font, fontSize: t.fontSize, lineHeight: 16 },
+      amount: { color: t.text, fontFamily: t.font, fontSize: 13, fontWeight: 600, lineHeight: 18 },
+      share: { color: t.textTertiary, fontFamily: t.font, fontSize: t.fontSize, lineHeight: 18 },
+    };
+    return {
+      tooltip: EChartKit.tooltip(t, {
+        trigger: 'item',
+        formatter: (p) => {
+          const d = p.data;
+          if (p.dataType === 'edge') {
+            return EChartKit.tipHtml({ rows: [{ color: p.color && p.color.colorStops ? null : p.color, name: d.label, value: fmtMoney(d.value) }] });
+          }
+          return EChartKit.tipHtml({
+            rows: [{ color: nodeColor(t, d), name: d.label, value: fmtMoney(d.total) }],
+            note: d.href ? `Click to see its transactions for this ${model.span}` : '',
+          });
+        },
+      }),
+      series: [{
+        type: 'sankey',
+        left: 10,
+        right: 10,
+        top: 28,
+        bottom: 28,
+        nodeWidth: NODE_W,
+        nodeGap: LABEL_GAP,
+        nodeAlign: 'justify',
+        layoutIterations: 0,
+        draggable: false,
+        emphasis: { focus: 'adjacency' },
+        lineStyle: { color: 'gradient', curveness: 0.5, opacity: LINK_OPACITY },
+        label: { distance: 10, rich },
+        data: model.nodes.map((n) => ({
+          ...n,
+          itemStyle: { color: nodeColor(t, n), borderWidth: 0 },
+          label: {
+            position: n.side === 'hub' ? (n.name === 'hub:in' ? 'right' : 'left') : LABEL_SIDE[n.side],
+            formatter: () => labelFor(n),
+          },
+          cursor: n.href ? 'pointer' : 'default',
+        })),
+        links: model.links.map((l) => ({
+          ...l,
+          // The channel is a stage, not a category: it holds the hub's grey.
+          ...(l.source === 'hub:in' && l.target === 'hub:out' ? { lineStyle: { color: t.net, opacity: LINK_OPACITY } } : {}),
+        })),
+      }],
+    };
+  }
+
+  /** The diagram's links as real links, for the keyboard and screen readers:
+   *  a canvas has no focusable parts, so each category and tag the diagram
+   *  draws is listed, visually hidden, beside it. */
+  function renderLinks(model) {
+    const chart = document.getElementById('cashflow-chart');
+    if (!chart) return;
+    let nav = document.getElementById('cashflow-links');
+    if (!nav) {
+      nav = document.createElement('nav');
+      nav.id = 'cashflow-links';
+      nav.className = 'ant-visually-hidden';
+      nav.setAttribute('aria-label', 'Cash flow categories');
+      chart.after(nav);
+    }
+    nav.innerHTML = model
+      ? `<ul>${model.nodes.filter((n) => n.href).map((n) =>
+        `<li><a href="${escapeHtml(n.href)}">${escapeHtml(`${n.label}: ${fmtMoney(n.total)} — view transactions for ${state.year}`)}</a></li>`).join('')}</ul>`
+      : '';
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   function showEmpty(show) {
     const el = document.getElementById('cashflow-empty');
@@ -721,6 +402,7 @@
         desc: 'Add income and expenses to your Cash Flow statement and the diagram will map how your money moves.',
         action: { label: 'Open Statements', href: '/statements#cash-flow' },
       });
+      EChartKit.unmount(chart);
       chart.innerHTML = '';
     } else {
       el.innerHTML = '';
@@ -730,18 +412,19 @@
   function render() {
     const el = document.getElementById('cashflow-chart');
     if (!el || !state.data) return;
-    // Both dimensions are watched: the diagram is laid out to its box's height
-    // as well as its width. The box (.chart-area, el's parent) takes its height
-    // from the flex chain above it, never from this svg, so redrawing cannot
-    // resize the box that triggered the redraw. The entrance animation is
-    // driven by `firstPaint` (see buildSVG), not by the observer's flag.
-    UI.observeChart(el, (w, h) => {
-      const svg = buildSVG(w, h);
-      if (svg === null) { showEmpty(true); return; }
-      showEmpty(false);
-      el.innerHTML = svg;
-      firstPaint = false;
-    }, { height: true });
+    const model = state.year === null ? null : buildModel();
+    renderLinks(model);
+    if (!model) { showEmpty(true); return; }
+    showEmpty(false);
+    EChartKit.mount(el, (t) => buildOption(t, model), {
+      label: `Cash flow for ${state.month ? `${state.month} ` : ''}${state.year}`,
+      on: {
+        click: (p) => {
+          const href = p.data && p.data.href;
+          if (href) location.assign(href);
+        },
+      },
+    });
   }
 
   // ─── Span picker: year + month, one joined control ───────────────────────────
@@ -815,10 +498,8 @@
     buildMonthMenu();
     wirePickers();
     load();
-    // Retone amounts when the currency symbol changes in Settings, and repaint
-    // when the theme does — the node/flow colours are CSS tokens read at draw time.
-    const repaint = () => { firstPaint = false; render(); };
-    window.addEventListener('currencychange', repaint);
-    window.addEventListener('themechange', repaint);
+    // Retone amounts when the currency symbol changes in Settings. A theme
+    // change needs nothing here: the kit rebuilds the diagram's colours.
+    window.addEventListener('currencychange', render);
   });
 }());

@@ -7,88 +7,33 @@
 //
 //   sources → Money in → groups (Spending, Accounts, …) → each module
 //
-// Every column shares one value scale. Within its column, each band is spread
-// out evenly down the height (equal space above, between and below; a lone
-// band is centred), so the diagram fans out rather than hanging from a flat
-// top as Manage's does. A column too crowded for that falls back to filling
-// the height edge to edge. Ribbons are gradients from the colour of
-// the bar they leave to the colour of the bar they meet. Labels sit on the
-// inner face of their bar, out over their own ribbon, so the ribbons get the
-// whole width. A group's label shares the run between Money in and the
-// groups with Money in's own label; when the run is too narrow for both side
-// by side, they are spread apart vertically together.
+// Drawn by Apache ECharts' Sankey through the app's chart kit
+// (widgets/echart-kit.js). Every column shares one value scale, each column
+// keeps the order given (largest first), and ribbons are gradients from the
+// colour of the bar they leave to the colour of the bar they meet. Labels sit
+// on the inner face of their bar, out over their own ribbon, cut to fit the
+// run between two columns.
 //
 // Manage draws this on a full page; here it lives in a short panel the user
 // can resize. So when the box is too short to label every band, the smallest
-// fold into "Other" (within their group on the right), and the gaps between
-// bands shrink before the bands do (labels then spread apart on thin leader
-// lines).
+// fold into "Other" (within their group on the right).
 //
-// Colours arrive as CSS custom-property names and are applied as
-// `fill: var(--x)` / `stop-color: var(--x)`, so a theme switch recolours a
-// drawn diagram with no redraw, as chart.js does.
+// Colours arrive as CSS custom-property names and are resolved by the kit,
+// which rebuilds the diagram when the theme changes. A canvas has no focusable
+// parts, so the modules a click can select are also listed as visually hidden
+// buttons beside it.
 
 (function () {
     const PAD = { t: 12, b: 16 };
     const LABEL_OFFSET = 10;   // gap between a bar's face and its label
     const EDGE_PAD = 10;       // gap between a side column and the box edge
     const NODE_W = 13;         // bar thickness
-    const CAP_R = 4;           // rounding on a side bar's outer corners only
-    const MIN_BAND = 1.5;      // floor so a tiny band is still visible
     const LABEL_GAP = 32;      // label block height (name over amount)
     const LABEL_MARGIN = 16;   // room above the first band and below the last for their labels
     const MIN_GAP = 6;         // bands never sit closer than this
-    const GAP_SHARE = 0.5;     // the gaps may take at most this share of a column
     const OTHER_COLOR = '--chart-unassigned';
 
-    const r1 = (v) => Math.round(v * 10) / 10;
     const sum = (items) => items.reduce((a, b) => a + b.value, 0);
-
-    /** Horizontal ribbon between two equal-height slots. */
-    function ribbon(sx, s0, tx, t0, h) {
-        const mx = r1((sx + tx) / 2);
-        return `M ${r1(sx)} ${r1(s0)} C ${mx} ${r1(s0)} ${mx} ${r1(t0)} ${r1(tx)} ${r1(t0)}`
-             + ` L ${r1(tx)} ${r1(t0 + h)} C ${mx} ${r1(t0 + h)} ${mx} ${r1(s0 + h)} ${r1(sx)} ${r1(s0 + h)} Z`;
-    }
-
-    /** A side bar: the corners on the box-edge side are rounded, the ones the
-     *  ribbon meets are square. outer -1 rounds the left, +1 the right. */
-    function capPath(x, y, w, h, outer) {
-        const r = Math.min(CAP_R, h / 2, w / 2);
-        const x0 = r1(x), x1 = r1(x + w), y0 = r1(y), y1 = r1(y + h);
-        if (outer < 0) {
-            return `M ${x1} ${y0} L ${r1(x + r)} ${y0} Q ${x0} ${y0} ${x0} ${r1(y + r)}`
-                 + ` L ${x0} ${r1(y + h - r)} Q ${x0} ${y1} ${r1(x + r)} ${y1} L ${x1} ${y1} Z`;
-        }
-        return `M ${x0} ${y0} L ${r1(x + w - r)} ${y0} Q ${x1} ${y0} ${x1} ${r1(y + r)}`
-             + ` L ${x1} ${r1(y + h - r)} Q ${x1} ${y1} ${r1(x + w - r)} ${y1} L ${x0} ${y1} Z`;
-    }
-
-    // Label text is measured, not counted per character: the font and theme
-    // both move it. One shared canvas context; none (no canvas) measures as 0.
-    let measureCtx;
-    function textWidth(text, size, weight) {
-        if (measureCtx === undefined) measureCtx = document.createElement('canvas').getContext('2d');
-        if (!measureCtx) return 0;
-        const family = getComputedStyle(document.documentElement).getPropertyValue('--font-family').trim() || 'sans-serif';
-        measureCtx.font = `${weight} ${size}px ${family}`;
-        return measureCtx.measureText(text).width;
-    }
-    // .sankey-label: 12px regular; .sankey-amount: 13px semibold (outlook.css).
-    const nameWidth = (text) => textWidth(text, 12, 400);
-    const amountWidth = (text) => textWidth(text, 13, 600);
-
-    /** `text` cut with an ellipsis to fit `max` px as a band name. */
-    function fitName(text, max) {
-        if (nameWidth(text) <= max) return text;
-        let lo = 0;
-        let hi = text.length;
-        while (lo < hi) {
-            const mid = (lo + hi + 1) >> 1;
-            if (nameWidth(`${text.slice(0, mid)}…`) <= max) lo = mid; else hi = mid - 1;
-        }
-        return lo ? `${text.slice(0, lo).trimEnd()}…` : '';
-    }
 
     const otherBand = (label, rest) => ({ label, value: sum(rest), color: OTHER_COLOR, folded: rest.map((b) => b.label) });
 
@@ -146,26 +91,6 @@
         return `(${pct < 10 ? pct.toFixed(1) : Math.round(pct)}%)`;
     }
 
-    /** Label centres, top to bottom: where they want to be where they fit,
-     *  else pushed at least LABEL_GAP apart within the box. */
-    function spread(wanted, H) {
-        const top = PAD.t + 10;
-        const bottom = H - PAD.b - 12;
-        const ys = wanted.slice();
-        for (let i = 1; i < ys.length; i++) ys[i] = Math.max(ys[i], ys[i - 1] + LABEL_GAP);
-        if (ys.length && ys[ys.length - 1] > bottom) {
-            ys[ys.length - 1] = bottom;
-            for (let i = ys.length - 2; i >= 0; i--) ys[i] = Math.min(ys[i], ys[i + 1] - LABEL_GAP);
-        }
-        if (ys.length && ys[0] < top) {
-            ys[0] = top;
-            for (let i = 1; i < ys.length; i++) ys[i] = Math.max(ys[i], ys[i - 1] + LABEL_GAP);
-        }
-        return ys;
-    }
-
-    let drawSeq = 0;
-
     /**
      * Draw into `box` (a positioned element), replacing whatever chart is there.
      *   opts.left        [{ label, value, id?, color?, pinned?, note? }] the sources
@@ -183,187 +108,133 @@
      *   opts.onSelect    id → void
      */
     function draw(box, opts) {
-        const entering = !box.querySelector('.sankey');
-        box.querySelector('.chart-svg')?.remove();
-        box.querySelector('.chart-tip')?.remove();
-        const W = box.clientWidth;
+        const canvas = PlanChart.canvasOf(box);
         const H = box.clientHeight;
-        if (W < 160 || H < 80) return;
-
+        const W = box.clientWidth;
         // As many bands per column as there is height to label without overlap.
         const maxBands = Math.max(2, Math.floor((H - PAD.t - PAD.b - 22) / LABEL_GAP) + 1);
         const left = foldSources(opts.left, maxBands, opts.otherLabel);
         const groups = foldGroups(opts.groups, maxBands, opts.otherLabel);
-        const items = groups.flatMap((g) => g.items.map((it) => ({ ...it, group: g.label })));
-        const seq = drawSeq++;
+        const total = Math.max(sum(left), sum(groups));
+        // A label sits in the run between two columns, so it is cut to fit it.
+        const labelRoom = Math.max(40, (W - EDGE_PAD * 2 - NODE_W * 4) / 3 - LABEL_OFFSET * 2);
 
-        if (!left.length && !groups.length) {
-            box.insertAdjacentHTML('beforeend', `<svg class="chart-svg sankey" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(opts.label)}">`
-                + `<text class="sankey-empty" x="${r1(W / 2)}" y="${r1(H / 2)}" text-anchor="middle">${escapeHtml(opts.empty)}</text></svg>`);
-            return;
-        }
+        // Nodes and links by name. Names are ids, not labels: two modules may
+        // share a label.
+        const nodes = [];
+        const links = [];
+        const HUB = 'hub';
+        left.forEach((b, i) => {
+            const name = `src:${i}`;
+            nodes.push({ name, band: b, depth: 0, color: b.color || opts.inRamp[i % opts.inRamp.length], side: 'right' });
+            links.push({ source: name, target: HUB, value: b.value, band: b, tip: `${b.label} → ${opts.hubLabel}` });
+        });
+        nodes.push({ name: HUB, band: { label: opts.hubLabel, value: total }, depth: 1, color: opts.hubColor, side: 'right' });
+        groups.forEach((g, gi) => {
+            const gname = `grp:${gi}`;
+            nodes.push({ name: gname, band: g, depth: 2, color: g.color, side: 'left' });
+            links.push({ source: HUB, target: gname, value: g.value, band: g, tip: `${opts.hubLabel} → ${g.label}` });
+            g.items.forEach((it, ii) => {
+                const name = `${gname}:${ii}`;
+                nodes.push({ name, band: it, depth: 3, color: it.color, side: 'left' });
+                links.push({ source: gname, target: name, value: it.value, band: it, tip: `${g.label} → ${it.label}` });
+            });
+        });
+        const empty = !left.length && !groups.length;
 
-        const totalIn = sum(left);
-        const totalOut = sum(groups);
-        const total = Math.max(totalIn, totalOut);
-        const TOP = PAD.t + LABEL_MARGIN;
-        const availH = H - TOP - PAD.b - LABEL_MARGIN;
-        // Manage keeps bands a whole label apart; a short box gives up gap first.
-        const gapFor = (n) => (n > 1 ? Math.max(MIN_GAP, Math.min(LABEL_GAP, (availH * GAP_SHARE) / (n - 1))) : 0);
-        const fitScale = (n, value) => (availH - gapFor(n) * Math.max(0, n - 1)) / (value || 1);
-        const scale = Math.max(0, Math.min(
-            fitScale(left.length, totalIn),
-            fitScale(groups.length, totalOut),
-            fitScale(items.length, totalOut),
-            fitScale(1, total),
-        ));
-
-        // Four columns, three equal ribbon runs between them.
-        const sourceX = EDGE_PAD;
-        const itemX = W - EDGE_PAD - NODE_W;
-        const run = Math.max(0, (itemX - sourceX - NODE_W * 3) / 3);
-        const hubX = sourceX + NODE_W + run;
-        const groupX = hubX + NODE_W + run;
-        const hubH = Math.max(total * scale, MIN_BAND);
-        const hubTop = TOP + (availH - hubH) / 2;
-
-        /** Spread bands down a column with equal space above, between and
-         *  below them. When that leaves less between them than the column's
-         *  planned gap, they fill the height edge to edge instead. */
-        const stack = (list, x, colorOf) => {
-            const n = list.length;
-            const hs = list.map((b) => Math.max(b.value * scale, MIN_BAND));
-            const free = Math.max(0, availH - hs.reduce((a, h) => a + h, 0));
-            let gap = free / (n + 1);
-            let y = TOP + gap;
-            if (n > 1 && gap < gapFor(n)) {
-                gap = free / (n - 1);
-                y = TOP;
+        EChartKit.mount(canvas, (t) => {
+            if (empty) {
+                return {
+                    title: {
+                        text: opts.empty, left: 'center', top: 'middle',
+                        textStyle: { color: t.textTertiary, fontFamily: t.font, fontSize: 13, fontWeight: 400 },
+                    },
+                };
             }
-            return list.map((b, i) => {
-                const h = hs[i];
-                const node = { ...b, x, y, h, color: colorOf(b, i) };
-                y += h + gap;
-                return node;
-            });
-        };
-        const sourceNodes = stack(left, sourceX, (b, i) => b.color || opts.inRamp[i % opts.inRamp.length]);
-        const groupNodes = stack(groups, groupX, (g) => g.color);
-        const itemNodes = stack(items, itemX, (it) => it.color);
-
-        let defs = '';
-        let gradSeq = 0;
-        const rampFill = (x1, x2, from, to) => {
-            const id = `sankey-${seq}-${gradSeq++}`;
-            defs += `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${r1(x1)}" y1="0" x2="${r1(x2)}" y2="0">`
-                  + `<stop offset="0" style="stop-color: var(${from})"/><stop offset="1" style="stop-color: var(${to})"/></linearGradient>`;
-            return `url(#${id})`;
-        };
-
-        const amountText = (n) => {
-            const pct = share(n.value, total);
-            return `${escapeHtml(opts.format(n.value))}${pct ? ` <tspan class="sankey-share">${escapeHtml(pct)}</tspan>` : ''}`;
-        };
-        const labelBlock = (x, y, anchor, name, amountHtml) =>
-            `<text class="sankey-label" x="${r1(x)}" y="${r1(y - 3)}" text-anchor="${anchor}">${escapeHtml(name)}</text>`
-            + `<text class="sankey-amount" x="${r1(x)}" y="${r1(y + 13)}" text-anchor="${anchor}">${amountHtml}</text>`;
-        const leader = (fromX, fromY, toX, toY) => (Math.abs(toY - fromY) > 1
-            ? `<path class="sankey-leader" d="M ${r1(fromX)} ${r1(fromY)} L ${r1(toX)} ${r1(toY)}"/>` : '');
-        const labelRoom = Math.max(0, run - LABEL_OFFSET * 2);
-
-        /** One band: its ribbon, leader and labels as one group (the hover and
-         *  click target, when it stands for a module). */
-        const band = (n, d, fill, tip, label) => {
-            const pick = n.id
-                ? ` class="sankey-cat is-pickable" data-id="${escapeHtml(n.id)}" tabindex="0" role="button" aria-label="${escapeHtml(`${n.label}: ${opts.format(n.value)}. Select module`)}"`
-                : ' class="sankey-cat"';
-            const note = [n.note, n.folded && n.folded.join(', ')].filter(Boolean).join('\n');
-            return `<g${pick}><title>${escapeHtml(`${tip}: ${opts.format(n.value)}${note ? `\n${note}` : ''}`)}</title>`
-                 + `<path class="sankey-link" d="${d}" fill="${fill}"/>${label}</g>`;
-        };
-
-        let waves = '';
-        let bars = '';
-
-        // Sources → Money in. Labels to the right of their bars.
-        {
-            const ys = spread(sourceNodes.map((n) => n.y + n.h / 2), H);
-            let slot = hubTop;
-            sourceNodes.forEach((n, i) => {
-                const h = Math.max(n.value * scale, MIN_BAND);
-                const edge = n.x + NODE_W;
-                const lx = edge + LABEL_OFFSET;
-                waves += band(n, ribbon(edge, n.y, hubX, slot, h), rampFill(edge, hubX, n.color, opts.hubColor), `${n.label} → ${opts.hubLabel}`,
-                    leader(edge, n.y + n.h / 2, lx, ys[i]) + labelBlock(lx, ys[i], 'start', fitName(n.label, labelRoom), amountText(n)));
-                bars += `<path class="sankey-node" d="${capPath(n.x, n.y, NODE_W, n.h, -1)}" style="fill: var(${n.color})"/>`;
-                slot += n.value * scale;
-            });
-        }
-
-        // Money in → groups, and each group → its modules. Group labels sit to
-        // the left of their bars, in the run they share with Money in's label;
-        // module labels to the left of theirs.
-        const hubAmount = opts.format(total);
-        const hubCy = hubTop + hubH / 2;
-        const groupNames = groupNodes.map((g) => fitName(g.label, labelRoom));
-        const blockW = (name, amount) => Math.max(nameWidth(name), amountWidth(amount));
-        const widestGroup = Math.max(0, ...groupNodes.map((g, i) => blockW(groupNames[i], `${opts.format(g.value)} ${share(g.value, total)}`)));
-        const sideBySide = blockW(opts.hubLabel, hubAmount) + widestGroup + LABEL_OFFSET * 3 <= run;
-        let hubLy = hubCy;
-        let groupLys;
-        if (sideBySide) {
-            groupLys = spread(groupNodes.map((g) => g.y + g.h / 2), H);
-        } else {
-            const wanted = [...groupNodes.map((g, i) => ({ y: g.y + g.h / 2, i })), { y: hubCy, hub: true }].sort((a, b) => a.y - b.y);
-            const ys = spread(wanted.map((w) => w.y), H);
-            groupLys = [];
-            wanted.forEach((w, k) => { if (w.hub) hubLy = ys[k]; else groupLys[w.i] = ys[k]; });
-        }
-
-        const itemLys = spread(itemNodes.map((n) => n.y + n.h / 2), H);
-        let hubSlot = hubTop;
-        let itemIdx = 0;
-        groupNodes.forEach((g, gi) => {
-            const h = Math.max(g.value * scale, MIN_BAND);
-            const lx = groupX - LABEL_OFFSET;
-            waves += band(g, ribbon(hubX + NODE_W, hubSlot, groupX, g.y, h), rampFill(hubX + NODE_W, groupX, opts.hubColor, g.color), `${opts.hubLabel} → ${g.label}`,
-                leader(groupX, g.y + g.h / 2, lx, groupLys[gi]) + labelBlock(lx, groupLys[gi], 'end', groupNames[gi], amountText(g)));
-            bars += `<rect class="sankey-node" x="${r1(groupX)}" y="${r1(g.y)}" width="${NODE_W}" height="${r1(g.h)}" style="fill: var(${g.color})"/>`;
-            hubSlot += g.value * scale;
-
-            let slot = g.y;
-            g.items.forEach(() => {
-                const n = itemNodes[itemIdx];
-                const ih = Math.max(n.value * scale, MIN_BAND);
-                const lx2 = n.x - LABEL_OFFSET;
-                waves += band(n, ribbon(groupX + NODE_W, slot, n.x, n.y, ih), rampFill(groupX + NODE_W, n.x, g.color, n.color), `${g.label} → ${n.label}`,
-                    leader(n.x, n.y + n.h / 2, lx2, itemLys[itemIdx]) + labelBlock(lx2, itemLys[itemIdx], 'end', fitName(n.label, labelRoom), amountText(n)));
-                bars += `<path class="sankey-node" d="${capPath(n.x, n.y, NODE_W, n.h, 1)}" style="fill: var(${n.color})"/>`;
-                slot += n.value * scale;
-                itemIdx++;
-            });
+            const amount = (b) => {
+                const pct = share(b.value, total);
+                return `{amount|${opts.format(b.value)}}${pct ? ` {share|${pct}}` : ''}`;
+            };
+            const tipFor = (b, tip) => {
+                const note = [b.note, b.folded && b.folded.join(', ')].filter(Boolean).join(' · ');
+                return EChartKit.tipHtml({ rows: [{ name: tip, value: opts.format(b.value) }], note });
+            };
+            return {
+                tooltip: EChartKit.tooltip(t, {
+                    trigger: 'item',
+                    formatter: (p) => (p.dataType === 'edge'
+                        ? tipFor(p.data.band, p.data.tip)
+                        : tipFor(p.data.band, p.data.band.label)),
+                }),
+                series: [{
+                    type: 'sankey',
+                    left: EDGE_PAD,
+                    right: EDGE_PAD,
+                    top: PAD.t + LABEL_MARGIN,
+                    bottom: PAD.b + LABEL_MARGIN,
+                    nodeWidth: NODE_W,
+                    nodeGap: Math.max(MIN_GAP, Math.min(LABEL_GAP, H / 12)),
+                    nodeAlign: 'justify',
+                    layoutIterations: 0,
+                    draggable: false,
+                    emphasis: { focus: 'adjacency' },
+                    lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.4 },
+                    label: {
+                        distance: LABEL_OFFSET,
+                        width: labelRoom,
+                        overflow: 'truncate',
+                        rich: {
+                            // Name and amount take the full text colour: they
+                            // float over the ribbons, where a muted tone reads poorly.
+                            name: { color: t.text, fontFamily: t.font, fontSize: 12, lineHeight: 16 },
+                            amount: { color: t.text, fontFamily: t.font, fontSize: 13, fontWeight: 600, lineHeight: 18 },
+                            share: { color: t.textSecondary, fontFamily: t.font, fontSize: 11, lineHeight: 18 },
+                        },
+                    },
+                    data: nodes.map((n) => ({
+                        name: n.name,
+                        depth: n.depth,
+                        band: n.band,
+                        itemStyle: { color: PlanChart.colorOf(box, n.color, t.textTertiary), borderWidth: 0 },
+                        cursor: n.band.id ? 'pointer' : 'default',
+                        label: {
+                            position: n.side,
+                            formatter: () => `{name|${String(n.band.label).replace(/[{}|]/g, ' ')}}\n${amount(n.band)}`,
+                        },
+                    })),
+                    links,
+                }],
+            };
+        }, {
+            label: opts.label,
+            animate: !box.querySelector(':scope > .chart-canvas canvas'),
+            on: {
+                click: (p) => {
+                    const id = p.data && p.data.band && p.data.band.id;
+                    if (id && opts.onSelect) opts.onSelect(id);
+                },
+            },
         });
+        renderKeys(box, empty ? [] : nodes.filter((n) => n.band.id), opts);
+    }
 
-        const hubTip = `<title>${escapeHtml(`${opts.hubLabel}: ${hubAmount}`)}</title>`;
-        bars += `<rect class="sankey-node" x="${r1(hubX)}" y="${r1(hubTop)}" width="${NODE_W}" height="${r1(hubH)}" style="fill: var(${opts.hubColor})">${hubTip}</rect>`
-              + leader(hubX + NODE_W, hubCy, hubX + NODE_W + LABEL_OFFSET, hubLy)
-              + labelBlock(hubX + NODE_W + LABEL_OFFSET, hubLy, 'start', opts.hubLabel, escapeHtml(hubAmount));
-
-        box.insertAdjacentHTML('beforeend',
-            `<svg class="chart-svg sankey${entering ? ' sankey-enter' : ''}" viewBox="0 0 ${W} ${H}" role="group" aria-label="${escapeHtml(opts.label)}">`
-            + `<defs>${defs}</defs>${waves}${bars}</svg>`);
-
-        const svg = box.lastElementChild;
-        const select = (e) => {
-            const g = e.target.closest('[data-id]');
-            if (g && opts.onSelect) opts.onSelect(g.dataset.id);
-        };
-        svg.addEventListener('click', select);
-        svg.addEventListener('keydown', (e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            e.preventDefault();
-            select(e);
-        });
+    /** The modules the diagram can select, as buttons for the keyboard and
+     *  screen readers: a canvas has no focusable parts. Visually hidden. */
+    function renderKeys(box, pickable, opts) {
+        let keys = box.querySelector(':scope > .sankey-keys');
+        if (!keys) {
+            keys = document.createElement('div');
+            keys.className = 'sankey-keys ant-visually-hidden';
+            keys.setAttribute('role', 'group');
+            keys.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-id]');
+                if (btn && keys.onSelect) keys.onSelect(btn.dataset.id);
+            });
+            box.appendChild(keys);
+        }
+        keys.onSelect = opts.onSelect;
+        keys.setAttribute('aria-label', opts.label || 'Diagram');
+        keys.innerHTML = pickable.map((n) => `<button type="button" data-id="${escapeHtml(n.band.id)}">${escapeHtml(`${n.band.label}: ${opts.format(n.band.value)}. Select module`)}</button>`).join('');
     }
 
     window.PlanSankey = { draw };

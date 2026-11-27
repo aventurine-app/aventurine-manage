@@ -1,47 +1,9 @@
 /* ============================================================================
-   donut.css — the ring and its legend, shared by Dashboard and Portfolio.
+   donut.css — the ring's legend rows, for Portfolio.
    ============================================================================
-   Drawn by widgets/donut.js. Each page owns the layout around it (how wide the
-   ring is, where the legend sits); this file owns how the ring and the legend
-   rows look.
+   The ring itself is an ECharts doughnut (widgets/donut.js), styled from the
+   theme's tokens there. The Dashboard draws its own legend (dashboard.css).
    ============================================================================ */
-
-.accounts-pie-svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-/* Hovering the ring spotlights one segment by dimming the rest. The arcs'
-   opacity transition is declared inline in donut.js (it shares a transition
-   list with the staggered sweep-in), so only the values change here. */
-.accounts-pie-svg:hover .donut-arc { opacity: 0.5; }
-.accounts-pie-svg .donut-arc:hover { opacity: 1; }
-
-/* A slice that links somewhere gets the cursor and a keyboard focus ring drawn
-   on the arc itself. */
-.accounts-pie-svg .donut-link { cursor: pointer; }
-.accounts-pie-svg .donut-link:focus { outline: none; }
-.accounts-pie-svg .donut-link:focus-visible .donut-arc { opacity: 1; }
-
-/* Centre readout inside the ring. */
-.donut-center-label {
-    fill: var(--text-tertiary);
-    font-family: var(--font-h3);
-    font-size: 11px;
-    font-weight: var(--weight-semibold);
-    letter-spacing: var(--track-widest);
-    text-transform: uppercase;
-}
-
-.donut-center-value {
-    fill: var(--text-primary);
-    font-family: var(--font-numeric);
-    font-size: 24px;
-    font-weight: var(--weight-light);
-    letter-spacing: var(--track-tight);
-    font-variant-numeric: tabular-nums;
-}
 
 .accounts-legend {
     display: flex;
@@ -132,6 +94,4 @@ a.accounts-legend-item:hover .accounts-legend-label { color: var(--accent-primar
     font-variant-numeric: tabular-nums;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .accounts-pie-svg .donut-arc { transition: none !important; }
-}
+

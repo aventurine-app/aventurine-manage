@@ -23,7 +23,10 @@
 //
 //   PlanReport.save({ entries: [{ plan, results }], goals, title })
 //
-// Needs: escapeHtml, Fmt, PlanModel, PlanEngine, PlanGoals, PlanSummary, Describe.
+// The charts are Apache ECharts' server-side SVG (svgChart below).
+//
+// Needs: escapeHtml, Fmt, PlanModel, PlanEngine, PlanGoals, PlanSummary, Describe,
+// echarts (vendor/echarts).
 // Used by plan/export-menu.js.
 
 (function () {
@@ -66,23 +69,59 @@
         return ticks;
     }
 
-    /** The y scale and its gridlines and labels, for values from lo to hi. */
-    function yAxis(lo, hi) {
+    /** The value axis for values from lo to hi: ticks, dashed grid, the zero
+     *  line solid. */
+    function valueAxis(lo, hi) {
         // A sliver on one side of zero (a small card balance under a large net
         // worth) would add a whole empty tick step; it is drawn against the zero line instead.
         const span = Math.max(Math.abs(lo), Math.abs(hi));
         if (lo < 0 && -lo < span * 0.02) lo = 0;
         if (hi > 0 && hi < span * 0.02) hi = 0;
         const ticks = niceTicks(Math.min(0, lo), Math.max(0, hi));
-        const min = ticks[0];
-        const max = ticks[ticks.length - 1];
-        const y = (v) => M.top + (1 - (v - min) / (max - min)) * (H - M.top - M.bottom);
-        const svg = ticks.map((t) => `<line x1="${M.left}" x2="${W - M.right}" y1="${y(t)}" y2="${y(t)}" stroke="${t === 0 ? '#8c8c8c' : GRID}" stroke-width="1"${t === 0 ? '' : ' stroke-dasharray="3 3"'}/>
-            <text x="${M.left - 8}" y="${y(t) + 4}" text-anchor="end" fill="${AXIS_TEXT}" font-size="11">${esc(compact(t))}</text>`).join('');
-        return { y, svg };
+        return {
+            type: 'value',
+            min: ticks[0],
+            max: ticks[ticks.length - 1],
+            interval: ticks.length > 1 ? ticks[1] - ticks[0] : undefined,
+            axisLabel: { color: AXIS_TEXT, fontSize: 11, formatter: (v) => compact(v), margin: 8 },
+            splitLine: { lineStyle: { color: GRID, type: [3, 3] } },
+        };
     }
 
-    const svgOpen = (label) => `<svg class="report-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}" preserveAspectRatio="xMidYMid meet">`;
+    /** One chart as vector SVG, rendered by Apache ECharts with no DOM (its
+     *  server-side renderer), so the printed PDF keeps sharp lines and text.
+     *  Paper colours: the report is drawn in fixed light colours whatever the
+     *  app's theme (see the top of this file). */
+    function svgChart(label, option) {
+        const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width: W, height: H });
+        try {
+            chart.setOption({
+                animation: false,
+                textStyle: { fontFamily: getComputedStyle(document.body).fontFamily },
+                grid: { left: M.left, right: M.right, top: M.top, bottom: M.bottom, containLabel: false },
+                ...option,
+            });
+            return `<div class="report-chart" role="img" aria-label="${esc(label)}">${chart.renderToSVGString({ useViewBox: true })}</div>`;
+        } finally {
+            chart.dispose();
+        }
+    }
+
+    /** The x axis: one category per point, labelled only where `labelAt` has one. */
+    function categoryAxis(count, labelAt, boundaryGap) {
+        return {
+            type: 'category',
+            boundaryGap,
+            data: Array.from({ length: count }, (_, i) => i),
+            axisLine: { lineStyle: { color: '#8c8c8c' } },
+            axisTick: { show: false },
+            axisLabel: {
+                color: AXIS_TEXT, fontSize: 11,
+                interval: (i) => labelAt.has(i),
+                formatter: (_v, i) => labelAt.get(i) || '',
+            },
+        };
+    }
 
     function legend(items) {
         return `<div class="report-legend">${items.map((it) => `<span><i class="${it.line ? 'is-line' : ''}" style="background:${it.color}"></i>${esc(it.label)}</span>`).join('')}</div>`;
@@ -113,52 +152,50 @@
         const downs = fold(of('debt'), DEBT_SHADES.length, 'Other debts', (n) => res.nodes[n.id].balance)
             .map((b, i) => ({ ...b, color: DEBT_SHADES[i] }));
 
-        // Stack away from zero: an overdrawn account (below zero) stacks down.
-        const posBase = new Float64Array(count);
-        const negBase = new Float64Array(count);
-        const shapes = [];
-        for (const [band, sign] of [...ups.map((b) => [b, 1]), ...downs.map((b) => [b, -1])]) {
-            const lo = new Float64Array(count);
-            const hi = new Float64Array(count);
+        // Stack away from zero: an overdrawn account (below zero) stacks down,
+        // which is ECharts' same-sign stacking.
+        const all = [...ups.map((b) => [b, 1]), ...downs.map((b) => [b, -1])]
+            .filter(([b]) => b.values.some((v) => Math.abs(v) > 0.5));
+        const worth = res.netWorth;
+        const up = new Float64Array(count);
+        const down = new Float64Array(count);
+        for (const [band, sign] of all) {
             for (let k = 0; k < count; k++) {
                 const v = band.values[k] * sign;
-                const base = v >= 0 ? posBase : negBase;
-                lo[k] = base[k];
-                hi[k] = base[k] + v;
-                base[k] = hi[k];
+                if (v >= 0) up[k] += v; else down[k] += v;
             }
-            shapes.push({ band, lo, hi });
         }
-        const worth = res.netWorth;
-        let lo = Math.min(...negBase);
-        let hi = Math.max(...posBase);
+        let lo = Math.min(...down);
+        let hi = Math.max(...up);
         for (const v of worth) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
-        const { y, svg: grid } = yAxis(lo, hi);
-        const x = (k) => M.left + (count === 1 ? 0 : k / (count - 1)) * (W - M.left - M.right);
-        const pts = (arr) => Array.from(arr, (v, k) => `${x(k).toFixed(1)},${y(v).toFixed(1)}`);
-
-        const areas = shapes.filter((s) => s.band.values.some((v) => Math.abs(v) > 0.5)).map((s) => {
-            const top = pts(s.hi);
-            const bottom = pts(s.lo).reverse();
-            return `<polygon points="${top.join(' ')} ${bottom.join(' ')}" fill="${s.band.color}"/>`;
-        }).join('');
-        const line = `<polyline points="${pts(worth).join(' ')}" fill="none" stroke="${LINE}" stroke-width="2" stroke-linejoin="round"/>`;
-        const shown = shapes.map((s) => s.band).filter((b) => b.values.some((v) => Math.abs(v) > 0.5));
-        return `${svgOpen('Net worth over time')}${grid}${areas}${line}${yearTicks(plan, count, x)}</svg>
+        const chart = svgChart('Net worth over time', {
+            xAxis: categoryAxis(count, yearLabels(plan, count), false),
+            yAxis: valueAxis(lo, hi),
+            series: [
+                ...all.map(([band, sign]) => ({
+                    type: 'line', stack: 'bands', symbol: 'none', color: band.color,
+                    lineStyle: { width: 0 }, areaStyle: { color: band.color, opacity: 1 },
+                    data: Array.from(band.values, (v) => v * sign),
+                })),
+                { type: 'line', symbol: 'none', color: LINE, lineStyle: { width: 2 }, data: Array.from(worth) },
+            ],
+        });
+        const shown = all.map(([b]) => b);
+        return `${chart}
             ${legend([{ label: 'Net worth', color: LINE, line: true }, ...shown.map((b) => ({ label: b.label, color: b.color }))])}`;
     }
 
-    /** Year labels along the bottom at each January, at most about ten. */
-    function yearTicks(plan, count, x) {
+    /** Year labels at each January, at most about ten: Map<index, year>. */
+    function yearLabels(plan, count) {
         const startMonth = P.ymParse(plan.settings.start).m - 1;
         const startYear = P.ymParse(plan.settings.start).y;
         const years = Math.ceil(count / 12);
         const every = Math.max(1, Math.ceil(years / 10));
-        let out = '';
+        const out = new Map();
         for (let k = (12 - startMonth) % 12; k < count; k += 12) {
             const year = startYear + Math.floor((startMonth + k) / 12);
             if ((year - startYear) % every) continue;
-            out += `<text x="${x(k)}" y="${H - 6}" text-anchor="middle" fill="${AXIS_TEXT}" font-size="11">${year}</text>`;
+            out.set(k, String(year));
         }
         return out;
     }
@@ -189,32 +226,23 @@
             hi = Math.max(hi, bars.filter((b) => b.sign > 0).reduce((s, b) => s + b.values[i], 0));
             lo = Math.min(lo, -bars.filter((b) => b.sign < 0).reduce((s, b) => s + b.values[i], 0));
         }
-        const { y, svg: grid } = yAxis(lo, hi);
-        const slot = (W - M.left - M.right) / Math.max(1, count);
-        const barW = Math.max(1, slot * 0.6);
-        const cx = (i) => M.left + slot * (i + 0.5);
-        let rects = '';
-        for (let i = 0; i < count; i++) {
-            let up = 0;
-            let down = 0;
-            for (const b of bars) {
-                const v = b.values[i];
-                if (v <= 0.5) continue;
-                const from = b.sign > 0 ? up : down;
-                const to = from + b.sign * v;
-                if (b.sign > 0) up = to; else down = to;
-                const top = y(Math.max(from, to));
-                rects += `<rect x="${(cx(i) - barW / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0.5, y(Math.min(from, to)) - top).toFixed(1)}" fill="${b.color}"/>`;
-            }
-        }
-        const line = `<polyline points="${net.map((v, i) => `${cx(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="${LINE}" stroke-width="2" stroke-linejoin="round"/>`;
         const every = Math.max(1, Math.ceil(count / 12));
-        let ticks = '';
+        const labels = new Map();
         for (let i = 0; i < count; i += every) {
-            const text = yearly ? `Y${i + 1}` : P.MONTHS[P.ymParse(P.ymAdd(plan.settings.start, i)).m - 1];
-            ticks += `<text x="${cx(i)}" y="${H - 6}" text-anchor="middle" fill="${AXIS_TEXT}" font-size="11">${esc(text)}</text>`;
+            labels.set(i, yearly ? `Y${i + 1}` : P.MONTHS[P.ymParse(P.ymAdd(plan.settings.start, i)).m - 1]);
         }
-        return `${svgOpen(yearly ? 'Cash flow by year' : 'Cash flow by month')}${grid}${rects}${line}${ticks}</svg>
+        const chart = svgChart(yearly ? 'Cash flow by year' : 'Cash flow by month', {
+            xAxis: categoryAxis(count, labels, true),
+            yAxis: valueAxis(lo, hi),
+            series: [
+                ...bars.map((b) => ({
+                    type: 'bar', stack: 'flow', color: b.color, barCategoryGap: '40%',
+                    data: Array.from(b.values, (v) => (v > 0.5 ? b.sign * v : null)),
+                })),
+                { type: 'line', symbol: 'none', color: LINE, lineStyle: { width: 2 }, data: net },
+            ],
+        });
+        return `${chart}
             ${legend([...bars.map((b) => ({ label: b.label, color: b.color })), { label: 'Net change', color: LINE, line: true }])}`;
     }
 

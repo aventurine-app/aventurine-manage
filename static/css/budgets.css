@@ -2,24 +2,20 @@
    budgets.css — the Budgets page (pages/budgets.html), in Ant Design.
    ============================================================================
    The components (cards, buttons, segmented, table, progress, modal, alert…)
-   are ant.css; this file is the page: its layout, the field of circles, the
+   are ant.css; this file is the page: its layout, the chart's box, the
    list's columns and the Set Budget dialog's rows.
 
-   One circle per BUDGETED category: its AREA is the monthly target, and how far
-   up it is filled is how much of that target the month on the toolbar has
-   already reached. An empty ring means nothing has moved in that category yet.
-   A category with no target gets no circle at all — the circle IS the target.
-
-   Positions come from JS (static/js/widgets/bubblefield.js) as a `translate` on
-   each circle, and its size as inline width/height, so nothing in this file
-   may set either. What this file owns is what a circle LOOKS like at whatever
-   size it is handed, which is why the type inside scales in container units
-   (cqmin) off the circle itself: one rule covers a 64px circle and a 240px one.
+   One wedge of a Nightingale rose per BUDGETED category (budgets.js, drawn by
+   Apache ECharts): its AREA is the monthly target, and the filled wedge inside
+   it is how much of that target the month on the toolbar has already reached.
+   A category with no target gets no wedge at all — the wedge IS the target.
 
    Colour carries TWO things and no more. The HUE is the kind of target: the
-   accent for spending, Ant's info blue for money put away (Savings, Investing,
-   any transfer-direction category). The SHIFT to red is the verdict, and only
-   a spending target ever shifts (see budgets.js for why put-away never does).
+   theme's primary for spending, its info blue for money put away (Savings,
+   Investing, any transfer-direction category). The SHIFT to red is the
+   verdict, and only a spending target ever shifts (see budgets.js for why
+   put-away never does). The rose reads those colours from the theme itself;
+   this file styles the page around it and the List view.
    ============================================================================ */
 
 /* Anchored to the top, and at least as tall as the window: the field takes
@@ -101,153 +97,12 @@
     overflow: hidden;
 }
 
-/* The circles are absolutely positioned inside this box, so it is their
-   containing block and the box BubbleField measures. Clipped, so a circle
-   mid-flight can never raise a scrollbar, but with room to paint a hovered
-   circle's growth and a focus ring at its edges. */
+/* The rose (budgets.js, Apache ECharts) fills this box: the card's height left
+   over, with the card's floor above keeping room for it in a short window. */
 .bud-field {
-    position: relative;
     flex: 1;
+    min-height: 0;
     margin: 8px;
-    overflow: clip;
-    overflow-clip-margin: 8px;
-}
-
-
-/* ─── A circle ──────────────────────────────────────────────────────────────
-   --bud-paint is what the ring, the fill and the waterline all draw with, so
-   one class repaints a whole circle by changing it; --bud-fill is the level.
-   Exactly two classes repaint it: -away and -over. */
-.bud-bubble {
-    --bud-paint: var(--ant-color-primary);
-    --bud-tint: color-mix(in srgb, var(--bud-paint) 20%, transparent);
-
-    box-sizing: border-box;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 1.5px solid var(--bud-paint);
-    border-radius: 50%;
-    background: var(--ant-color-bg-container);
-    color: var(--ant-color-text);
-    font: inherit;
-    cursor: pointer;
-    overflow: hidden;
-    /* The type inside sizes itself off the circle (cqmin below). Its own size
-       is the inline width/height BubbleField writes, so containment is free. */
-    container-type: size;
-    /* `translate` belongs to the simulation and moves every frame while the
-       field settles. Hover grows the circle with the separate `scale`, which
-       applies around the circle's own centre before that translate. */
-    will-change: translate;
-    transition: scale 150ms ease;
-}
-
-.bud-bubble:hover,
-.bud-bubble:focus-visible {
-    /* Over its neighbours, so the grown ring stays whole. */
-    z-index: 1;
-}
-.bud-bubble:hover { scale: 1.02; }
-.bud-bubble:active { scale: 1; }
-.bud-bubble:focus-visible {
-    outline: 2px solid var(--ant-color-primary);
-    outline-offset: 2px;
-}
-
-/* Money put away. Blue at every level, and never combined with -over. */
-.bud-bubble-away { --bud-paint: var(--ant-color-info); }
-
-/* Over the target: the one thing that changes a spending circle's colour.
-   Colour is never the only carrier — the figures inside show the overshoot,
-   and the tooltip says how much over. */
-.bud-bubble-over { --bud-paint: var(--ant-color-error); }
-
-/* Ant's dark algorithm needs a stronger tint to read on a dark card. */
-html[data-theme="dark"] .bud-bubble {
-    --bud-tint: color-mix(in srgb, var(--bud-paint) 33%, transparent);
-}
-
-/* ─── The level ─────────────────────────────────────────────────────────────
-   A tint, not a solid, because the readout sits over it. The waterline along
-   its top is the crisp edge that makes the level readable at a glance. */
-.bud-bubble-fill {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: var(--bud-fill, 0%);
-    background: var(--bud-tint);
-    border-top: 1.5px solid var(--bud-paint);
-    pointer-events: none;
-    transition: height 260ms ease;
-}
-/* Nothing moved: no fill, or its zero-height waterline would still draw. */
-.bud-bubble-empty .bud-bubble-fill { display: none; }
-/* Reached or passed: full to the top, where the curve would only clip a line. */
-.bud-bubble-filled .bud-bubble-fill { border-top-color: transparent; }
-/* Over: the whole circle in Ant's error background. */
-.bud-bubble-over .bud-bubble-fill { background: var(--ant-color-error-bg); }
-
-/* ─── The readout ───────────────────────────────────────────────────────────
-   Above the fill, inside the middle 80% so it stays clear of the curve. cqmin
-   scales the type against the circle's own box; the clamps stop it going
-   illegibly small or comically large. */
-.bud-bubble-text {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    max-width: 80%;
-    line-height: 1.2;
-    text-align: center;
-}
-
-.bud-bubble-name,
-.bud-bubble-target {
-    max-width: 100%;
-    overflow: hidden;
-    font-size: clamp(11px, 6.5cqmin, 15px);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.bud-bubble-name { color: var(--ant-color-text-secondary); }
-.bud-bubble-target {
-    color: var(--ant-color-text-tertiary);
-    font-variant-numeric: tabular-nums;
-}
-
-.bud-bubble-spent {
-    max-width: 100%;
-    overflow: hidden;
-    color: var(--ant-color-text);
-    font-size: clamp(12px, 13.5cqmin, 30px);
-    font-variant-numeric: tabular-nums;
-    font-weight: var(--ant-font-weight-strong);
-    letter-spacing: -0.01em;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.bud-bubble-over .bud-bubble-spent { color: var(--ant-color-error-text); }
-
-/* The amount is written twice by budgets.js; a circle under 120px across
-   shows the one without a ".00". */
-.bud-amount-short { display: none; }
-
-/* As a circle shrinks, the readout sheds lines rather than shrinking past
-   legibility. The amount is the last thing to go, so every circle always says
-   what it reached; the name and the target stay in the tooltip and the
-   aria-label either way. */
-@container (max-width: 119.98px) {
-    .bud-amount-full { display: none; }
-    .bud-amount-short { display: inline; }
-}
-@container (max-width: 92px) {
-    .bud-bubble-name { display: none; }
-}
-@container (max-width: 68px) {
-    .bud-bubble-target { display: none; }
 }
 
 

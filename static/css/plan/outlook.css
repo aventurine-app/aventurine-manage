@@ -70,31 +70,9 @@
     height: clamp(300px, calc(100vh - 440px), 640px);
     min-height: 0;
 }
-.chart-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.chart-grid { stroke: var(--chart-grid); stroke-dasharray: 3 3; }
-.chart-zero { stroke: var(--color-border); }
-.chart-tick { fill: var(--color-text-tertiary); font-size: 12px; font-variant-numeric: tabular-nums; }
-.chart-band { stroke: var(--color-bg-container); stroke-width: 0.5; fill-opacity: 0.85; }
-.chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.chart-bar { shape-rendering: geometricPrecision; }
-.chart-between { fill: var(--color-fill-secondary); }
-.chart-cross { stroke: var(--color-text-quaternary); stroke-dasharray: 3 3; }
-.chart-dot { stroke: var(--color-bg-container); stroke-width: 2; }
-.chart-hit { fill: transparent; cursor: crosshair; }
+.chart-canvas { position: absolute; inset: 0; }
 
-/* The tooltip: Ant's chart tooltip, an elevated card. */
-.chart-tip {
-    position: absolute;
-    z-index: 7;
-    min-width: 200px;
-    padding: var(--space-8) var(--space-12);
-    background: var(--color-bg-elevated);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--box-shadow-secondary);
-    pointer-events: none;
-    color: var(--color-text);
-    font-size: var(--font-size-sm);
-}
+/* The tooltip's people block, above the kit's card content (chart.js). */
 .chart-tip-people {
     margin-bottom: var(--space-8);
     padding-bottom: var(--space-8);
@@ -110,34 +88,6 @@
 }
 .chart-tip-person span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chart-tip-person b { color: var(--color-text-secondary); font-weight: var(--font-weight-normal); font-variant-numeric: tabular-nums; }
-.chart-tip-title {
-    margin-bottom: var(--space-4);
-    color: var(--color-text);
-    font-weight: var(--font-weight-strong);
-}
-.chart-tip-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-8);
-    color: var(--color-text-secondary);
-    line-height: 22px;
-}
-.chart-tip-row i { width: 8px; height: 8px; border-radius: 50%; background: var(--swatch); flex-shrink: 0; }
-.chart-tip-row span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chart-tip-row b { color: var(--color-text); font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
-.chart-tip-row.is-total { margin-top: var(--space-4); padding-top: var(--space-4); border-top: var(--line-width) solid var(--color-split); }
-.chart-tip-row.is-total b { font-weight: var(--font-weight-strong); }
-
-/* A goal met (chart.js markers): a dashed rule in the goal's chart shade
-   (--goal-*-mark), hanging from a rounded badge in its colour with a white
-   target and label (goals.css). */
-.chart-marker { stroke: currentColor; stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.8; }
-.chart-marker-icon { fill: var(--goal-ink); overflow: visible; }
-.chart-marker-label {
-    fill: var(--goal-ink);
-    font-size: 12px;
-    font-weight: var(--font-weight-strong);
-}
 
 /* ── Tables ─────────────────────────────────────────────────────────────── */
 .outlook-table-wrap {
@@ -151,44 +101,6 @@
 .year-cell span { color: var(--color-text-tertiary); font-size: var(--font-size-sm); font-weight: var(--font-weight-normal); }
 
 /* ── Sankey (sankey.js) ─────────────────────────────────────────────────────
-   Ribbons rest translucent; a band that stands for a module brightens under
-   the pointer or keyboard focus, since clicking it selects that module. The
-   others (Saved, Other, the middle channel) hold still: brightening would
-   offer a click with nowhere to go. Their tooltips still show. */
+   Drawn by ECharts into the same chart box; the legend has nothing to add. */
 .chart-pane.is-sankey .chart-legend { display: none; }
 .chart-pane.is-sankey { padding-left: var(--space-24); }
-
-.sankey .sankey-link { opacity: 0.4; transition: opacity var(--motion-duration-mid); }
-.sankey .is-pickable { cursor: pointer; }
-.sankey .is-pickable:hover .sankey-link,
-.sankey .is-pickable:focus-visible .sankey-link { opacity: 0.7; }
-.sankey .is-pickable:focus { outline: none; }
-.sankey .is-pickable:focus-visible .sankey-link { stroke: var(--color-primary); stroke-width: 1.5; }
-
-/* Thin connector from a bar to a label that was moved off its centreline. */
-.sankey .sankey-leader { fill: none; stroke: var(--color-text-tertiary); stroke-width: 1; opacity: 0.45; }
-
-/* Name, amount and share all take the full text colour: they float over the
-   ribbons, where a muted tone reads poorly. */
-.sankey .sankey-label {
-    fill: var(--color-text);
-    font-family: var(--font-family);
-    font-size: 12px;
-}
-.sankey .sankey-amount {
-    fill: var(--color-text);
-    font-family: var(--font-family);
-    font-size: 13px;
-    font-weight: var(--font-weight-strong);
-    font-variant-numeric: tabular-nums;
-}
-.sankey .sankey-share { font-size: 11px; font-weight: var(--font-weight-normal); fill: var(--color-text-secondary); }
-.sankey .sankey-empty { fill: var(--color-text-tertiary); font-size: var(--font-size); }
-
-/* Fade in when the view opens; redraws on edits and resizes do not. */
-.sankey.sankey-enter { animation: sankey-fade 0.5s ease both; }
-@keyframes sankey-fade { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-    .sankey .sankey-link { transition: none; }
-    .sankey.sankey-enter { animation: none; }
-}

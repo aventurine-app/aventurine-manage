@@ -119,7 +119,7 @@
     syncAccountSelect();
     syncKebab();
     renderSummary();
-    renderChartResponsive();
+    renderChart();
     if (state.activeId != null) renderCard();
   }
 
@@ -285,21 +285,11 @@
   }
 
   // ─── Chart ───────────────────────────────────────────────────────────────
-  // Self-contained inline SVG, single weekly series, x scaled by DATE (not by
-  // week index) so a planned item pins to the day it actually falls on.
+  // Apache ECharts (widgets/echart-kit.js), single weekly series on a TIME axis
+  // (not a week index) so a planned item pins to the day it actually falls on.
+  // The box's height is CSS (.ec-box); the chart fills it.
 
-  const CHART_RATIO = 240 / 800;
-  const CHART_PAD = { l: 60, r: 22, t: 20, b: 34 };
-
-  function readAccent() {
-    // The forecast line is a neutral projection, so it uses the chart palette and
-    // changes with the theme, rather than the green/red reserved for
-    // gain/loss. --chart-1 rather than --accent-primary: it resolves to the
-    // theme's first chart colour (theme.css), so this line changes with the
-    // rest of the app's charts.
-    const v = getComputedStyle(document.documentElement).getPropertyValue('--chart-1').trim();
-    return v || '#8fb088';
-  }
+  const msOf = (iso) => toUTC(iso);
 
   /**
    * The value axis. Zero is pulled into the domain when the projection actually
@@ -316,31 +306,12 @@
     return ChartMath.niceTicks(nearZero ? Math.min(0, lo) : lo, Math.max(0, hi), 4);
   }
 
-  // The tick maths, the clamped Catmull-Rom curve and curveYAt all live in
-  // ChartMath (core/chartmath.js), shared with widgets/chart.js and
-  // pages/dashboard.js. curveYAt travels with the curve deliberately: a pin's
-  // height is only right while it is solved against the same control points the
-  // line was drawn from, so the two must not be able to drift apart.
-
-  /**
-   * Two halves meeting at today, which sits dead centre: real weekly balances on
-   * the left, the projection on the right. The split is what makes the
-   * projection readable — a slope is only meaningful next to the slope it came
-   * from — and the split is drawn, not just labelled: the past is a solid line
-   * over a filled area, the future is dashed and lighter over a fainter one, with
-   * a marked divider between them. Dashing rather than a second hue: the app uses
-   * reduced emphasis for projections elsewhere (see .rec-occ-projected on the
-   * Recurring calendar), and red/green are used for gain/loss.
-   */
-  function buildChartSVG(W, animate) {
+  /** The two halves and the range, in data terms. The anchor (today, at the
+   *  balance before any projected flow) is the LAST history point and the
+   *  FIRST forecast point, so the two lines join exactly. */
+  function chartData() {
     const d = state.data;
-    const series = d ? d.series : [];
-    // Nothing to draw — the empty state renders above instead of a flat line at
-    // zero pretending to be a projection.
-    if (!hasAnythingToShow()) { plot = null; return ''; }
-
-    // The anchor — today, at the balance before any projected flow — is the LAST
-    // history point and the FIRST forecast point, so the two paths join exactly.
+    const series = d.series;
     const anchor = d.anchor || { date: series[0].weekStart, balance: series[0].balance };
     const anchorPt = { date: anchor.date, balance: anchor.balance, anchor: true };
     const pastPts = [
@@ -351,11 +322,44 @@
       anchorPt,
       ...series.map((s) => ({ date: s.weekEnd, balance: s.balance, week: s })),
     ];
+    // Domain comes from the server, symmetric about today by construction —
+    // re-deriving it from whichever points happen to exist would drift the
+    // divider off centre as soon as history is shorter than the horizon.
+    const domain = d.domain || { start: pastPts[0].date, end: futurePts[futurePts.length - 1].date };
+    const hasBand = series.length > 0 && series.every((s) => s.low != null && s.high != null);
+    return { anchor, pastPts, futurePts, domain, hasBand };
+  }
+
+  /** The tooltip line for one dot. */
+  function dotTitle(p) {
+    if (p.anchor) return `Today: ${fmtMoney(p.balance)}`;
+    if (p.past) return `Week of ${p.past.label}: ${fmtMoney(p.balance)}`;
+    const range = p.week.low != null
+      ? `, typical range ${fmtMoney(p.week.low)} to ${fmtMoney(p.week.high)}` : '';
+    return `Projected week of ${p.week.label}: ${fmtMoney(p.balance)} (net ${fmtMoney(p.week.net)}${range})`;
+  }
+
+  /**
+   * Two halves meeting at today, which sits dead centre: real weekly balances on
+   * the left, the projection on the right. The split is what makes the
+   * projection readable — a slope is only meaningful next to the slope it came
+   * from — and the split is drawn, not just labelled: the past is a solid line
+   * over a filled area, the future is dashed and lighter over a fainter one, with
+   * a marked divider between them. Dashing rather than a second hue: the app uses
+   * reduced emphasis for projections elsewhere (see .rec-occ-projected on the
+   * Recurring calendar), and red/green are used for gain/loss.
+   *
+   * The lines are straight from week to week, so a planned item's pin, placed
+   * by interpolating between the weeks either side of its date, sits exactly on
+   * the line drawn.
+   */
+  function buildOption(t) {
+    const { anchor, pastPts, futurePts, domain, hasBand } = chartData();
+    const series = state.data.series;
 
     // The range is part of what the axis must hold, but only up to one line-span
     // beyond the line either side: a very wide band must not flatten the line it
     // is meant to qualify. Whatever pokes past that is clipped at the plot edge.
-    const hasBand = series.length > 0 && series.every((s) => s.low != null && s.high != null);
     const lineVals = [...pastPts, ...futurePts].map((p) => p.balance);
     let axisVals = lineVals;
     if (hasBand) {
@@ -368,143 +372,143 @@
         Math.min(Math.max(...series.map((s) => s.high)), hi + span),
       ];
     }
-    const yTicks = valueTicks(axisVals);
-    const minVal = yTicks[0];
-    const maxVal = yTicks[yTicks.length - 1];
-    const valRange = maxVal - minVal || 1;
+    const ticks = valueTicks(axisVals);
 
-    const H = Math.max(Math.round(W * CHART_RATIO), 210);
-    const { l: PL, r: PR, t: PT, b: PB } = CHART_PAD;
-    const CW = W - PL - PR;
-    const CH = H - PT - PB;
-
-    // Domain comes from the server, symmetric about today by construction —
-    // re-deriving it from whichever points happen to exist would drift the
-    // divider off centre as soon as history is shorter than the horizon.
-    const domain = d.domain || { start: pastPts[0].date, end: futurePts[futurePts.length - 1].date };
-    const first = domain.start;
-    const totalDays = Math.max(1, daysBetween(first, domain.end));
-    const xScale = (iso) => PL + (daysBetween(first, iso) / totalDays) * CW;
-    const yScale = (v) => PT + CH - ((v - minVal) / valRange) * CH;
-
-    // The screen geometry of both halves, built ONCE: the same segments are what
-    // the line is drawn from and what a pin's height is read off (plot.curveY),
-    // so a pin cannot end up beside a curve the chart never drew.
-    const toXY = (pts) => pts.map((p) => ({ x: xScale(p.date), y: yScale(p.balance) }));
-    const pastXY = toXY(pastPts);
-    const futureXY = toXY(futurePts);
-    const futureSegs = ChartMath.bezierSegments(futureXY);
-
-    // Published for the overlay + pins. `todayX` is where planning starts.
-    plot = {
-      W, H, PL, PR, PT, PB, CW, CH,
-      first, last: domain.end, totalDays, xScale, yScale,
-      today: anchor.date, todayX: xScale(anchor.date),
-      curveY: (x) => ChartMath.curveYAt(futureSegs, x),
-    };
-
-    const color = readAccent();
-    const baseY = H - PB;
-
-    let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg"
-      class="forecast-chart${animate ? '' : ' chart-no-anim'}" style="display:block;">`;
-
-    const fmtAxis = axisFormatter(yTicks);
-    for (const v of yTicks) {
-      const y = yScale(v);
-      svg += `<line class="chart-grid" x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}"/>`;
-      svg += `<text class="chart-label" x="${PL - 10}" y="${y}" text-anchor="end" dominant-baseline="middle">${escapeHtml(fmtAxis(v))}</text>`;
-    }
-
-    if (minVal < 0 && maxVal > 0) {
-      const y0 = yScale(0);
-      svg += `<line class="chart-zero" x1="${PL}" y1="${y0}" x2="${W - PR}" y2="${y0}"/>`;
-    }
-
-    // The divider: everything right of it is projected.
-    svg += `<line class="fc-today-rule" x1="${plot.todayX}" y1="${PT}" x2="${plot.todayX}" y2="${baseY}"/>`;
-
-    // X labels — up to ~9 evenly spaced across the whole domain, with the centre
-    // one always reading "Today" (dropping any neighbour that would collide).
-    const allPts = [...pastPts, ...futurePts.slice(1)];
-    const anchorIdx = pastPts.length - 1;
-    const stride = Math.max(1, Math.round(allPts.length / 9));
-    allPts.forEach((p, i) => {
-      if (i === anchorIdx) return;
-      if (i % stride !== 0 && i !== allPts.length - 1) return;
-      if (Math.abs(i - anchorIdx) < stride * 0.75) return; // too close to "Today"
-      svg += `<text class="chart-label" x="${xScale(p.date)}" y="${H - PB + 18}" text-anchor="middle">${escapeHtml(fmtShortDate(p.date))}</text>`;
+    // The forecast line is a neutral projection, so it takes the theme's first
+    // chart colour rather than the green/red reserved for gain/loss.
+    const color = t.chart[0] || t.primary;
+    const point = (p) => ({
+      value: [msOf(p.date), p.balance],
+      title: dotTitle(p),
+      itemStyle: { color: p.balance < 0 ? t.error : color, opacity: p.week ? 0.6 : 1 },
+      ...(p.anchor ? { symbolSize: 9 } : {}),
     });
-    svg += `<text class="chart-label fc-today-label" x="${plot.todayX}" y="${H - PB + 18}" text-anchor="middle">Today</text>`;
+    const area = (projected) => ({
+      origin: 'start',
+      color: {
+        type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+        colorStops: [
+          { offset: 0, color: EChartKit.alpha(color, projected ? 0.11 : 0.28) },
+          { offset: 1, color: EChartKit.alpha(color, 0) },
+        ],
+      },
+    });
+    const line = (pts, projected) => ({
+      type: 'line',
+      name: projected ? 'Projected' : 'Recorded',
+      color,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { width: projected ? 2 : 2.25, type: projected ? [6, 4] : 'solid' },
+      areaStyle: area(projected),
+      z: 3,
+      data: pts.map(point),
+    });
 
-    const gradId = 'fcgrad';
-    const gradProjId = 'fcgradproj';
-    const topY = yScale(maxVal);
-    svg += `<defs>
-      <linearGradient id="${gradId}" gradientUnits="userSpaceOnUse" x1="0" y1="${topY}" x2="0" y2="${baseY}">
-        <stop offset="0%" stop-color="${color}" stop-opacity="0.28"/>
-        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-      </linearGradient>
-      <linearGradient id="${gradProjId}" gradientUnits="userSpaceOnUse" x1="0" y1="${topY}" x2="0" y2="${baseY}">
-        <stop offset="0%" stop-color="${color}" stop-opacity="0.11"/>
-        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-      </linearGradient>
-    </defs>`;
-
-    const draw = (xy, { projected }) => {
-      if (xy.length < 2) return '';
-      const lineD = ChartMath.smoothPath(xy);
-      const areaD = `${lineD} L ${xy[xy.length - 1].x} ${baseY} L ${xy[0].x} ${baseY} Z`;
-      // pathLength on the ACTUAL line only: it normalises the path to 1 unit so
-      // the draw animation can sweep it with dashoffset — which would also
-      // rescale the projected line's dash pattern into one giant dash.
-      return `<path class="fc-area${projected ? ' fc-area-projected' : ''}" d="${areaD}"
-          fill="url(#${projected ? gradProjId : gradId})"/>
-        <path class="${projected ? 'fc-line-projected' : 'fc-line-actual'}" d="${lineD}"
-          ${projected ? '' : 'pathLength="1"'} fill="none" stroke="${color}"
-          stroke-width="${projected ? 2 : 2.25}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const past = line(pastPts, false);
+    // The divider: everything right of it is projected.
+    past.markLine = {
+      silent: true,
+      symbol: 'none',
+      lineStyle: { color: t.textTertiary, type: [3, 3], width: 1 },
+      // Above the plot, where no date label can collide with it.
+      label: {
+        position: 'end', formatter: 'Today', color: t.textSecondary,
+        fontFamily: t.font, fontSize: t.fontSize, fontWeight: 600,
+      },
+      data: [{ xAxis: msOf(anchor.date) }],
     };
-    // The range, behind both lines: an upper edge out along the highs and a lower
-    // edge back along the lows, closed into one shape. It opens from a point at
-    // today (the balance is known there) and widens with the horizon.
+
+    const out = [past, line(futurePts, true)];
+    // The range, behind both lines: the lows, then the highs stacked on them as
+    // a filled band. It opens from a point at today (the balance is known
+    // there) and widens with the horizon.
     if (hasBand) {
-      const edge = (key) => futurePts.map((p) => ({
-        x: xScale(p.date), y: yScale(p.week ? p.week[key] : p.balance),
-      }));
-      const upper = ChartMath.smoothPath(edge('high'));
-      const lower = ChartMath.smoothPath(edge('low').reverse()).replace(/^M/, 'L');
-      svg += `<clipPath id="fcbandclip"><rect x="${PL}" y="${PT}" width="${CW}" height="${CH}"/></clipPath>
-        <path class="fc-band" d="${upper} ${lower} Z" fill="${color}" clip-path="url(#fcbandclip)">
-          <title>Typical range: where the balance has landed about half the time, judging by how far recent months strayed from their average.</title>
-        </path>`;
+      const edge = (fn) => futurePts.map((p) => [msOf(p.date), fn(p)]);
+      const low = (p) => (p.week ? p.week.low : p.balance);
+      const high = (p) => (p.week ? p.week.high : p.balance);
+      const band = { type: 'line', stack: 'range', symbol: 'none', silent: true, z: 1, lineStyle: { opacity: 0 } };
+      out.unshift(
+        { ...band, name: 'Range low', data: edge(low) },
+        { ...band, name: 'Typical range', data: edge((p) => high(p) - low(p)),
+          areaStyle: { color: EChartKit.alpha(color, 0.12) } },
+      );
     }
-    svg += draw(pastXY, { projected: false });
-    svg += draw(futureXY, { projected: true });
 
-    const dot = (p) => {
-      const cls = `chart-dot${p.anchor ? ' chart-dot-anchor' : ''}`
-        + `${p.week ? ' chart-dot-projected' : ''}${p.balance < 0 ? ' chart-dot-neg' : ''}`;
-      let title;
-      if (p.anchor) title = `Today: ${fmtMoney(p.balance)}`;
-      else if (p.past) title = `Week of ${p.past.label}: ${fmtMoney(p.balance)}`;
-      else {
-        const range = p.week.low != null
-          ? `, typical range ${fmtMoney(p.week.low)} to ${fmtMoney(p.week.high)}` : '';
-        title = `Projected week of ${p.week.label}: ${fmtMoney(p.balance)} (net ${fmtMoney(p.week.net)}${range})`;
-      }
-      return `<circle class="${cls}" cx="${xScale(p.date)}" cy="${yScale(p.balance)}"
-        r="3" fill="${color}"><title>${escapeHtml(title)}</title></circle>`;
+    return {
+      // The dates are whole UTC days (toUTC), so the axis ticks on UTC days.
+      useUTC: true,
+      grid: { left: 0, right: 22, top: 20, bottom: 0, containLabel: true },
+      tooltip: EChartKit.tooltip(t, {
+        trigger: 'item',
+        formatter: (p) => (p.data && p.data.title
+          ? EChartKit.tipHtml({ rows: [{ color: p.color, name: p.data.title, value: '' }] })
+          : ''),
+      }),
+      xAxis: {
+        type: 'time',
+        min: msOf(domain.start),
+        max: msOf(domain.end),
+        axisLine: { lineStyle: { color: t.borderSecondary } },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        axisLabel: EChartKit.axisLabel(t, {
+          hideOverlap: true,
+          formatter: (v) => fmtShortDate(fromUTC(v)),
+        }),
+      },
+      yAxis: EChartKit.valueAxis(t, ticks, axisFormatter(ticks)),
+      series: out,
     };
-    svg += allPts.map(dot).join('');
-
-    svg += '</svg>';
-    return svg;
   }
 
-  // ─── Planned pins (HTML overlay above the SVG) ───────────────────────────
-  // Drawn as DOM rather than SVG nodes so they are ordinary focusable buttons
-  // with the app's standard hover and focus styles, like the Recurring calendar's
-  // chips.
+  /** The drawn chart's geometry, for the pins and the add-here guide: the
+   *  plot's pixel extent and a date ↔ pixel mapping read off the chart itself,
+   *  so the overlay can never drift from what ECharts drew. */
+  function measure(chart) {
+    const { futurePts, domain, anchor } = chartData();
+    const el = chart.getDom();
+    const px = (iso, v = 0) => chart.convertToPixel({ gridIndex: 0 }, [msOf(iso), v]);
+    const PL = px(domain.start)[0];
+    const PR = px(domain.end)[0];
+    // The balance on the projected line at a date, between the weeks either
+    // side of it (the line is straight between them).
+    const balanceAt = (iso) => {
+      const at = msOf(iso);
+      for (let i = 1; i < futurePts.length; i++) {
+        const a = futurePts[i - 1];
+        const b = futurePts[i];
+        const ta = msOf(a.date);
+        const tb = msOf(b.date);
+        if (at >= ta && at <= tb) {
+          const f = tb === ta ? 0 : (at - ta) / (tb - ta);
+          return a.balance + (b.balance - a.balance) * f;
+        }
+      }
+      return null;
+    };
+    return {
+      W: el.clientWidth,
+      H: el.clientHeight,
+      PL,
+      CW: PR - PL,
+      first: domain.start,
+      last: domain.end,
+      totalDays: Math.max(1, daysBetween(domain.start, domain.end)),
+      today: anchor.date,
+      todayX: px(anchor.date)[0],
+      xScale: (iso) => px(iso)[0],
+      yAt: (iso) => {
+        const v = balanceAt(iso);
+        return v == null ? null : px(iso, v)[1];
+      },
+    };
+  }
+
+  // ─── Planned pins (HTML overlay above the chart) ─────────────────────────
+  // Drawn as DOM rather than chart marks so they are ordinary focusable buttons
+  // with the app's standard hover and focus styles, like the Recurring
+  // calendar's chips.
 
   function renderPins() {
     const host = document.getElementById('forecast-overlay');
@@ -525,7 +529,7 @@
     host.innerHTML = inRange.map((p) => {
       const x = plot.xScale(p.date);
       // On the line at that date, not at the level its week ends on.
-      const y = plot.curveY(x);
+      const y = plot.yAt(p.date);
       if (y == null) return '';
       const active = state.activeId === p.id;
       const tip = `${p.label} — ${p.flow === 'income' ? '+' : '−'}${formatCurrency(p.amount, true)} on ${fmtShortDate(p.date)}`;
@@ -586,14 +590,29 @@
     if (guide) guide.hidden = true;
   }
 
-  function renderChartResponsive() {
+  /** Draw (or clear) the chart. Called again whenever the data changes; the
+   *  pins follow every paint and resize through afterRender. */
+  function renderChart() {
     const el = document.getElementById('forecast-chart');
     if (!el) return;
-    // Called again whenever the data changes, which redraws at the same width.
-    UI.observeChart(el, (w, _h, animate) => {
-      el.innerHTML = buildChartSVG(w, animate);
+    // Nothing to draw — the empty state renders above instead of a flat line at
+    // zero pretending to be a projection.
+    if (!hasAnythingToShow()) {
+      EChartKit.unmount(el);
+      el.innerHTML = '';
+      el.hidden = true;
+      plot = null;
       renderPins();
-    }, { target: document.getElementById('forecast-plot') || el });
+      return;
+    }
+    el.hidden = false;
+    EChartKit.mount(el, buildOption, {
+      label: 'Balance forecast',
+      afterRender: (chart) => {
+        plot = measure(chart);
+        renderPins();
+      },
+    });
   }
 
   // ─── The card ────────────────────────────────────────────────────────────
