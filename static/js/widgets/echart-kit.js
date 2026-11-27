@@ -15,6 +15,8 @@
 //            panel has none) and follows it with a ResizeObserver.
 //   REPAINT  On 'themechange' (shell/settings.js) every live chart rebuilds its
 //            option, so a theme swap recolours it with no work from the page.
+//            A chart hidden at the time (an inactive tab) is marked stale and
+//            repainted when it is shown, not merely resized.
 //   CLEANUP  A container that leaves the document takes its chart with it: the
 //            observer sees it go and disposes the instance, so pages that redraw
 //            by replacing innerHTML (the Dashboard's cards) never leak one.
@@ -262,7 +264,14 @@
 
   function paint(rec, { fresh = false } = {}) {
     const { el, opts } = rec;
-    if (!hasSize(el)) return;   // the observer paints it once it has a size
+    // The observer paints it once it has a size. A chart already drawn is
+    // marked stale, so showing it again repaints it rather than only resizing
+    // it (a hidden tab's chart would otherwise keep the old theme's colours).
+    if (!hasSize(el)) {
+      if (rec.chart) rec.stale = true;
+      return;
+    }
+    rec.stale = false;
     if (!rec.chart) {
       // The container may hold an empty state or a previous engine's markup.
       el.replaceChildren();
@@ -301,12 +310,16 @@
   }
 
   function createRecord(el) {
-    const rec = { el, chart: null, observer: null, build: null, opts: {}, handlers: new Set() };
+    const rec = { el, chart: null, observer: null, build: null, opts: {}, handlers: new Set(), stale: false };
     rec.observer = new ResizeObserver(() => {
       // A container taken out of the document is done with: free the chart.
       if (!el.isConnected) { dispose(rec); return; }
       if (!hasSize(el)) return;
-      if (rec.chart) {
+      if (rec.chart && rec.stale) {
+        // Hidden through a theme change or a redraw: paint it whole now.
+        rec.chart.resize();
+        paint(rec, { fresh: true });
+      } else if (rec.chart) {
         rec.chart.resize();
         if (rec.opts.afterRender) rec.opts.afterRender(rec.chart);
       } else {
