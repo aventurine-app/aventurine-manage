@@ -55,6 +55,18 @@
     const [y, m] = ym.split('-').map(Number);
     return `${MONTHS[m - 1]} ${y}`;
   };
+  const ymShift = (ym, n) => {
+    const [y, m] = ym.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + n, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  };
+  // A window of months, ['2026-09', '2026-11'] → "Sep–Nov 2026" (the year is
+  // repeated only when the window crosses one: "Nov 2025–Jan 2026").
+  const rangeLabel = ([a, b]) => {
+    const [ya, ma] = a.split('-').map(Number);
+    const [yb, mb] = b.split('-').map(Number);
+    return ya === yb ? `${MONTHS[ma - 1]}–${MONTHS[mb - 1]} ${yb}` : `${MONTHS[ma - 1]} ${ya}–${MONTHS[mb - 1]} ${yb}`;
+  };
   // Direction of a price change. Under half a percent is "flat": a rounding
   // difference is not a trend and should not be painted as one.
   const dirOf = (v) => (v > 0.005 ? 'up' : v < -0.005 ? 'down' : 'flat');
@@ -107,7 +119,28 @@
 
   // ─── Axis frame shared by both plots ───────────────────────────────────────
 
-  function frame(host, { height, xTicks, yTicks, x, y, xFmt, yFmt, pad, xLabelY = height - 8 }) {
+  // Calendar x ticks: the first of each quarter, labelled "Apr", "Jul", "Oct",
+  // with Jan 1 labelled by its year ("2025") so the year boundary stands out.
+  // A month-and-two-digit-year label ("Apr 25") read as a day, hence the change.
+  // Thinned to half-years, then years, when the quarters would crowd.
+  // `first`/`last` are { y, m } (m 0-11); returns [{ y, m, year }].
+  function quarterTicks(first, last, plotW) {
+    const months = (last.y - first.y) * 12 + (last.m - first.m);
+    let step = 3;
+    while (step < 12 && (months / step) * 44 > plotW) step *= 2;
+    const ticks = [];
+    let y = first.y;
+    let m = Math.ceil(first.m / step) * step;
+    for (; y < last.y || (y === last.y && m <= last.m); m += step) {
+      if (m >= 12) { y += 1; m -= 12; }
+      if (y > last.y || (y === last.y && m > last.m)) break;
+      ticks.push({ y, m, year: m === 0 });
+    }
+    return ticks;
+  }
+  const quarterLabel = (q) => (q.year ? String(q.y) : MONTHS[q.m]);
+
+  function frame(host, { height, xTicks, yTicks, x, y, xFmt, yFmt, xClass, pad, xLabelY = height - 8 }) {
     host.querySelectorAll('svg').forEach((s) => s.remove());
     const W = host.clientWidth;
     const svg = el('svg', { width: W, height, viewBox: `0 0 ${W} ${height}`, class: 'ins-svg', role: 'img' });
@@ -117,7 +150,7 @@
       el('text', { x: pad.l - 8, y: y(t) + 4, 'text-anchor': 'end', class: 'ins-axis' }, grid).textContent = yFmt(t);
     }
     for (const t of xTicks) {
-      el('text', { x: x(t), y: xLabelY, 'text-anchor': 'middle', class: 'ins-axis' }, grid).textContent = xFmt(t);
+      el('text', { x: x(t), y: xLabelY, 'text-anchor': 'middle', class: `ins-axis ${xClass ? xClass(t) : ''}` }, grid).textContent = xFmt(t);
     }
     host.prepend(svg);
     return { svg, W };
@@ -139,39 +172,31 @@
     const stats = document.getElementById('inflation-stats');
     const split = document.getElementById('inflation-split');
     if (!d || !stats) return;
+    // The card above the split only carries the empty state.
+    const card = stats.closest('.ins-infl-stats');
 
     if (!d.merchants.length) {
       split.hidden = true;
+      card.hidden = false;
       stats.innerHTML = Ant.empty({
         title: 'No regular merchants yet',
-        desc: `A merchant appears here once you have visited it ${d.rules.min_visits} times over at least 10 months.`,
+        desc: `A merchant appears here once you have visited it ${d.rules.min_visits} times, including at least once in ${windowsText(d)}.`,
         action: { label: 'Add transactions', href: '/transactions' },
       });
       return;
     }
     split.hidden = false;
-
-    const steady = d.merchants.filter((m) => m.steady);
-    const rates = steady.map((m) => m.rate).sort((a, b) => a - b);
-    const median = rates.length ? rates[Math.floor((rates.length - 1) / 2)] : null;
-    const rateCls = (v) => `ins-${dirOf(v)}`;
-    const n = d.steady_count;
-    stats.innerHTML = [
-      statHtml(`Your inflation rate${infoTip('How fast the bills at the places you pay regularly are rising or falling per year, comparing each place\'s average bill before and after the midpoint of your history there. '
-        + 'Places are weighted by how much you spend at each, so big bills like rent count the most.')}`,
-        d.rate == null ? '—' : `<span class="${rateCls(d.rate)}">${arrow(d.rate)} ${pct(d.rate)}</span><small> / yr</small>`),
-      statHtml(`Typical merchant${infoTip(`The yearly change at the middle place when your ${n} regular merchants are ranked from biggest rise to biggest fall. `
-        + 'Every place counts equally, so one big bill like rent cannot move it.')}`,
-        median == null ? '—' : `<span class="${rateCls(median)}">${arrow(median)} ${pct(median)}</span><small> / yr</small>`),
-      statHtml(`Bills going up${infoTip(`How many of your ${n} regular merchants now charge you more on average than they did earlier in your history with them. `
-        + 'Changes under half a percent a year count as flat.')}`, `${d.rising}`),
-      statHtml(`Bills going down${infoTip(`How many of your ${n} regular merchants now charge you less on average than they did earlier in your history with them. `
-        + 'Changes under half a percent a year count as flat.')}`, `${d.falling}`),
-    ].join('');
+    card.hidden = true;
+    stats.innerHTML = '';
 
     renderInflationList();
     renderMerchantDetail();
   }
+
+  // "Sep–Nov 2026 and Sep–Nov 2025", or a general phrase on an empty ledger.
+  const windowsText = (d) => (d.windows
+    ? `both ${rangeLabel(d.windows.recent)} and ${rangeLabel(d.windows.prior)}`
+    : `the last ${d.rules.window_months} months and the same months a year earlier`);
 
   const isCatView = () => state.view === 'categories';
   const listItems = () => (isCatView() ? state.inflation.categories || [] : state.inflation.merchants);
@@ -218,7 +243,7 @@
     const scroll = body.scrollTop;
     tbody.innerHTML = rows.length ? rows.join('') : `<tr><td colspan="3">${Ant.empty({ compact: true,
       title: 'No regular categories yet',
-      desc: `A category appears here once it has ${d.rules.min_visits} transactions over at least 10 months.` })}</td></tr>`;
+      desc: `A category appears here once it has ${d.rules.min_visits} transactions, including at least one in ${windowsText(d)}.` })}</td></tr>`;
     body.scrollTop = scroll;
   }
 
@@ -283,10 +308,9 @@
     const mini = (label, value, foot) =>
       `<span class="ins-mini"><span class="ins-mini-label">${label}</span><strong>${value}</strong><span class="ins-mini-foot">${foot}</span></span>`;
     statsEl.innerHTML = [
-      mini(`Before ${dateLabel(m.split_date)}`, money(m.early_avg), `avg of ${m.early_visits}`),
-      mini('Since then', money(m.recent_avg), `avg of ${m.recent_visits}`),
-      mini('Change', `<span class="ins-${dir}">${arrow(m.change)} ${pct(m.change)}</span>`,
-        `${pct(m.rate)} / yr`),
+      mini(rangeLabel(m.prior_window), money(m.early_avg), `avg of ${m.early_visits}`),
+      mini(rangeLabel(m.recent_window), money(m.recent_avg), `avg of ${m.recent_visits}`),
+      mini('Change', `<span class="ins-${dir}">${arrow(m.change)} ${pct(m.change)}</span>`, 'over 12 months'),
     ].join('');
     drawVisits(host, m);
   }
@@ -307,14 +331,13 @@
       return;
     }
     const lastPt = tr[tr.length - 1];
-    const chg = lastPt.index / 100 - 1;
-    const base = ymLabel(tr[0].ym);
-    // The title carries the answer: the index's change since it started, beside
-    // the name, with the method behind the ⓘ.
+    const chg = lastPt.change;
+    // The title carries the answer: the latest 12-month change, beside the
+    // name, with the method behind the ⓘ.
     document.getElementById('inflation-detail-title').innerHTML = `<span>Personal Price Index</span>${infoTip(
-      `The percentage the bills at the places you visit regularly have risen or fallen since ${base}. `
-      + 'Each month compares what you paid at each place over the last 3 months with your usual bill there, averaged with every place counted equally.')}
-      <span class="ins-head-figure ins-${dirOf(chg)}">${arrow(chg)} ${pct(chg)}</span><span class="ins-head-since">since ${base}</span>`;
+      'How much more or less you paid per visit at the places you go regularly than a year earlier, month by month: the same 12-month change the reported CPI is quoted as. '
+      + 'Each month compares the average bill at each place over the 3 months to that month with the same 3 months a year before, averaged with every place counted equally.')}
+      <span class="ins-head-figure ins-${dirOf(chg)}">${arrow(chg)} ${pct(chg)}</span><span class="ins-head-since">over the year to ${ymLabel(lastPt.ym)}</span>`;
     // No caption: the row keeps its height (min-height in insights.css), so
     // opening a merchant's figures does not push the chart or the list down.
     statsEl.innerHTML = '';
@@ -324,10 +347,9 @@
   function drawTrend(host, tr) {
     host.querySelectorAll('.ant-empty').forEach((x) => x.remove());
     if (!host.clientWidth) return;
-    // Plotted as percent change since the first month (the backend's index
-    // minus 100), on a 0% baseline: "+11%" reads directly, an index of 111
-    // has to be translated first.
-    const chgOf = (p) => p.index - 100;
+    // Plotted as the 12-month change in percent, on a 0% (no change) baseline,
+    // the way CPI charts are drawn.
+    const chgOf = (p) => p.change * 100;
     const vals = tr.map(chgOf);
     const lo = Math.min(0, ...vals);
     const hi = Math.max(0, ...vals);
@@ -341,14 +363,18 @@
     const n = tr.length;
     const x = (i) => pad.l + (n > 1 ? i / (n - 1) : 0.5) * (W - pad.l - pad.r);
     const y = (v) => pad.t + (1 - (v - yMin) / (yMax - yMin)) * (H - pad.t - pad.b);
-    const stride = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - pad.l - pad.r) / 70))));
-    const xTicks = tr.map((_, i) => i).filter((i) => i % stride === 0);
+    // Each point is a month, so a quarter tick sits on that month's index.
+    const ymOf = (p) => { const [yy, mm] = p.ym.split('-').map(Number); return { y: yy, m: mm - 1 }; };
+    const m0 = ymOf(tr[0]);
+    const qs = quarterTicks(m0, ymOf(tr[n - 1]), W - pad.l - pad.r);
+    const qAt = new Map(qs.map((q) => [(q.y - m0.y) * 12 + (q.m - m0.m), q]));
     const { svg } = frame(host, {
-      height: H, pad, x, y, yTicks, xTicks,
+      height: H, pad, x, y, yTicks, xTicks: [...qAt.keys()],
       yFmt: (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v))}%`,
-      xFmt: (i) => { const [yy, mm] = tr[i].ym.split('-').map(Number); return `${MONTHS[mm - 1]} ${String(yy).slice(2)}`; },
+      xFmt: (i) => quarterLabel(qAt.get(i)),
+      xClass: (i) => (qAt.get(i).year ? 'ins-axis-year' : ''),
     });
-    svg.setAttribute('aria-label', `Personal price index: ${pct(chgOf(tr[n - 1]) / 100)} from ${ymLabel(tr[0].ym)} to ${ymLabel(tr[n - 1].ym)}.`);
+    svg.setAttribute('aria-label', `Personal price index, 12-month change by month from ${ymLabel(tr[0].ym)} to ${ymLabel(tr[n - 1].ym)}; latest ${pct(tr[n - 1].change)}.`);
     el('line', { x1: pad.l, x2: W - pad.r, y1: y(0), y2: y(0), class: 'ins-diag' }, svg);
     // The line is one fixed blue, not the up/down red or green: it is a series
     // to read, and the title's arrowed figure already says which way it went.
@@ -367,7 +393,8 @@
       const p = tr[i];
       guide.setAttribute('x1', x(i)); guide.setAttribute('x2', x(i)); guide.setAttribute('visibility', 'visible');
       ring.setAttribute('cx', x(i)); ring.setAttribute('cy', y(chgOf(p))); ring.setAttribute('visibility', 'visible');
-      tip.show(`<strong>${pct(chgOf(p) / 100)} vs ${ymLabel(tr[0].ym)}</strong><span>3 months to ${ymLabel(p.ym)}</span>
+      const w = [ymShift(p.ym, -2), p.ym];
+      tip.show(`<strong>${pct(p.change)} vs a year earlier</strong><span>${rangeLabel(w)} vs ${rangeLabel(w.map((v) => ymShift(v, -12)))}</span>
         <span>${p.merchants} merchants</span>`, x(i), y(chgOf(p)));
     });
     svg.addEventListener('pointerleave', () => { tip.hide(); guide.setAttribute('visibility', 'hidden'); ring.setAttribute('visibility', 'hidden'); });
@@ -376,42 +403,55 @@
   function drawVisits(host, m) {
     host.querySelectorAll('.ant-empty').forEach((x) => x.remove());
     if (!host.clientWidth) return;
-    const pts = m.points.map(([date, amount]) => ({ date, amount, t: Date.parse(`${date}T00:00:00Z`) }));
-    const t0 = pts[0].t;
-    const t1 = pts[pts.length - 1].t;
-    const tSplit = Date.parse(`${m.split_date}T00:00:00Z`);
-    const tPad = (t1 - t0) * 0.03 || 86400000;
+    // The chart spans the 15 months from the start of the year-ago window to
+    // the end of the recent one; the two windows are shaded bands, and visits
+    // between them are drawn faint (they are not in the comparison).
+    const ymStart = (ym, add = 0) => { const [yy, mm] = ym.split('-').map(Number); return Date.UTC(yy, mm - 1 + add, 1); };
+    const tA = ymStart(m.prior_window[0]);
+    const tB = ymStart(m.recent_window[1], 1);
+    const inW = (date, w) => date.slice(0, 7) >= w[0] && date.slice(0, 7) <= w[1];
+    const pts = m.points
+      .map(([date, amount]) => ({ date, amount, t: Date.parse(`${date}T00:00:00Z`),
+        inWin: inW(date, m.prior_window) || inW(date, m.recent_window) }))
+      .filter((p) => p.t >= tA && p.t < tB);
     const yMax = Math.max(...pts.map((p) => p.amount), m.early_avg, m.recent_avg);
     const yTicks = ChartMath.niceTicks(0, yMax * 1.08, 4);
     const top = yTicks[yTicks.length - 1];
     const H = CHART_H;
-    const pad = { l: 56, r: 16, t: 16, b: 32 };
+    const pad = { l: 56, r: 16, t: 22, b: 32 };
     const W = host.clientWidth;
-    const x = (t) => pad.l + ((t - (t0 - tPad)) / (t1 - t0 + 2 * tPad)) * (W - pad.l - pad.r);
+    const x = (t) => pad.l + ((t - tA) / (tB - tA)) * (W - pad.l - pad.r);
     const y = (v) => H - pad.b - (v / top) * (H - pad.t - pad.b);
 
-    // x ticks: the first of each quarter (or each year, on a long history).
-    const xTicks = [];
-    const span = (t1 - t0) / 86400000;
-    const stepM = span > 1100 ? 12 : span > 500 ? 6 : 3;
-    const s = new Date(t0);
-    for (let dt = new Date(Date.UTC(s.getUTCFullYear(), Math.ceil((s.getUTCMonth() + 1) / stepM) * stepM, 1));
-      dt.getTime() <= t1; dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + stepM, 1))) {
-      xTicks.push(dt.getTime());
-    }
+    const ymT = (t) => { const dt = new Date(t); return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() }; };
+    const qAt = new Map(quarterTicks(ymT(tA), ymT(tB), W - pad.l - pad.r)
+      .map((q) => [Date.UTC(q.y, q.m, 1), q]));
     const { svg } = frame(host, {
-      height: H, pad, x, y, yTicks, xTicks,
+      height: H, pad, x, y, yTicks, xTicks: [...qAt.keys()],
       yFmt: moneyRound,
-      xFmt: (t) => { const dt = new Date(t); return `${MONTHS[dt.getUTCMonth()]} ${String(dt.getUTCFullYear()).slice(2)}`; },
+      xFmt: (t) => quarterLabel(qAt.get(t)),
+      xClass: (t) => (qAt.get(t).year ? 'ins-axis-year' : ''),
     });
-    svg.setAttribute('aria-label', `${m.name}: ${m.visits} visits. Average bill ${money(m.early_avg)} before ${dateLabel(m.split_date)}, ${money(m.recent_avg)} since.`);
+    svg.setAttribute('aria-label', `${m.name}: average bill ${money(m.early_avg)} in ${rangeLabel(m.prior_window)}, ${money(m.recent_avg)} in ${rangeLabel(m.recent_window)}.`);
 
-    el('line', { x1: x(tSplit), x2: x(tSplit), y1: pad.t, y2: H - pad.b, class: 'ins-split-line' }, svg);
+    // The two windows: a band each, named above the plot.
+    const bands = el('g', {}, svg);
+    for (const w of [m.prior_window, m.recent_window]) {
+      const a = ymStart(w[0]);
+      const b = ymStart(w[1], 1);
+      el('rect', { x: x(a), y: pad.t, width: x(b) - x(a), height: H - pad.t - pad.b, class: 'ins-window' }, bands);
+      el('text', { x: (x(a) + x(b)) / 2, y: pad.t - 6, 'text-anchor': 'middle', class: 'ins-axis' }, bands)
+        .textContent = rangeLabel(w);
+    }
 
     const dots = el('g', { class: 'ins-dots' }, svg);
-    for (const p of pts) el('circle', { cx: x(p.t), cy: y(p.amount), r: 4 }, dots);
+    for (const p of pts) el('circle', { cx: x(p.t), cy: y(p.amount), r: 4, class: p.inWin ? '' : 'ins-dot-out' }, dots);
 
-    // The two averages, each across its own half, labelled at its end.
+    // The two averages, each across its own window, labelled inside it.
+    const tP0 = ymStart(m.prior_window[0]);
+    const tP1 = ymStart(m.prior_window[1], 1);
+    const tR0 = ymStart(m.recent_window[0]);
+    const tR1 = ymStart(m.recent_window[1], 1);
     const dir = dirOf(m.change);
     const seg = (a, b, v, cls, label, anchorEnd) => {
       el('line', { x1: x(a), x2: x(b), y1: y(v), y2: y(v), class: `ins-avg ${cls}` }, svg);
@@ -421,8 +461,8 @@
       }, svg);
       tx.textContent = label;
     };
-    seg(t0, tSplit, m.early_avg, 'ins-avg-early', `Avg ${money(m.early_avg)}`, false);
-    seg(tSplit, t1, m.recent_avg, `ins-avg-recent ins-stroke-${dir}`, `Avg ${money(m.recent_avg)}`, true);
+    seg(tP0, tP1, m.early_avg, 'ins-avg-early', `Avg ${money(m.early_avg)}`, false);
+    seg(tR0, tR1, m.recent_avg, `ins-avg-recent ins-stroke-${dir}`, `Avg ${money(m.recent_avg)}`, true);
 
     // Hover: the nearest visit along x, within reach.
     const tip = tooltip(host);

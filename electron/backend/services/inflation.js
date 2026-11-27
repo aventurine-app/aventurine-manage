@@ -12,14 +12,16 @@
 // index; for a regular habit the two move together closely enough to be the
 // interesting number.
 //
-// THE RATE IS AVERAGE-THEN vs AVERAGE-NOW. The span from first to last visit
-// is cut at its midpoint DATE; the average bill on each side is compared, and
-// the change is annualised over the time between the two halves' average
-// dates. That is exactly the question a person asks ("has my Chipotle bill
-// averaged up?") and it can be checked by hand from the ledger. A fitted slope
-// (least squares, Theil–Sen) was tried first and rejected: tickets cluster at a
-// few price points — one burrito, two burritos — and the slope jumped between
-// clusters, disagreeing in sign with the two averages it was meant to explain.
+// THE RATE IS A 12-MONTH CHANGE, framed like the CPI figure in the news
+// ("prices rose 2.9% over the year to October"): the average bill over the
+// latest WINDOW_MONTHS calendar months against the same months a year earlier
+// (Sep–Nov 2026 vs Sep–Nov 2025), so a reader can set the two side by side.
+// Three months rather than CPI's one because a merchant is visited a few times
+// a month at most; a single month is too few tickets to average. A merchant
+// with no visit in either window has no rate and is left off the list. A fitted
+// slope (least squares, Theil–Sen) was tried once and rejected: tickets cluster
+// at a few price points — one burrito, two burritos — and the slope jumped
+// between clusters.
 //
 // STEADY vs VARIED. A grocery run or an Amazon order is a different basket
 // every time, so its ticket is not a like-for-like price and its trend is mostly
@@ -29,12 +31,9 @@
 // STEADY merchants only.
 
 const MIN_VISITS = 6;        // fewer than this is not a habit, and not a trend
-const MIN_SPAN_DAYS = 300;   // shorter, and annualising a small gap magnifies noise
+const WINDOW_MONTHS = 3;     // each side of the 12-month comparison
 const MAX_MERCHANTS = 200;   // ranked by spend; the list scrolls, so this is only a guard
 const VARIED_CV = 0.45;      // robust CV above which the basket is not like-for-like
-
-const DAY_MS = 86400000;
-const YEAR_DAYS = 365.25;
 
 function median(sorted) {
   const n = sorted.length;
@@ -46,138 +45,156 @@ function median(sorted) {
 const sortNum = (a) => [...a].sort((x, y) => x - y);
 
 const round = (v, dp = 2) => (Number.isFinite(v) ? Math.round(v * 10 ** dp) / 10 ** dp : null);
-const dayOf = (iso) => Date.parse(`${String(iso).slice(0, 10)}T00:00:00Z`);
 const mean = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN);
 
-/**
- * One merchant's visits → its ticket trend, or null when it does not qualify.
- * `visits` is [{ date: 'YYYY-MM-DD', amount }] in any order.
- */
-function merchantTrend(visits) {
-  const v = visits
-    .filter((x) => Number(x.amount) > 0 && Number.isFinite(dayOf(x.date)))
-    .map((x) => ({ date: String(x.date).slice(0, 10), amount: Number(x.amount), d: dayOf(x.date) }))
-    .sort((a, b) => a.d - b.d);
-  if (v.length < MIN_VISITS) return null;
-  const d0 = v[0].d;
-  const span = (v[v.length - 1].d - d0) / DAY_MS;
-  if (span < MIN_SPAN_DAYS) return null;
-
-  // Early vs recent: the visits either side of the span's midpoint DATE, not the
-  // midpoint visit, so "early" and "recent" are periods a reader can picture.
-  const midD = d0 + (span * DAY_MS) / 2;
-  const earlyV = v.filter((x) => x.d < midD);
-  const recentV = v.filter((x) => x.d >= midD);
-  if (earlyV.length < 2 || recentV.length < 2) return null;
-  const early = earlyV.map((x) => x.amount);
-  const recent = recentV.map((x) => x.amount);
-  const earlyAvg = mean(early);
-  const recentAvg = mean(recent);
-  const gapYears = (mean(recentV.map((x) => x.d)) - mean(earlyV.map((x) => x.d))) / DAY_MS / YEAR_DAYS;
-  const change = recentAvg / earlyAvg - 1;
-  const rate = gapYears > 0 ? (recentAvg / earlyAvg) ** (1 / gapYears) - 1 : 0;
-
-  const amounts = sortNum(v.map((x) => x.amount));
-  const med = median(amounts);
-  const mad = median(sortNum(amounts.map((a) => Math.abs(a - med))));
-  const cv = med > 0 ? (1.4826 * mad) / med : Infinity;
-
-  return {
-    visits: v.length,
-    first_date: v[0].date,
-    last_date: v[v.length - 1].date,
-    span_days: Math.round(span),
-    total: round(amounts.reduce((s, a) => s + a, 0)),
-    median: round(med),
-    // The two halves: their visit counts, average bill, and where they split.
-    split_date: new Date(midD).toISOString().slice(0, 10),
-    early_visits: early.length,
-    recent_visits: recent.length,
-    early_avg: round(earlyAvg),
-    recent_avg: round(recentAvg),
-    change: round(change, 4),
-    gap_years: round(gapYears, 2),
-    rate: round(rate, 4),
-    cv: round(cv, 3),
-    steady: cv <= VARIED_CV,
-    points: v.map((x) => [x.date, round(x.amount)]),
-  };
-}
-
-// ─── The trend line: a monthly personal price index ─────────────────────────
-// For each month, every steady merchant visited in the trailing TREND_MONTHS
-// months contributes its average bill over that window RELATIVE TO ITS OWN
-// usual bill (its mean over all its visits), so a $1,900 rent and a $15
-// burrito both start near 1.0. The month's figure is the GEOMETRIC MEAN of
-// those ratios with every merchant counted equally — a Jevons index, the form
-// statistical agencies use for elementary price aggregates — and the series is
-// rebased so its first month is 100.
-//
-// EQUAL WEIGHTS, NOT SPEND WEIGHTS, deliberately unlike the headline rate. On
-// a real ledger, spend weights made the line a rent index: rent was most of
-// the steady spend, so every month a rent payment fell in or out of the
-// trailing window the whole line jumped 20–30 points. Counted equally, the
-// line answers "are the places I go getting pricier", which is what a trend of
-// bills is read for; the spend-weighted view stays in the headline figure. A month with fewer than
-// TREND_MIN_MERCHANTS contributors is skipped: an index of one or two shops is
-// those shops, not your cost of living.
-const TREND_MONTHS = 3;
-const TREND_MIN_MERCHANTS = 3;
-
-const ymOf = (iso) => iso.slice(0, 7);
+const ymOf = (iso) => String(iso).slice(0, 7);
 function ymAdd(ym, n) {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + n, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-function buildTrend(steady) {
-  if (!steady.length) return [];
-  const books = steady.map((m) => {
+/** The two windows compared for the month `asOf` ('YYYY-MM'), each [from, to]. */
+function windowsFor(asOf) {
+  const from = ymAdd(asOf, 1 - WINDOW_MONTHS);
+  return { recent: [from, asOf], prior: [ymAdd(from, -12), ymAdd(asOf, -12)] };
+}
+const inWin = (ym, w) => ym >= w[0] && ym <= w[1];
+
+/** A merchant's visits, cleaned and date-sorted, with its spread; null under MIN_VISITS. */
+function profile(visits) {
+  const v = visits
+    .filter((x) => Number(x.amount) > 0 && /^\d{4}-\d{2}-\d{2}/.test(String(x.date)))
+    .map((x) => ({ date: String(x.date).slice(0, 10), amount: Number(x.amount) }))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  if (v.length < MIN_VISITS) return null;
+  const amounts = sortNum(v.map((x) => x.amount));
+  const med = median(amounts);
+  const mad = median(sortNum(amounts.map((a) => Math.abs(a - med))));
+  const cv = med > 0 ? (1.4826 * mad) / med : Infinity;
+  return { v, amounts, med, cv };
+}
+
+/**
+ * One merchant's visits → its 12-month ticket change as of `asOf` ('YYYY-MM',
+ * default: the month of its own latest visit), or null when it does not
+ * qualify. `visits` is [{ date: 'YYYY-MM-DD', amount }] in any order.
+ */
+function merchantTrend(visits, asOf) {
+  const p = profile(visits);
+  if (!p) return null;
+  const { v, amounts, med, cv } = p;
+  const w = windowsFor(asOf || ymOf(v[v.length - 1].date));
+  const prior = v.filter((x) => inWin(ymOf(x.date), w.prior)).map((x) => x.amount);
+  const recent = v.filter((x) => inWin(ymOf(x.date), w.recent)).map((x) => x.amount);
+  if (!prior.length || !recent.length) return null;
+  const earlyAvg = mean(prior);
+  const recentAvg = mean(recent);
+  const change = recentAvg / earlyAvg - 1;
+
+  return {
+    visits: v.length,
+    first_date: v[0].date,
+    last_date: v[v.length - 1].date,
+    total: round(amounts.reduce((s, a) => s + a, 0)),
+    median: round(med),
+    // The two windows: their months, visit counts and average bill.
+    prior_window: w.prior,
+    recent_window: w.recent,
+    early_visits: prior.length,
+    recent_visits: recent.length,
+    early_avg: round(earlyAvg),
+    recent_avg: round(recentAvg),
+    // Already a 12-month figure, so the rate is the change itself.
+    change: round(change, 4),
+    rate: round(change, 4),
+    cv: round(cv, 3),
+    steady: cv <= VARIED_CV,
+    points: v.map((x) => [x.date, round(x.amount)]),
+  };
+}
+
+// ─── The trend line: the 12-month change, month by month ────────────────────
+// For each month M, every steady merchant visited both in the WINDOW_MONTHS
+// months to M and in the same months a year earlier contributes the ratio of
+// its two average bills. The month's figure is the GEOMETRIC MEAN of those
+// ratios with every merchant counted equally — a Jevons index, the form
+// statistical agencies use for elementary price aggregates — minus one: the
+// same "% vs a year ago" a CPI chart plots, so the two lines can be compared.
+//
+// EQUAL WEIGHTS, NOT SPEND WEIGHTS, deliberately unlike the headline rate. On
+// a real ledger, spend weights made the line a rent index: rent was most of
+// the steady spend, so every time a rent payment fell in or out of a window
+// the whole line jumped. Counted equally, the line answers "are the places I
+// go getting pricier"; the spend-weighted view stays in the headline figure.
+// A month with fewer than TREND_MIN_MERCHANTS contributors is skipped: an
+// index of one or two shops is those shops, not your cost of living.
+const TREND_MIN_MERCHANTS = 3;
+
+function buildTrend(profiles) {
+  if (!profiles.length) return [];
+  const books = profiles.map((p) => {
     const byYm = new Map();
-    for (const [date, amount] of m.points) {
-      const e = byYm.get(ymOf(date)) || [0, 0];
-      e[0] += amount;
+    for (const x of p.v) {
+      const e = byYm.get(ymOf(x.date)) || [0, 0];
+      e[0] += x.amount;
       e[1] += 1;
-      byYm.set(ymOf(date), e);
+      byYm.set(ymOf(x.date), e);
     }
-    return { usual: m.total / m.visits, byYm };
+    return byYm;
   });
-  const first = steady.reduce((a, m) => (m.first_date < a ? m.first_date : a), '9999');
-  const last = steady.reduce((a, m) => (m.last_date > a ? m.last_date : a), '0000');
+  const avgOver = (byYm, w) => {
+    let sum = 0;
+    let cnt = 0;
+    for (let ym = w[0]; ym <= w[1]; ym = ymAdd(ym, 1)) {
+      const e = byYm.get(ym);
+      if (e) { sum += e[0]; cnt += e[1]; }
+    }
+    return cnt ? sum / cnt : null;
+  };
+  const first = profiles.reduce((a, p) => (p.v[0].date < a ? p.v[0].date : a), '9999');
+  const last = profiles.reduce((a, p) => (p.v[p.v.length - 1].date > a ? p.v[p.v.length - 1].date : a), '0000');
   const out = [];
-  let base = null;
-  for (let ym = ymAdd(ymOf(first), TREND_MONTHS - 1); ym <= ymOf(last); ym = ymAdd(ym, 1)) {
+  for (let ym = ymAdd(ymOf(first), 11 + WINDOW_MONTHS); ym <= ymOf(last); ym = ymAdd(ym, 1)) {
+    const w = windowsFor(ym);
     let rSum = 0;
     let n = 0;
     for (const b of books) {
-      let sum = 0;
-      let cnt = 0;
-      for (let k = 0; k < TREND_MONTHS; k++) {
-        const e = b.byYm.get(ymAdd(ym, -k));
-        if (e) { sum += e[0]; cnt += e[1]; }
-      }
-      if (!cnt) continue;
-      rSum += Math.log(sum / cnt / b.usual);
+      const now = avgOver(b, w.recent);
+      const then = now == null ? null : avgOver(b, w.prior);
+      if (now == null || then == null) continue;
+      rSum += Math.log(now / then);
       n += 1;
     }
     if (n < TREND_MIN_MERCHANTS) continue;
-    const r = Math.exp(rSum / n);
-    if (base == null) base = r;
-    out.push({ ym, index: round((100 * r) / base, 1), merchants: n });
+    out.push({ ym, change: round(Math.exp(rSum / n) - 1, 4), merchants: n });
   }
   return out;
+}
+
+/** The latest visit month across every group: the month the windows end on. */
+function latestYm(groups) {
+  let last = '';
+  for (const g of groups) for (const x of g.visits) if (String(x.date) > last) last = String(x.date);
+  return last ? ymOf(last) : null;
 }
 
 /**
  * Every qualifying merchant, ranked by spend, plus the headline: the
  * spend-weighted average rate across the STEADY ones.
  * `groups` is an iterable of { key, name, category, visits: [{date, amount}] }.
+ * `asOf` ('YYYY-MM') is the last month of the recent window; by default the
+ * latest month with a visit.
  */
-function buildInflation(groups) {
+function buildInflation(groupsIn, asOf) {
+  const groups = [...groupsIn];
+  const at = asOf || latestYm(groups);
   const merchants = [];
+  const steadyProfiles = [];
   for (const g of groups) {
-    const t = merchantTrend(g.visits);
+    const p = profile(g.visits);
+    if (p && p.cv <= VARIED_CV) steadyProfiles.push(p);
+    const t = p && merchantTrend(g.visits, at);
     if (t) merchants.push({ key: g.key, name: g.name, category: g.category || null, ...t });
   }
   merchants.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
@@ -199,26 +216,32 @@ function buildInflation(groups) {
     falling,
     qualifying: merchants.length,
     merchants: listed,
-    trend: buildTrend(steady),
-    rules: { min_visits: MIN_VISITS, min_span_days: MIN_SPAN_DAYS, varied_cv: VARIED_CV },
+    // The trend reads every steady habit, not only today's qualifiers: a
+    // place you stopped going to still counts in the months you went.
+    trend: buildTrend(steadyProfiles),
+    windows: at ? windowsFor(at) : null,
+    rules: { min_visits: MIN_VISITS, window_months: WINDOW_MONTHS, varied_cv: VARIED_CV },
   };
 }
 
 /**
- * The same ticket trend per CATEGORY, for the table's Categories view: every
+ * The same ticket change per CATEGORY, for the table's Categories view: every
  * expense in the category is a "visit", so the change reads as "has my average
  * Restaurants bill gone up". A category mixes places, so its ticket drifts with
  * where you went as well as with what they charged; categories are listed for
  * browsing only and never feed the headline rate or the index.
- * `groups` is an iterable of { key, name, visits: [{date, amount}] }.
+ * `groups` is an iterable of { key, name, visits: [{date, amount}] }; pass the
+ * merchants' `asOf` so both views compare the same windows.
  */
-function buildCategoryTrends(groups) {
+function buildCategoryTrends(groupsIn, asOf) {
+  const groups = [...groupsIn];
+  const at = asOf || latestYm(groups);
   const out = [];
   for (const g of groups) {
-    const t = merchantTrend(g.visits);
+    const t = merchantTrend(g.visits, at);
     if (t) out.push({ key: g.key, name: g.name, ...t });
   }
   return out.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 }
 
-module.exports = { buildInflation, buildCategoryTrends, merchantTrend, MIN_VISITS, MIN_SPAN_DAYS, VARIED_CV };
+module.exports = { buildInflation, buildCategoryTrends, merchantTrend, windowsFor, MIN_VISITS, WINDOW_MONTHS, VARIED_CV };

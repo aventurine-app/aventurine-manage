@@ -19,22 +19,33 @@ function visits(n, everyDays, fn) {
   }));
 }
 
-test('inflation: early vs recent average, annualised over the gap', () => {
-  // 24 visits a month apart: the first 12 at $10, the last 12 at $12.
+test('inflation: the latest 3 months against the same 3 months a year earlier', () => {
+  // 24 visits a month apart from Jan 2024 (last ~Nov 2025): $10 for the first
+  // 12, $12 after. As of 2025-11 the windows are Sep–Nov 2025 vs Sep–Nov 2024.
   const t = merchantTrend(visits(24, 30, (i) => (i < 12 ? 10 : 12)));
+  assert.deepEqual(t.recent_window, ['2025-09', '2025-11']);
+  assert.deepEqual(t.prior_window, ['2024-09', '2024-11']);
   assert.equal(t.early_avg, 10);
   assert.equal(t.recent_avg, 12);
   assert.equal(t.change, 0.2);
-  // The halves' average dates sit ~360 days apart, so the annual rate is a
-  // touch over the 20% total change.
-  assert.ok(t.rate > 0.19 && t.rate < 0.22, String(t.rate));
+  assert.equal(t.rate, 0.2);
   assert.equal(t.steady, true);
   assert.equal(t.points.length, 24);
 });
 
-test('inflation: too few visits or too short a span does not qualify', () => {
+test('inflation: an explicit as-of month moves both windows', () => {
+  // As of 2025-06: Apr–Jun 2025 (all $12) vs Apr–Jun 2024 (all $10).
+  const t = merchantTrend(visits(24, 30, (i) => (i < 12 ? 10 : 12)), '2025-06');
+  assert.deepEqual(t.recent_window, ['2025-04', '2025-06']);
+  assert.equal(t.change, 0.2);
+});
+
+test('inflation: too few visits, or none in a window, does not qualify', () => {
   assert.equal(merchantTrend(visits(5, 90, () => 10)), null);
-  assert.equal(merchantTrend(visits(20, 10, () => 10)), null); // ~190 days
+  // ~190 days of history: nothing a year before the latest months.
+  assert.equal(merchantTrend(visits(20, 10, () => 10)), null);
+  // Plenty of history, but nothing in the last 3 months as of 2026-11.
+  assert.equal(merchantTrend(visits(24, 30, () => 10), '2026-11'), null);
 });
 
 test('inflation: a widely varying basket is flagged and left out of the rate', () => {
@@ -48,15 +59,16 @@ test('inflation: a widely varying basket is flagged and left out of the rate', (
   assert.equal(r.rate, r.merchants.find((m) => m.key === 'a').rate);
 });
 
-test('inflation: the index starts at 100 and follows like-for-like bills', () => {
-  // Three steady merchants, every bill 10% higher in the second year.
-  const mk = (key, base) => ({ key, name: key, visits: visits(24, 30.4, (i) => base * (i < 12 ? 1 : 1.1)) });
+test('inflation: the trend is the 12-month change, month by month', () => {
+  // Three steady merchants, every bill 10% higher from the second year on.
+  const mk = (key, base) => ({ key, name: key, visits: visits(30, 30.4, (i) => base * (i < 12 ? 1 : 1.1)) });
   const r = buildInflation([mk('a', 10), mk('b', 40), mk('c', 100)]);
-  assert.ok(r.trend.length > 12);
-  assert.equal(r.trend[0].index, 100);
+  assert.ok(r.trend.length > 6, String(r.trend.length));
   assert.equal(r.trend[0].merchants, 3);
-  const last = r.trend[r.trend.length - 1].index;
-  assert.ok(Math.abs(last - 110) < 0.5, String(last));
+  // Once both windows sit wholly in their own year, the change is +10%;
+  // by the end both windows are in the higher-priced stretch, so 0%.
+  assert.ok(r.trend.some((p) => Math.abs(p.change - 0.1) < 0.005), JSON.stringify(r.trend));
+  assert.ok(Math.abs(r.trend[r.trend.length - 1].change) < 0.005, JSON.stringify(r.trend));
 });
 
 test('beta: OLS slope and the category slopes sum to the total', () => {
@@ -118,8 +130,7 @@ test('routes: inflation lists categories too, keyed apart from merchants', (t) =
   assert.equal(row.visits, 40);
   assert.equal(row.early_avg, 15);
   assert.equal(row.recent_avg, 17);
-  const un = r.categories.find((x) => x.key === 'c:__uncategorized__');
-  assert.equal(un.name, 'Uncategorized');
-  assert.equal(un.cat, 'none');
-  assert.equal(un.visits, 8);
+  // The uncategorized rows stop in Feb 2025, before the latest window
+  // (May–Jul 2025), so they have no 12-month change to list.
+  assert.equal(r.categories.find((x) => x.key === 'c:__uncategorized__'), undefined);
 });

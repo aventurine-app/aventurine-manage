@@ -75,7 +75,10 @@ function inflationGet(ctx) {
     g.category = [...g.cats.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
   }
 
-  const result = buildInflation(groups.values());
+  // Both views compare the same windows: the latest 3 months with an expense
+  // (rows are date-ordered) against the same months a year earlier.
+  const asOf = rows.length ? String(rows[rows.length - 1].date).slice(0, 7) : null;
+  const result = buildInflation(groups.values(), asOf);
   // Ledger search terms for the listed merchants only (the walk is quadratic).
   for (const m of result.merchants) {
     const g = groups.get(m.key);
@@ -87,7 +90,7 @@ function inflationGet(ctx) {
   }
   // Ledger filter for each category: its key, or 'none' for Uncategorized
   // (the value Transactions' ?cat= takes).
-  const cats = buildCategoryTrends(catGroups.values());
+  const cats = buildCategoryTrends(catGroups.values(), asOf);
   for (const c of cats) c.cat = catGroups.get(c.key.slice(2)).cat;
   return { ok: true, ...result, categories: cats };
 }

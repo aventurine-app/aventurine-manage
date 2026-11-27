@@ -315,6 +315,10 @@
     font-variant-numeric: tabular-nums;
 }
 .ins-axis-title { font-size: 12px; }
+.ins-axis-year { fill: var(--ant-color-text); font-weight: 600; }
+/* A merchant's two comparison windows, and the visits that fall between them. */
+.ins-window { fill: var(--ant-color-fill-tertiary); }
+.ins-dots circle.ins-dot-out { fill-opacity: 0.25; }
 
 .ins-dots circle {
     fill: var(--ant-color-text-secondary);
@@ -332,11 +336,6 @@
     stroke: var(--ant-color-text);
     stroke-width: 2;
     pointer-events: none;
-}
-.ins-split-line {
-    stroke: var(--ant-color-text-quaternary);
-    stroke-width: 1;
-    stroke-dasharray: 3 4;
 }
 .ins-avg { stroke-width: 2.5; stroke-linecap: round; }
 .ins-avg-early { stroke: var(--ant-color-text); }
