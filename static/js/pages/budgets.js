@@ -55,7 +55,7 @@
     // WHAT A TRANSFER CELL DOES NOT SAY. The schema records a transfer as an
     // amount with a direction, not as a pair of accounts (the v7 accounts work
     // was reverted), so money coming back OUT of savings adds to the same cell
-    // as money going in. Saved & Invested (handlers/transfers.js) and the
+    // as money going in. The Dashboard's Saved & Invested cards and the
     // Metrics tab both accept this and say so; a third definition of saving
     // would put this page at odds with both, which costs more than the
     // imprecision does.
@@ -456,13 +456,29 @@
 
     // ─── List ───────────────────────────────────────────────────────────────
 
-    function progressHtml(item) {
+    // Past the target. Every row shares one scale so the target ticks line up
+    // down the column: the track runs to the furthest row's figure, never
+    // short of the target and never past twice it. A row further over than
+    // that fills its track; its percentage still says by how much.
+    const MAX_SCALE = 2;
+
+    function scaleOf(items) {
+        const furthest = items.reduce((max, item) => Math.max(max, item.ratio), 1);
+        return Math.min(furthest, MAX_SCALE);
+    }
+
+    function progressHtml(item, scale) {
         const percent = Math.round(item.ratio * 100);
         const tone = item.over ? 'ant-progress-status-exception' : `bud-progress-${item.away ? 'away' : 'spend'}`;
+        const fill = Math.min(item.ratio / scale, 1) * 100;
+        const target = 100 / scale;
         return `<div class="ant-progress ${tone}">
-            <div class="ant-progress-outer" aria-hidden="true"><div class="ant-progress-inner">
-                <div class="ant-progress-bg" style="width:${Math.min(percent, 100)}%"></div>
-            </div></div>
+            <div class="ant-progress-outer bud-progress-outer" aria-hidden="true">
+                <div class="ant-progress-inner">
+                    <div class="ant-progress-bg" style="width:${fill.toFixed(2)}%"></div>
+                </div>
+                <span class="bud-target-tick" style="left:${target.toFixed(2)}%" title="Target ${escapeHtml(formatCurrency(item.target))}"></span>
+            </div>
             <span class="ant-progress-text">${percent}%</span>
         </div>`;
     }
@@ -470,14 +486,14 @@
     /** The table, furthest along first. Each row opens the ledger behind it;
      *  the name is the row's link, so the keyboard reaches it too. */
     function listHtml(items) {
+        const scale = scaleOf(items);
         const rows = [...items].sort((a, b) => b.ratio - a.ratio).map((item) => {
             const href = escapeHtml(ledgerHref(item.key));
             return `<tr data-href="${href}">
                 <td class="bud-col-name">
                     <a class="bud-table-link" href="${href}">${escapeHtml(item.label)}</a>
-                    ${item.away ? '<span class="ant-typography-secondary bud-put-away">put away</span>' : ''}
                 </td>
-                <td>${progressHtml(item)}</td>
+                <td>${progressHtml(item, scale)}</td>
                 <td class="ant-table-cell-end bud-num${item.over ? ' bud-num-over' : ''}">${escapeHtml(formatCurrency(item.actual))}</td>
                 <td class="ant-table-cell-end bud-num">${escapeHtml(formatCurrency(item.target))}</td>
                 <td class="ant-table-cell-end bud-num">${item.away ? '—' : escapeHtml(formatCurrency(item.target - item.actual))}</td>

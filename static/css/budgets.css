@@ -111,7 +111,7 @@
    card rather than crushing the progress bars. */
 .bud-table { min-width: 560px; }
 .bud-col-progress { width: 40%; }
-/* A name and its "put away" stay on one line; the table scrolls instead. */
+/* A long name stays on one line; the table scrolls instead. */
 .bud-col-name { white-space: nowrap; }
 .bud-table tbody tr { cursor: pointer; }
 /* The card's border closes the table, so the last row needs no rule of its own. */
@@ -127,7 +127,6 @@
     outline: 2px solid var(--ant-color-primary);
     outline-offset: 2px;
 }
-.bud-put-away { margin-inline-start: 8px; }
 
 .bud-num {
     font-variant-numeric: tabular-nums;
@@ -138,6 +137,20 @@
 /* The bars in the circles' colours; over is Progress's own exception status. */
 .bud-progress-spend .ant-progress-bg { background: var(--ant-color-primary); }
 .bud-progress-away .ant-progress-bg { background: var(--ant-color-info); }
+
+/* The target: a short upright line across the track where the budget sits
+   (budgets.js scaleOf). It stands a little proud of the 6px track so it
+   reads over a filled bar as well as an empty one. */
+.bud-progress-outer { position: relative; }
+.bud-target-tick {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 14px;
+    border-radius: 1px;
+    background: var(--ant-color-text);
+    transform: translate(-50%, -50%);
+}
 
 
 /* ─── Under the card ────────────────────────────────────────────────────── */

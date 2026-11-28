@@ -5,7 +5,7 @@
    Empty, Modal and the rest come from ant.css. This file holds what is the
    Reports page's own and shared by all five reports — the shell's layout, the
    charts' Ant palette and the pickers drawn as Ant's Select — then the Cash
-   Flow and Forecast reports. trends.css, transfers.css and metrics.css load
+   Flow and Forecast reports. trends.css, metrics.css and insights.css load
    alongside it and style the other three.
 
    Page-scoped: forecast.css loads only on pages/reports.html.
@@ -22,7 +22,7 @@
 
 /* ─── Reports shell: tab bar + panel wrapper ────────────────────────────────
    The wrapper owns the page padding; the report inside it (the .forecast-page
-   / .trends-page / .tfr-page / .metrics-page column) then just stacks its
+   / .trends-page / .metrics-page column) then just stacks its
    cards. 16px from the tab bar to the panel, Ant's gap under a Tabs nav.
 
    Grown as a flex item rather than width:100%: .page is a scroll container,

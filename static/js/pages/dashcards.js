@@ -630,6 +630,62 @@
     };
     const isoOf = (date) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 
+    // ─── Saved & Invested ────────────────────────────────────────────────────
+    // What moved into the user's own savings and investment accounts: the
+    // Transfer columns of the Cash Flow statement, month by month. Money moved
+    // this way is never counted as spending, so these two cards are where it is
+    // reported. One card is the total over time, the other the same months split
+    // by account (each Transfer row is one account), so the stack sums to the
+    // line when both cover the same period.
+
+    /** The statement's Transfer columns, in statement order. */
+    const transferColumns = (data) => (data.columns || []).filter((c) => c.type === 'transfer');
+
+    /** The month's statement cells, or null when the statement has no month there. */
+    const cellsAt = (data, slot) => ((data.entries || {})[String(slot.year)] || {})[MONTHS[slot.monthIdx]] || null;
+
+    /** Total put away per month of the period. A month the statement has no
+     *  cells for is left out rather than drawn as a zero. */
+    function savedPoints(data, slots) {
+        const keys = new Set(transferColumns(data).map((c) => c.key));
+        const points = [];
+        for (const slot of slots) {
+            const cells = cellsAt(data, slot);
+            if (!cells) continue;
+            let value = 0;
+            for (const [key, val] of Object.entries(cells)) {
+                if (keys.has(key) && typeof val === 'number') value += val;
+            }
+            points.push({ year: slot.year, monthIdx: slot.monthIdx, value });
+        }
+        return points;
+    }
+
+    /** One series per account that took money in the period, biggest first so
+     *  the largest band sits on the baseline, each in its category's hue. */
+    function savedAccountSeries(data, slots) {
+        const totals = statementTotals(data, slots);
+        return transferColumns(data)
+            .filter((c) => (totals.get(c.key) || 0) > 0)
+            .sort((a, b) => totals.get(b.key) - totals.get(a.key) || a.label.localeCompare(b.label))
+            .map((c) => {
+                const points = [];
+                for (const slot of slots) {
+                    const val = (cellsAt(data, slot) || {})[c.key];
+                    if (typeof val === 'number' && val > 0) points.push({ year: slot.year, monthIdx: slot.monthIdx, value: val });
+                }
+                return { label: c.label, color: catColor(c.key), points };
+            });
+    }
+
+    /** The empty state both cards share: a way to start when no category is
+     *  set to Transfer, else just the period. */
+    function savedEmpty(data, period) {
+        return transferColumns(data).length === 0
+            ? empty('Nothing saved or invested yet', { label: 'Open transactions', href: '/transactions' })
+            : empty(`Nothing put away in ${period.label}`);
+    }
+
     // ─── Savings Rate ────────────────────────────────────────────────────────
     // The share of income moved into the user's own savings or brokerage
     // accounts: the Transfer columns of the Cash Flow statement over its Income
@@ -1101,6 +1157,50 @@
             },
         },
 
+        savedInvested: {
+            name: 'Saved & Invested', group: 'Cash flow',
+            info: 'How much you moved into your own savings and investment accounts each month. Any category set to Transfer counts. Money moved this way is never counted as spending, so this is where it is reported.',
+            periods: TREND, period: YEAR_TO_DATE,
+            sizes: { S: [3, 3], M: [4, 6], L: [6, 6], XL: [8, 6] }, min: [3, 3],
+            defaults: {}, fields: [],
+            uses: ['ie'],
+            load: (ctx) => ctx.hub.store('ie'),
+            render(host, ctx) {
+                const { period } = ctx;
+                const points = savedPoints(ctx.data, slotsOf(period));
+                const total = points.reduce((sum, p) => sum + p.value, 0);
+                if (!(total > 0)) { host.innerHTML = savedEmpty(ctx.data, period); return; }
+                const head = figureHtml(escapeHtml(fmtValue(total)), 'put away');
+                // A card sized down to a tile is the figure alone.
+                if (ctx.h < 150) { host.innerHTML = head; return; }
+                const { plot } = chartBody(host, { head });
+                // zeroBase: the line is read against the zero-based stack on the
+                // by-account card, so both share one floor.
+                FinanceChart.render(plot, {
+                    series: [{ label: 'Saved & invested', color: paint(COLOR.transfer), points }],
+                    slots: slotsOf(period), zeroBase: true, centred: true, dots: false, animate: ctx.animate,
+                });
+            },
+        },
+
+        savedByAccount: {
+            name: 'Saved & Invested by Account', group: 'Cash flow',
+            info: 'The same months split by which of your accounts the money went into, one band per Transfer row of the Cash Flow statement, so the columns add up to the Saved & Invested card.',
+            periods: TREND, period: YEAR_TO_DATE,
+            sizes: { S: [3, 5], M: [4, 6], L: [6, 6], XL: [8, 6] }, min: [3, 4],
+            defaults: {}, fields: [],
+            uses: ['ie'],
+            load: (ctx) => ctx.hub.store('ie'),
+            render(host, ctx) {
+                const { period } = ctx;
+                const slots = slotsOf(period);
+                const series = savedAccountSeries(ctx.data, slots);
+                if (series.length === 0) { host.innerHTML = savedEmpty(ctx.data, period); return; }
+                const { plot } = chartBody(host);
+                FinanceChart.renderStacked(plot, { series, slots, animate: ctx.animate });
+            },
+        },
+
         merchants: {
             name: 'Top Merchants', group: 'Spending',
             info: 'Where the period’s spending went, by merchant, each bar in its main category’s colour. Click one to see its transactions.',
@@ -1315,6 +1415,12 @@
             + '<rect class="t-fill t-c" x="14" y="42" width="12" height="20" rx="2"/><rect class="t-fill t-c" x="36" y="34" width="12" height="28" rx="2"/>'
             + '<rect class="t-fill t-c" x="58" y="40" width="12" height="22" rx="2"/><rect class="t-fill t-c" x="80" y="28" width="12" height="34" rx="2"/>'
             + '<rect class="t-fill t-c" x="102" y="36" width="10" height="26" rx="2"/>',
+        savedInvested: '<rect class="t-ink" x="8" y="8" width="36" height="8" rx="2"/><rect class="t-mute" x="8" y="20" width="24" height="4" rx="2"/>'
+            + '<path class="t-line t-c" d="M8 58 C22 54 32 48 46 50 S76 40 90 38 106 32 112 30"/>',
+        savedByAccount: '<rect class="t-fill t-c" x="12" y="34" width="12" height="28" rx="2"/><rect class="t-fill t-a" x="12" y="22" width="12" height="10" rx="2"/>'
+            + '<rect class="t-fill t-c" x="36" y="28" width="12" height="34" rx="2"/><rect class="t-fill t-a" x="36" y="16" width="12" height="10" rx="2"/>'
+            + '<rect class="t-fill t-c" x="60" y="38" width="12" height="24" rx="2"/><rect class="t-fill t-a" x="60" y="28" width="12" height="8" rx="2"/>'
+            + '<rect class="t-fill t-c" x="84" y="26" width="12" height="36" rx="2"/><rect class="t-fill t-a" x="84" y="12" width="12" height="12" rx="2"/>',
         merchants: '<circle class="t-fill t-mute" cx="13" cy="15" r="5"/><rect class="t-fill t-b" x="24" y="12" width="80" height="6" rx="3"/>'
             + '<circle class="t-fill t-mute" cx="13" cy="36" r="5"/><rect class="t-fill t-b" x="24" y="33" width="54" height="6" rx="3"/>'
             + '<circle class="t-fill t-mute" cx="13" cy="57" r="5"/><rect class="t-fill t-b" x="24" y="54" width="32" height="6" rx="3"/>',

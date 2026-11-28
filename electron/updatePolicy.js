@@ -10,6 +10,7 @@
 //   • Is a published version newer than this one?     isNewerVersion
 //   • What did the latest-release API answer?         parseLatestRelease
 //   • Does the user want automatic updates?           read/writeUpdatePreferences
+//   • Which command installs a downloaded .deb/.rpm?   packageInstallCommand
 //
 // The preference lives in its own small JSON file in the profile, not in the
 // database's app_settings table: it belongs to the install rather than to any
@@ -137,7 +138,52 @@ function writeUpdatePreferences(dir, prefs) {
     fs.renameSync(tmp, file);
 }
 
+// ─── Package install command ────────────────────────────────────────────────
+//
+// In 'package' mode the downloaded .deb/.rpm goes to the system package manager.
+// electron-updater does that with spawnSync, which freezes the main process for
+// the whole password prompt and transaction; GNOME and KDE then flag the window
+// as not responding. updater.js runs this command asynchronously instead.
+//
+// The same package managers, in the same order, as electron-updater's
+// RpmUpdater/DebUpdater. The file path goes in as "$1", never spliced into the
+// script, so no character in it can change the command. A failed dpkg is
+// followed by apt-get -f in the same shell, so the user is asked for their
+// password once rather than twice.
+//
+// Returns the argv to spawn, or null when this system has no package manager
+// for the type, or no graphical way to ask for a password (updater.js then falls
+// back to electron-updater's own install).
+//   hasCommand(name) → boolean: is `name` on PATH?
+//   isRoot: already running as root, so no pkexec
+
+const PACKAGE_INSTALL_SCRIPTS = {
+    rpm: [
+        ['zypper', 'zypper --non-interactive --no-refresh install --allow-unsigned-rpm -f "$1"'],
+        ['dnf',    'dnf install --nogpgcheck -y "$1"'],
+        ['yum',    'yum install --nogpgcheck -y "$1"'],
+        ['rpm',    'rpm -Uvh --replacepkgs --replacefiles --nodeps "$1"'],
+    ],
+    deb: [
+        ['dpkg', 'dpkg -i "$1" || apt-get install -f -y'],
+        ['apt',  'apt install -y --allow-unauthenticated --allow-downgrades --allow-change-held-packages "$1"'],
+    ],
+};
+
+function packageInstallCommand({ packageType, installerPath, hasCommand, isRoot = false }) {
+    const candidates = PACKAGE_INSTALL_SCRIPTS[packageType];
+    if (!candidates || typeof installerPath !== 'string' || !path.isAbsolute(installerPath)) return null;
+    const found = candidates.find(([name]) => hasCommand(name));
+    if (!found) return null;
+    const shell = ['/bin/bash', '-c', found[1], 'bash', installerPath];
+    if (isRoot) return shell;
+    // --disable-internal-agent: never fall back to a text prompt on a terminal
+    // nobody is looking at; the desktop's polkit agent asks instead.
+    return hasCommand('pkexec') ? ['pkexec', '--disable-internal-agent', ...shell] : null;
+}
+
 module.exports = {
+    packageInstallCommand,
     LATEST_RELEASE_API,
     DOWNLOAD_PAGE_URL,
     DEFAULT_PREFERENCES,

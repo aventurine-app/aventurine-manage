@@ -126,19 +126,6 @@
     gap: 8px;
     min-width: 0;
 }
-.ins-detail-stats {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 12px 32px;
-    /* Holds one line even when empty (the overall index shows no figures),
-       so opening a merchant does not move the chart or the list below. */
-    min-height: 22px;
-    margin-bottom: 8px;
-}
-.ins-mini { display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; }
-.ins-mini-label, .ins-mini-foot { color: var(--ant-color-text-tertiary); font-size: var(--ant-font-size-sm); }
-.ins-mini strong { font-weight: 600; font-variant-numeric: tabular-nums; }
 /* The flex gap already spaces the ⓘ off the title; drop the tip's own margin
    so it sits as close as the ⓘ on every other title. */
 .ins-detail .ant-card-head-title > .ant-info-tip { margin-inline-start: -2px; }
@@ -153,7 +140,6 @@
     font-size: var(--ant-font-size);
     font-weight: normal;
 }
-.ins-detail-stats .ant-statistic-content { font-size: var(--ant-font-size-heading-4); }
 
 /* ─── Merchant table ──────────────────────────────────────────────────────────
    An ant-table like the Transactions ledger (middle size, column splits in the

@@ -61,7 +61,7 @@
   //       so colour never has to carry identity alone.
   //
   // This is the one place the expense side stopped sharing --cat-* with the
-  // Spending report and the Saved & Invested stack. Those two rank and itemize
+  // Spending report and the Saved & Invested by Account card. Those two rank and itemize
   // categories, where a colour is a NAME; here it is a direction.
   //
   // The hub is neither ramp: --chart-net is the palette's green (ant.css). The

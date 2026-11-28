@@ -13,7 +13,8 @@
 //            finished download also installs itself when the app quits.
 //   package  electron-updater checks and downloads the .deb/.rpm; installing
 //            needs an administrator password, so it waits for the user to
-//            click Restart & Install.
+//            click Restart & Install. The install itself runs here, not in
+//            electron-updater (see runPackageInstall).
 //   notify   One request to GitHub's latest-release API. A newer version is
 //            reported with a link to the download page.
 //
@@ -36,6 +37,7 @@
 // publishes it. Releases start as drafts (release.yml), and neither feed shows
 // a draft until someone publishes it by hand.
 
+const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { app, ipcMain, net, shell } = require('electron');
@@ -83,13 +85,53 @@ function readPackageType() {
     }
 }
 
+// PATH with relative entries removed, as electron-updater does, so a writable
+// directory early in PATH can't shadow the package manager.
+function absolutePath() {
+    return (process.env.PATH || '').split(path.delimiter).filter((dir) => path.isAbsolute(dir)).join(path.delimiter);
+}
+
+function hasCommand(name) {
+    return absolutePath().split(path.delimiter).some((dir) => {
+        try {
+            fs.accessSync(path.join(dir, name), fs.constants.X_OK);
+            return true;
+        } catch {
+            return false;
+        }
+    });
+}
+
+// Runs the package manager without blocking the main process. electron-updater
+// installs a .deb/.rpm with spawnSync, so the app stops answering the window
+// manager for the whole password prompt and transaction, and GNOME offers to
+// Force Quit a window that would have restarted on its own a few seconds later.
+// Resolves when the install succeeds; rejects with the exit status and the
+// tail of stderr.
+function runPackageInstall(argv) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(argv[0], argv.slice(1), {
+            stdio: ['ignore', 'ignore', 'pipe'],
+            env:   { ...process.env, PATH: absolutePath() },
+        });
+        let stderr = '';
+        child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-4000); });
+        child.on('error', reject);
+        child.on('close', (code, signal) => {
+            if (code === 0) resolve();
+            else reject(new Error(`${argv[0]} exited with ${signal || code}: ${stderr.trim()}`));
+        });
+    });
+}
+
 function initUpdater({ getWindow }) {
     const prefsDir = app.getPath('userData');
+    const packageType = app.isPackaged && process.platform === 'linux' ? readPackageType() : null;
     const mode = policy.resolveUpdateMode({
-        platform:    process.platform,
-        isPackaged:  app.isPackaged,
-        env:         process.env,
-        packageType: app.isPackaged && process.platform === 'linux' ? readPackageType() : null,
+        platform:   process.platform,
+        isPackaged: app.isPackaged,
+        env:        process.env,
+        packageType,
     });
 
     let prefs = policy.readUpdatePreferences(prefsDir, {
@@ -102,6 +144,10 @@ function initUpdater({ getWindow }) {
     //          | downloaded | installing | error
     //   newVersion, percent, error: present when the state calls for them
     let status = { state: 'idle' };
+
+    // Where electron-updater saved the finished download (package mode installs
+    // it from here).
+    let downloadedFile = null;
 
     function snapshot() {
         return { mode, currentVersion: app.getVersion(), autoUpdate: prefs.autoUpdate, ...status };
@@ -165,7 +211,10 @@ function initUpdater({ getWindow }) {
         updater.on('download-progress', (p) => setStatus({
             state: 'downloading', newVersion: status.newVersion, percent: p.percent,
         }));
-        updater.on('update-downloaded', (info) => setStatus({ state: 'downloaded', newVersion: info.version }));
+        updater.on('update-downloaded', (info) => {
+            downloadedFile = info.downloadedFile;
+            setStatus({ state: 'downloaded', newVersion: info.version });
+        });
         // Every failure, whichever call started it, arrives here. The step is
         // read off the state it interrupted.
         updater.on('error', (err) => {
@@ -233,9 +282,28 @@ function initUpdater({ getWindow }) {
     function install() {
         if (mode === 'notify' || status.state !== 'downloaded') return;
         setStatus({ state: 'installing', newVersion: status.newVersion });
-        // Give the renderer a moment to paint "Installing…": a deb/rpm install
-        // blocks this process while the password prompt is up. The database is
-        // closed by main.js's will-quit handler on the way out.
+        // The database is closed by main.js's will-quit handler on the way out.
+
+        // package: the app stays responsive, showing "Installing…", through the
+        // password prompt and the transaction, then reopens on success. A
+        // cancelled prompt or a failed install lands in fail('install'), which
+        // keeps the download on offer.
+        const argv = mode === 'package' ? policy.packageInstallCommand({
+            packageType,
+            installerPath: downloadedFile,
+            hasCommand,
+            isRoot: process.getuid?.() === 0,
+        }) : null;
+        if (argv) {
+            runPackageInstall(argv).then(() => {
+                app.relaunch();
+                app.quit();
+            }, (err) => fail('install', err));
+            return;
+        }
+
+        // replace, or a Linux system without pkexec: electron-updater installs.
+        // Give the renderer a moment to paint "Installing…" first.
         //   isSilent=false: the Windows installer shows its progress window.
         //   isForceRunAfter=true: reopen Aventurine Manage when it's done.
         setTimeout(() => getUpdater().quitAndInstall(false, true), 150);

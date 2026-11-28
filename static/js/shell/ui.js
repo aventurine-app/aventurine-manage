@@ -38,8 +38,8 @@
 //
 //   UI.wirePicker(btnId, menuId, onPick?) → { close } | null
 //       The app's one dropdown-picker shape, shared by every report header's
-//       range / year control (Spending, Top Merchants, Saved & Invested,
-//       Forecast, Metrics, Cash Flow). Six copies of this had diverged — one
+//       range / year control (Spending, Top Merchants, Forecast, Metrics,
+//       Cash Flow). Six copies of this had diverged — one
 //       was missing its "element missing" guard, two were missing the
 //       btn.disabled check that stops an empty picker from opening. onPick is
 //       DELEGATED off the menu, so the year pickers whose menus are rebuilt per

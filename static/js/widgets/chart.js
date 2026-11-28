@@ -2,8 +2,8 @@
 
 // ─── chart.js ────────────────────────────────────────────────────────────────
 // The app's month-by-month charts, exposed as window.FinanceChart and drawn by
-// Apache ECharts through widgets/echart-kit.js. Used by the Dashboard's line
-// and Spending cards and by Reports → Saved & Invested.
+// Apache ECharts through widgets/echart-kit.js. Used by the Dashboard's line,
+// Spending and Saved & Invested cards.
 //
 // Three forms over the same months:
 //   render()        LINES: one measure over time, smoothed, each with a soft

@@ -9,7 +9,7 @@
 //
 // Two cards rather than two sections of one: they answer two separate
 // questions, and the card border is the separator this page already uses (the
-// Spending and Saved & Invested tabs are each two cards). The frames, titles and
+// Spending tab is two cards). The frames, titles and
 // tooltips are static markup in pages/reports.html — this file fills them — so
 // the year picker keeps the one listener UI.wirePicker bound to it.
 //

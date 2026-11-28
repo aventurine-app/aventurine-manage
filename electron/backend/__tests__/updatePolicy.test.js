@@ -186,3 +186,43 @@ test('preferences: writing anything but a boolean throws and keeps the old file'
   assert.throws(() => policy.writeUpdatePreferences(dir, { autoUpdate: 'on' }), TypeError);
   assert.deepStrictEqual(policy.readUpdatePreferences(dir), { autoUpdate: false });
 });
+
+// ── packageInstallCommand ───────────────────────────────────────────────────
+// The argv updater.js spawns, without blocking, to install a .deb/.rpm.
+
+const has = (...names) => (name) => names.includes(name);
+const RPM = '/home/u/.cache/aventurine-manage-updater/pending/Aventurine Manage-1.2.3.x86_64.rpm';
+
+test('package install: Fedora runs dnf through pkexec, path passed as an argument', () => {
+  assert.deepStrictEqual(policy.packageInstallCommand({
+    packageType: 'rpm', installerPath: RPM, hasCommand: has('dnf', 'rpm', 'pkexec'),
+  }), ['pkexec', '--disable-internal-agent', '/bin/bash', '-c', 'dnf install --nogpgcheck -y "$1"', 'bash', RPM]);
+});
+
+test('package install: the file path never becomes part of the script', () => {
+  const evil = '/tmp/x"; rm -rf ~; ".rpm';
+  const argv = policy.packageInstallCommand({ packageType: 'rpm', installerPath: evil, hasCommand: has('dnf', 'pkexec') });
+  assert.equal(argv.at(-1), evil);
+  assert.ok(!argv.slice(0, -1).some((a) => a.includes('rm -rf')));
+});
+
+test('package install: deb tries dpkg, then fixes dependencies, under one prompt', () => {
+  const argv = policy.packageInstallCommand({ packageType: 'deb', installerPath: '/x/a.deb', hasCommand: has('dpkg', 'apt', 'pkexec') });
+  assert.equal(argv.filter((a) => a === 'pkexec').length, 1);
+  assert.equal(argv[4], 'dpkg -i "$1" || apt-get install -f -y');
+});
+
+test('package install: root skips pkexec', () => {
+  assert.equal(policy.packageInstallCommand({
+    packageType: 'rpm', installerPath: RPM, hasCommand: has('dnf'), isRoot: true,
+  })[0], '/bin/bash');
+});
+
+test('package install: no pkexec, no package manager, a relative path or an unknown type give null', () => {
+  const base = { packageType: 'rpm', installerPath: RPM, hasCommand: has('dnf', 'pkexec') };
+  assert.equal(policy.packageInstallCommand({ ...base, hasCommand: has('dnf') }), null);
+  assert.equal(policy.packageInstallCommand({ ...base, hasCommand: has('pkexec') }), null);
+  assert.equal(policy.packageInstallCommand({ ...base, installerPath: 'a.rpm' }), null);
+  assert.equal(policy.packageInstallCommand({ ...base, installerPath: null }), null);
+  assert.equal(policy.packageInstallCommand({ ...base, packageType: 'pacman' }), null);
+});

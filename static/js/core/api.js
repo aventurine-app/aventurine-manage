@@ -260,60 +260,6 @@
   // backend route implemented in electron/backend/handlers/ and must stay
   // shape-compatible with it, since pages cannot distinguish the two sources.
   // Comments below name the primary page or widget each entry feeds.
-  // static/js/pages/transfers.js — the Saved & Invested report. Built the way
-  // the real handler builds it (per-account months first, totals derived from
-  // them), so the stack sums to the line here as it does against the backend.
-  // One fixture serves every window, since query strings are not modeled
-  // — the picker changes the label and not the bars. Nine accounts on purpose:
-  // eight get a palette slot and the ninth has to fold into "Other", which is
-  // the case the legend and the neutral swatch exist for. A band is a Transfer
-  // ROW of the Cash Flow grid, so the names are categories and the links carry
-  // the category key; the uncategorized band is here too, since it is the one
-  // band the statement has no row for and therefore the one that never links.
-  const transfersFixture = (() => {
-    const rows = [
-      { key: 'investing', name: 'Investing',        cat: 'investing', base: 600, drift: 12 },
-      { key: 'savings',   name: 'Savings',          cat: 'savings',   base: 400, drift: 8 },
-      { key: 'cat_31',    name: 'Brokerage',        cat: 'cat_31',    base: 180, drift: -4 },
-      { key: 'cat_32',    name: 'Crypto',           cat: 'cat_32',    base: 120, drift: 6 },
-      { key: 'cat_33',    name: 'Emergency Fund',   cat: 'cat_33',    base: 95,  drift: 0 },
-      { key: 'cat_34',    name: 'College Fund',     cat: 'cat_34',    base: 75,  drift: 3 },
-      { key: 'cat_35',    name: 'Roth IRA',         cat: 'cat_35',    base: 60,  drift: 2 },
-      { key: '__uncategorized__', name: 'Uncategorized', cat: null,   base: 50,  drift: 1 },
-      { key: 'cat_36',    name: 'Vacation Fund',    cat: 'cat_36',    base: 40,  drift: 0 },
-    ];
-    const monthly = {};
-    let total = 0;
-    const accounts = rows.map((b) => {
-      const m = {};
-      trendsMonths.forEach((ym, i) => {
-        // Every third month sits out, so the stack has gaps and short columns
-        // to draw rather than eight flat bands of identical height.
-        const v = i % 3 === 1 && b.base < 200 ? 0 : Math.max(Math.round(b.base + b.drift * i), 0);
-        if (!v) return;
-        m[ym] = v;
-        monthly[ym] = (monthly[ym] || 0) + v;
-        total += v;
-      });
-      return { key: b.key, name: b.name, cat: b.cat, total: Object.values(m).reduce((a, c) => a + c, 0), monthly: m };
-    });
-    // The folded tail: more than one account, so it carries no category key and
-    // wears a neutral instead of a ninth hue.
-    const otherMonthly = {};
-    trendsMonths.forEach((ym, i) => {
-      const v = 25 + (i % 4) * 10;
-      otherMonthly[ym] = v;
-      monthly[ym] = (monthly[ym] || 0) + v;
-      total += v;
-    });
-    accounts.push({
-      key: '__other__', name: 'Other', cat: null,
-      total: Object.values(otherMonthly).reduce((a, c) => a + c, 0),
-      monthly: otherMonthly,
-    });
-    return { ok: true, window: 12, months: trendsMonths, total, monthly, accounts, everTransferred: true };
-  })();
-
   // static/js/pages/metrics.js — the Metrics report: one year's totals, the
   // ratios behind them, and pass/fail goal checks. FIVE years, so the
   // sparklines on the headline figures have a shape to draw and the year picker
@@ -597,8 +543,6 @@
       const total = Math.round(merchants.reduce((a, m) => a + m.total, 0) * 1.18 * 100) / 100;
       return { ok: true, window: 12, from: merchantFrom, category: null, limit: 20, total, merchants };
     })(),
-    // static/js/pages/transfers.js — see transfersFixture above.
-    '/api/transfers': transfersFixture,
     // static/js/widgets/forecast.js — see forecastFixture above.
     '/api/forecast': forecastFixture,
     // static/js/pages/metrics.js — see reportCardFixture above.

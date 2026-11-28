@@ -49,7 +49,7 @@ const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 // refused at the door instead of stored and silently skipped on every load.
 const CARD_TYPES = new Set([
   'networth', 'accounts', 'incomeExpenses', 'cashflow', 'balances', 'spending', 'monthlySpending',
-  'budgets', 'savingsRate', 'merchants', 'transactions', 'upcoming', 'forecast',
+  'budgets', 'savingsRate', 'savedInvested', 'savedByAccount', 'merchants', 'transactions', 'upcoming', 'forecast',
 ]);
 
 // Period presets (static/js/widgets/dashperiod.js): the calendar month, trailing

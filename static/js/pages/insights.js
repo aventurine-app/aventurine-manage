@@ -40,7 +40,9 @@
   const state = { inflation: null, beta: null, selected: null, sort: null, view: 'merchants' };
   // Both inflation charts share one height, so swapping between the index and
   // a merchant does not move the list under them.
-  const CHART_H = 200;
+  // 242 = the old 200 plus the 30px the figures row under the title took,
+  // then 5% taller.
+  const CHART_H = 242;
 
   // ─── Formatting ────────────────────────────────────────────────────────────
 
@@ -281,27 +283,22 @@
   function renderMerchantDetail() {
     const m = findItem(state.selected);
     const title = document.getElementById('inflation-detail-title');
-    const statsEl = document.getElementById('inflation-detail-stats');
     const link = document.getElementById('inflation-detail-link');
     const host = document.getElementById('inflation-chart');
     if (!host) return;
     if (!m) { renderOverall(); return; }
 
     const isCat = m.key.startsWith('c:');
-    title.innerHTML = `${isCat ? '' : merchantAvatarHtml(m.name)}<span>${escapeHtml(m.name)}</span>`;
+    // The change sits in the title, as on the overall index; the chart keeps
+    // the two windows' bills, so no caption row of figures under it.
+    const dir = dirOf(m.change);
+    title.innerHTML = `${isCat ? '' : merchantAvatarHtml(m.name)}<span>${escapeHtml(m.name)}</span>`
+      + `<span class="ins-head-figure ins-${dir}">${arrow(m.change)} ${pct(m.change)}</span><span class="ins-head-since">over 12 months</span>`;
     const href = isCat ? `/transactions?cat=${encodeURIComponent(m.cat)}`
       : m.search ? `/transactions?name=${encodeURIComponent(m.search)}` : '';
     link.innerHTML = `${href
       ? `<a class="ant-btn ant-btn-link ant-btn-sm" href="${escapeHtml(href)}">See transactions</a>`
       : ''}<button type="button" class="ant-btn ant-btn-default ant-btn-sm" data-action="overall">${Ant.icon('close')}<span>Back to overall</span></button>`;
-    const dir = dirOf(m.change);
-    const mini = (label, value, foot) =>
-      `<span class="ins-mini"><span class="ins-mini-label">${label}</span><strong>${value}</strong><span class="ins-mini-foot">${foot}</span></span>`;
-    statsEl.innerHTML = [
-      mini(rangeLabel(m.prior_window), money(m.early_avg), `avg of ${m.early_visits}`),
-      mini(rangeLabel(m.recent_window), money(m.recent_avg), `avg of ${m.recent_visits}`),
-      mini('Change', `<span class="ins-${dir}">${arrow(m.change)} ${pct(m.change)}</span>`, 'over 12 months'),
-    ].join('');
     drawVisits(host, m);
   }
 
@@ -311,10 +308,8 @@
     const d = state.inflation;
     const host = document.getElementById('inflation-chart');
     document.getElementById('inflation-detail-link').innerHTML = '';
-    const statsEl = document.getElementById('inflation-detail-stats');
     const tr = d.trend || [];
     if (tr.length < 2) {
-      statsEl.innerHTML = '';
       clearChart(host);
       host.innerHTML = Ant.empty({ compact: true, title: 'Not enough history for a trend yet',
         desc: `Pick a ${isCatView() ? 'category' : 'merchant'} below to see its bills.` });
@@ -328,9 +323,6 @@
       'How much more or less you paid per visit at the places you go regularly than a year earlier, month by month: the same 12-month change the reported CPI is quoted as. '
       + 'Each month compares the average bill at each place over the 3 months to that month with the same 3 months a year before, averaged with every place counted equally.')}
       <span class="ins-head-figure ins-${dirOf(chg)}">${arrow(chg)} ${pct(chg)}</span><span class="ins-head-since">over the year to ${ymLabel(lastPt.ym)}</span>`;
-    // No caption: the row keeps its height (min-height in insights.css), so
-    // opening a merchant's figures does not push the chart or the list down.
-    statsEl.innerHTML = '';
     drawTrend(host, tr);
   }
 

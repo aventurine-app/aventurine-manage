@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="/static/css/echart.css">
     <link rel="stylesheet" href="/static/css/forecast.css">
     <link rel="stylesheet" href="/static/css/trends.css">
-    <link rel="stylesheet" href="/static/css/transfers.css">
     <link rel="stylesheet" href="/static/css/metrics.css">
     <link rel="stylesheet" href="/static/css/insights.css">
 </head>
@@ -35,8 +34,6 @@
             data-tab="cashflow" aria-controls="rep-panel-cashflow" aria-selected="true">Cash Flow</button>
         <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-spending" role="tab"
             data-tab="spending" aria-controls="rep-panel-spending" aria-selected="false" tabindex="-1">Spending</button>
-        <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-transfers" role="tab"
-            data-tab="transfers" aria-controls="rep-panel-transfers" aria-selected="false" tabindex="-1">Saved &amp; Invested</button>
         <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-forecast" role="tab"
             data-tab="forecast" aria-controls="rep-panel-forecast" aria-selected="false" tabindex="-1">Forecast</button>
         <button type="button" class="rep-tab ant-tabs-tab" id="rep-tab-metrics" role="tab"
@@ -169,77 +166,6 @@
 
         <div class="ant-card-body" id="merchants-chart"></div>
     </section>
-
-</div>
-
-    </div><!-- /.rep-panel -->
-
-    <div class="rep-panel" id="rep-panel-transfers" role="tabpanel"
-        data-panel="transfers" aria-labelledby="rep-tab-transfers" tabindex="0" hidden>
-
-<div class="tfr-page">
-
-    <!-- Investing. Two cards, ONE picker: the second card is the first one
-         broken out by account — one band per Transfer row of the Cash Flow
-         grid — so the two are readings of the same statement cells over the
-         same months and the stack has to total the line. Two pickers would
-         let them fall out of step, and a stack that doesn't explain the chart
-         beside it is worse than no second chart. The panel-level toolbar row is
-         the sanctioned home for a control that scopes more than one card (see
-         the note at the top of this file); a report's controls still never get
-         hoisted into the tab bar. Controller: static/js/pages/transfers.js.
-
-         The two cards sit SIDE BY SIDE in .tfr-charts. Both charts are the same
-         months at the same width, so they draw at the same height and their
-         month axes line up across the gap — which is the whole reason to put a
-         stack next to the line it totals rather than under it, since comparing
-         a column to its point no longer costs a scroll. -->
-    <div class="tfr-toolbar">
-        <div class="range-selector" id="transfers-range">
-            <button class="range-selector-btn" id="transfers-range-btn" type="button"
-                aria-haspopup="menu" title="Time frame for both charts">12 Months<span class="anticon picker-caret" data-ant-icon="down" aria-hidden="true"></span></button>
-            <div class="range-selector-menu" id="transfers-range-menu" hidden>
-                <button data-window="3"  type="button">3 Months</button>
-                <button data-window="6"  type="button">6 Months</button>
-                <button data-window="12" type="button">12 Months</button>
-                <button data-window="24" type="button">24 Months</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="tfr-charts">
-
-    <section class="ant-card tfr-card" aria-labelledby="transfers-title">
-        <div class="ant-card-head"><div class="ant-card-head-wrapper">
-            <h2 class="ant-card-head-title" id="transfers-title">Saved &amp; Invested Over Time<span class="ant-info-tip" tabindex="0" role="note"
-                aria-label="How much you moved into your own savings and investment accounts each month. Any category you have set to Transfer counts, so nothing needs sorting by hand. Money moved this way is never counted as spending, so this is the one place it is reported. The current, incomplete month is excluded."
-                data-tip="How much you moved into your own savings and investment accounts each month. Any category you have set to Transfer counts, so nothing needs sorting by hand. Money moved this way is never counted as spending, so this is the one place it is reported. The current, incomplete month is excluded."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
-            <div class="ant-card-extra tfr-total" id="transfers-total"></div>
-        </div></div>
-
-        <div class="ant-card-body">
-            <div class="chart-area">
-                <div id="transfers-chart" class="ec-box"></div>
-            </div>
-        </div>
-    </section>
-
-    <section class="ant-card tfr-card" aria-labelledby="transfers-accounts-title">
-        <div class="ant-card-head"><div class="ant-card-head-wrapper">
-            <h2 class="ant-card-head-title" id="transfers-accounts-title">Saved &amp; Invested by Account<span class="ant-info-tip" tabindex="0" role="note"
-                aria-label="The same months split by which of your accounts the money went into, taken from the Transfer rows of the Cash Flow statement. The eight biggest get their own color and everything else is grouped as Other, so the columns always add up to the trend chart. Click a name to see those transactions."
-                data-tip="The same months split by which of your accounts the money went into, taken from the Transfer rows of the Cash Flow statement. The eight biggest get their own color and everything else is grouped as Other, so the columns always add up to the trend chart. Click a name to see those transactions."><span class="anticon" data-ant-icon="info-circle-outlined" aria-hidden="true"></span></span></h2>
-        </div></div>
-
-        <div class="ant-card-body">
-            <div class="chart-area">
-                <div id="transfers-accounts-chart" class="ec-box"></div>
-            </div>
-            <div class="tfr-legend" id="transfers-legend"></div>
-        </div>
-    </section>
-
-    </div><!-- /.tfr-charts -->
 
 </div>
 
@@ -418,7 +344,6 @@
                 <div class="ant-card-extra ins-detail-extra" id="inflation-detail-link"></div>
             </div></div>
             <div class="ant-card-body">
-                <div class="ins-detail-stats" id="inflation-detail-stats"></div>
                 <div class="chart-area"><div class="ins-plot" id="inflation-chart"></div></div>
             </div>
         </section>
@@ -522,7 +447,6 @@
     <script src="/static/js/widgets/spending-echart.js"></script>
     <script src="/static/js/pages/trends.js"></script>
     <script src="/static/js/pages/topmerchants.js"></script>
-    <script src="/static/js/pages/transfers.js"></script>
     <script src="/static/js/pages/metrics.js"></script>
     <script src="/static/js/pages/insights.js"></script>
 </body>

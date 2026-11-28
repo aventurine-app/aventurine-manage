@@ -927,12 +927,6 @@ app.whenReady().then(async () => {
       await shotEl('spending-category-chips', '#trends-rail', 8);
       await shotEl('reports-top-merchants', '.rep-panel:not([hidden]) .trends-card:last-of-type', 10);
 
-      await click('#rep-tab-transfers');
-      await sleep(2500);
-      await unhover();
-      await shotEl('reports-saved-invested', '.rep-panel:not([hidden]) .tfr-card', 10);
-      await shotEl('reports-saved-invested-merchants', '.rep-panel:not([hidden]) .tfr-card:last-of-type', 10);
-
       await click('#rep-tab-forecast');
       await sleep(3000);
       await unhover();
